@@ -1,0 +1,12 @@
+id,chapter_key,name,title,year_range,unlock_avatars_required,theme_color,description
+1,ANALOG,Analog Birth,디지털 이전의 시작,1974~1980,0,#f5f5dc,아동용 크레용 일러스트와 아날로그의 향수
+2,ARCADE,Arcade Pixel,첫 디지털 경험,1981~1986,5,#ff1a1a,8비트 픽셀 아트와 오락실의 흥분
+3,CONSOLE,Console Sprite,가정용 게임기 시대,1986~1991,5,#00ccff,16비트 스프라이트와 RPG의 추억
+4,KETEL,KETEL Connect,최초 네트워크 접속,1994~1996,8,#0000ff,PC통신의 시작과 모뎀의 소음
+5,PORTAL,Portal Explorer,초기 웹 탐험 시대,1996~1999,10,#9370db,웹 1.0과 정보의 바다 탐험
+6,COMMUNITY,Community Era,온라인 커뮤니티 시대,1999~2002,10,#32cd32,게시판과 동호회 그리고 유대감
+7,MESSENGER,Messenger Identity,실시간 연결 시대,2002~2005,12,#ffa500,실시간 메신저와 디지털 정체성
+8,AVATAR_ECONOMY,Avatar Economy,디지털 꾸미기 시대,2005~2008,12,#ff69b4,싸이월드 감성과 아바타 꾸미기
+9,MMORPG,MMORPG Awakening,첫 온라인 자아 생성,2008~2012,15,#ffd700,대규모 판타지 세계와 온라인 자아
+10,MOBILE,Mobile Social,모바일 소셜 혁명,2012~2016,18,#1e90ff,언제 어디서나 연결된 세상
+11,AI_METAVERSE,AI Metaverse,디지털 평행 세계,2016~2024,20,#00fa9a,가상과 현실의 경계가 무너진 시대

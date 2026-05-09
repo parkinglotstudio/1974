@@ -1,0 +1,226 @@
+# Animation Production Brief
+
+## NO MEMORY Intro
+
+Create a dynamic pixel intro animation for a retro nostalgia game.
+
+---
+
+## Visual Style
+
+Style:
+
+* 1-bit / monochrome pixel art
+* black background
+* white pixels
+* retro CRT aesthetic
+* minimal UI
+* low fps (8~12fps feel)
+
+Effects:
+
+* CRT flicker
+* scanline
+* subtle glitch
+* particle pixels
+* motion typography
+
+Reference mood:
+
+* emotional pixel animation
+* retro terminal
+* arcade nostalgia
+
+---
+
+## Animation Sequence
+
+### 01
+
+Black screen
+
+Text:
+...
+
+Pause 2 sec
+
+---
+
+### 02
+
+Single pixel appears.
+
+Pixel expands like signal pulse.
+
+Text:
+INITIALIZING
+
+---
+
+### 03
+
+NO MEMORY title enters dynamically.
+
+Animation:
+
+* fly in
+* rotate
+* zoom
+* bounce
+* glitch
+
+Subtitle:
+I don't remember.
+
+Title breaks into particles.
+
+---
+
+### 04
+
+Tiny baby sprite appears.
+
+Animation:
+
+* lying
+* crawling
+
+Text:
+SPAWNED
+
+---
+
+### 05
+
+Growth sequence.
+
+Character animation:
+
+* crawl
+* stand
+* walk
+* run
+
+Text:
+GROWTH DETECTED
+
+---
+
+### 06
+
+Timeline run sequence.
+
+Character runs across screen.
+
+Years appear:
+1974
+1975
+1976
+1977
+1978
+1979
+1980
+
+Scrolling background.
+
+---
+
+### 07
+
+Memory fragments orbit.
+
+Words:
+HOME
+MOTHER
+STREET
+FRIEND
+SCHOOL
+
+---
+
+### 08
+
+School gate appears.
+
+Text:
+ENTERING SYSTEM
+
+Character enters school.
+
+---
+
+### 09
+
+Unknown signal detected.
+
+Far neon glow appears.
+
+Text:
+UNKNOWN SIGNAL DETECTED
+
+Character stops and turns.
+
+---
+
+### 10
+
+Arcade machine reveal.
+
+First color appears only here.
+
+Allowed colors:
+
+* cyan
+* magenta
+* yellow
+
+Text:
+INSERT COIN
+
+Character inserts coin.
+
+Flash.
+
+---
+
+### 11
+
+Final title.
+
+NO MEMORY
+
+Subtitle:
+But I remember this.
+
+Auto transition to Chapter 02.
+
+---
+
+## Technical Specs
+
+Resolution:
+1920x1080 or 1080x1920
+
+Frame rate feel:
+8~12fps
+
+Duration:
+20~35 seconds
+
+Export:
+MP4 + transparent assets if possible
+
+---
+
+## Important
+
+This animation must feel dynamic and playful.
+
+Not static text slideshow.
+
+Need:
+
+* motion
+* growth
+* speed
+* emotional digital awakening

@@ -1,0 +1,179 @@
+/* ══════════════════════════════════════════════════════════════
+   PC Communication (KETEL) Styles - 100% PERFECT PORT (ORIGINAL)
+   ══════════════════════════════════════════════════════════════ */
+
+#pc-comm-scene {
+  --bg:      #000033;
+  --bg2:     #000044;
+  --bg3:     #000055;
+  --bg4:     #001166;
+  --border:  #0033aa;
+  --border2: #0044cc;
+  --border3: #002288;
+  --text:    #ffffff;
+  --text2:   #88ffff;
+  --text3:   #0088ff;
+  --bright:  #ffffff;
+  --white:   #ffffff;
+  --green:   #88ffff;
+  --yellow:  #ffffff;
+  --red:     #ffffff;
+  --cyan:    #00ffff;
+  --cyan2:   #00ccff;
+  --dim:     #002266;
+
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 30%,#001428 0%,#000710 50%,#00040a 100%);
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  color: var(--text);
+  overflow: hidden;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* ── CRT ── */
+#pc-comm-scene .crt-overlay {
+  position: absolute; inset: 0; pointer-events: none; z-index: 9999;
+}
+#pc-comm-scene .crt-overlay::before {
+  content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,8,20,.1) 2px, rgba(0,8,20,.1) 4px);
+}
+#pc-comm-scene .crt-overlay::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,.6) 100%);
+}
+
+/* ── Phone Frame ── */
+#pc-comm-scene .phone-frame {
+  width: 390px; height: 100%; max-width: 100vw; background: var(--bg);
+  position: relative; overflow: hidden;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 0 1px rgba(0,60,120,.3), 0 0 40px rgba(0,100,200,.12), 0 0 80px rgba(0,60,150,.08), inset 0 0 80px rgba(0,20,60,.3);
+}
+
+/* ── Keyframes ── */
+@keyframes blink { 0%,100% {opacity:1} 50% {opacity:0} }
+@keyframes fadein { from {opacity:0; transform:translateY(4px)} to {opacity:1; transform:none} }
+@keyframes glow-pulse { 0%,100% {text-shadow:0 0 6px rgba(0,200,255,.5)} 50% {text-shadow:0 0 18px rgba(0,220,255,.9), 0 0 40px rgba(0,180,255,.4)} }
+@keyframes cursor-blink { 0%,49% {opacity:1} 50%,100% {opacity:0} }
+@keyframes progress-fill { from {width:0} to {width:var(--target-w)} }
+@keyframes scan-down { 0% {transform:translateY(-100%)} 100% {transform:translateY(100vh)} }
+
+/* ── Layers ── */
+#pc-comm-scene .layer { display: none; position: absolute; inset: 0; flex-direction: column; background: var(--bg); }
+#pc-comm-scene .layer.on { display: flex; }
+
+/* ── Common ── */
+#pc-comm-scene .kbtn {
+  background: transparent; border: 1px solid var(--border3); color: var(--text2);
+  font-family: 'Share Tech Mono', monospace; font-size: 8px; padding: 5px 10px;
+  cursor: pointer; letter-spacing: .05em; transition: all .12s;
+}
+#pc-comm-scene .kbtn:hover { background: var(--bg4); color: var(--bright); border-color: var(--text); box-shadow: 0 0 8px rgba(0,160,255,.15); }
+#pc-comm-scene .kbtn.primary { border-color: var(--cyan2); color: var(--cyan); }
+#pc-comm-scene .kbtn.sm { font-size: 7px; padding: 3px 7px; }
+
+/* ── Layer 0: Connect ── */
+#pc-comm-scene #layerConnect { padding-top: 60px; }
+#pc-comm-scene .win-box { width: calc(100% - 20px); border: 1px solid var(--border2); background: var(--bg2); margin: 0 10px; }
+#pc-comm-scene .win-titlebar { background: linear-gradient(90deg,#001e50,#003080,#001e50); border-bottom: 1px solid var(--border2); padding: 4px 8px; display: flex; justify-content: space-between; align-items: center; }
+#pc-comm-scene .win-title { font-family: 'VT323', monospace; font-size: 14px; color: var(--white); }
+#pc-comm-scene .win-btn { width: 14px; height: 12px; border: 1px solid var(--border2); font-size: 8px; color: var(--text3); display: flex; align-items: center; justify-content: center; }
+#pc-comm-scene .connect-body { padding: 12px 14px; }
+#pc-comm-scene .connect-icons { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px 12px; border-bottom: 1px dashed var(--dim); margin-bottom: 12px; }
+#pc-comm-scene .ascii-icon { font-size: 9px; line-height: 1.2; color: var(--text2); text-align: center; }
+#pc-comm-scene .connect-status-text { font-family: 'VT323', monospace; font-size: 16px; color: var(--white); text-align: center; margin-bottom: 10px; animation: glow-pulse 2s ease-in-out infinite; }
+#pc-comm-scene .progress-wrap { border: 1px solid var(--border2); height: 18px; position: relative; margin-bottom: 10px; background: rgba(0,10,30,.6); overflow: hidden; }
+#pc-comm-scene .progress-fill { height: 100%; background: linear-gradient(90deg,#0040a0,#0080dd,#00aaff,#0080dd); transition: width .3s ease; }
+#pc-comm-scene .progress-pct { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 13px; color: var(--white); font-family: 'VT323', monospace; }
+#pc-comm-scene .status-grid { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; font-size: 8.5px; border: 1px solid var(--dim); padding: 7px 10px; margin-bottom: 10px; background: rgba(0,5,20,.4); }
+#pc-comm-scene .sg-label { color: var(--text3); }
+#pc-comm-scene .sg-val { color: var(--bright); }
+#pc-comm-scene .conn-log { font-size: 7.5px; line-height: 1.7; border: 1px solid var(--dim); padding: 6px 8px; background: rgba(0,5,15,.5); max-height: 90px; overflow: hidden; }
+
+/* ── Layer 1: Main ── */
+#pc-comm-scene #layerMain { overflow-y: auto; padding-top: 40px; }
+#pc-comm-scene .main-header { padding: 12px 10px 10px; border-bottom: 1px solid var(--border2); position: relative; }
+#pc-comm-scene .ketel-logo { font-family: 'VT323', monospace; font-size: 54px; color: var(--cyan); text-align: center; line-height: 1; animation: glow-pulse 3s ease-in-out infinite; position: relative; }
+#pc-comm-scene .ketel-logo::after { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle,rgba(0,0,0,.5) 1px,transparent 1px); background-size: 3px 3px; pointer-events: none; }
+#pc-comm-scene .ketel-sub { font-size: 8px; color: var(--text2); text-align: center; margin-top: 4px; }
+#pc-comm-scene .ketel-welcome {
+  font-family:'VT323',monospace;font-size:16px;color:var(--white);
+  text-align:center;margin-top:6px;letter-spacing:.08em;
+  text-shadow:0 0 10px rgba(200,240,255,.5);
+}
+#pc-comm-scene .main-menu-section { padding: 10px 12px 6px; border-bottom: 1px solid var(--dim); }
+#pc-comm-scene .menu-item { display: flex; align-items: center; gap: 10px; padding: 7px 8px; cursor: pointer; border-bottom: 1px solid rgba(8,31,58,.6); font-size: 10px; color: var(--text2); }
+#pc-comm-scene .menu-num { font-family: 'VT323', monospace; font-size: 14px; color: var(--text3); width: 18px; flex-shrink: 0; }
+#pc-comm-scene .menu-item:hover { background: var(--bg4); color: var(--bright); }
+#pc-comm-scene .menu-item.highlight .menu-name { color: var(--yellow); }
+
+#pc-comm-scene .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); margin: 10px 10px 8px; border-top: 1px solid var(--dim); border-left: 1px solid var(--dim); }
+#pc-comm-scene .icon-cell { border-right: 1px solid var(--dim); border-bottom: 1px solid var(--dim); padding: 10px 6px 8px; display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer; background: rgba(0,8,22,.3); }
+#pc-comm-scene .icon-label { font-size: 7px; color: var(--text3); }
+#pc-comm-scene .dot-icon { width: 40px; height: 34px; overflow: visible; }
+#pc-comm-scene .dot-icon circle { fill: var(--text2); opacity: .85; }
+
+#pc-comm-scene .woman-ascii-wrap pre {
+  animation: flicker 4s linear infinite;
+  image-rendering: pixelated;
+  filter: contrast(1.2) brightness(1.2);
+  width: 100%;
+  font-size: 0.8em;
+}
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  95% { opacity: 1; }
+  96% { opacity: 0.8; }
+  97% { opacity: 1; }
+  98% { opacity: 0.9; }
+  99% { opacity: 1; }
+}
+
+#pc-comm-scene .main-prompt { padding: 8px 12px 10px; display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--dim); font-size: 9px; }
+#pc-comm-scene .main-statusbar, #pc-comm-scene .statusbar { background: var(--bg2); border-top: 1px solid var(--border); padding: 3px 10px; display: flex; justify-content: space-between; font-size: 7px; color: var(--text3); }
+
+/* ── Layer 2: BBS ── */
+#pc-comm-scene .topbar { background: var(--bg2); border-bottom: 1px solid var(--border2); flex-shrink: 0; }
+#pc-comm-scene .topbar-title { padding: 5px 10px 4px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--dim); }
+#pc-comm-scene .logo { font-family: 'VT323', monospace; font-size: 15px; color: var(--cyan); cursor: pointer; }
+#pc-comm-scene .info { font-size: 7.5px; color: var(--text3); }
+#pc-comm-scene .tabs { display: flex; height: 28px; }
+#pc-comm-scene .tab { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 8.5px; color: var(--text3); cursor: pointer; border-right: 1px solid var(--dim); }
+#pc-comm-scene .tab.on { background: var(--bg4); color: var(--bright); border-bottom: 2px solid var(--cyan); }
+
+#pc-comm-scene .scene { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+#pc-comm-scene .scene.on { display: flex; }
+
+#pc-comm-scene .bbs-header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 6px 10px; flex-shrink: 0; }
+#pc-comm-scene .bbs-title { font-family: 'VT323', monospace; font-size: 15px; color: var(--cyan); }
+#pc-comm-scene .bbs-stat { font-size: 7px; color: var(--text3); background: rgba(0,30,70,.5); padding: 1px 5px; }
+#pc-comm-scene .bbs-nav { display: flex; gap: 0; font-size: 7.5px; color: var(--text3); border: 1px solid var(--dim); }
+#pc-comm-scene .bbs-nav span { padding: 2px 8px; border-right: 1px solid var(--dim); cursor: pointer; }
+#pc-comm-scene .bbs-nav span.on { background: rgba(0,100,180,.2); color: var(--cyan); }
+
+#pc-comm-scene .bbs-cols { display: grid; grid-template-columns: 28px 1fr 58px 30px; padding: 4px 8px; font-size: 7px; color: var(--text3); border-bottom: 1px solid var(--border); background: rgba(0,20,50,.5); }
+#pc-comm-scene .bbs-row { display: grid; grid-template-columns: 28px 1fr 58px 30px; padding: 6px 8px; font-size: 8px; color: var(--text2); cursor: pointer; border-bottom: 1px solid rgba(8,31,58,.8); }
+#pc-comm-scene .bbs-row:hover { background: var(--bg4); color: var(--bright); }
+
+#pc-comm-scene .post-view { flex: 1; overflow-y: auto; padding: 10px; }
+#pc-comm-scene .post-subject { font-family: 'VT323', monospace; font-size: 14px; color: var(--white); margin-bottom: 5px; }
+#pc-comm-scene .post-meta { font-size: 7px; color: var(--text3); display: flex; gap: 8px; margin-bottom: 10px; }
+#pc-comm-scene .post-body { font-size: 9px; color: var(--text); line-height: 1.85; white-space: pre-wrap; }
+
+/* ── Chat ── */
+#pc-comm-scene .chat-msgs { flex: 1; overflow-y: auto; padding: 6px 8px; display: flex; flex-direction: column; gap: 1px; }
+#pc-comm-scene .cmsg { font-size: 8.5px; line-height: 1.65; }
+#pc-comm-scene .cmsg .ts { font-size: 7px; color: var(--text3); margin-right: 4px; }
+#pc-comm-scene .chat-input-wrap { padding: 5px 7px; background: var(--bg2); border-top: 1px solid var(--border); display: flex; gap: 4px; align-items: center; }
+#pc-comm-scene .chat-input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--bright); font-size: 8.5px; padding: 4px 7px; outline: none; }
+
+/* ── Utils ── */
+#pc-comm-scene .cursor { display: inline-block; width: 7px; height: 10px; background: var(--cyan); animation: cursor-blink 1s step-end infinite; }
+#pc-comm-scene .prompt-cursor { display: inline-block; width: 8px; height: 12px; background: var(--bright); animation: cursor-blink 1s step-end infinite; }

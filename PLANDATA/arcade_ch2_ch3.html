@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1974 범띠 — Arcade Avatar</title>
+<style>
+  :root {
+    --bg: #000005;
+    --amber: #ffa500;
+    --neon-r: #ff1a1a;
+    --neon-g: #00ff41;
+    --neon-b: #00aaff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a0a;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    font-family: 'Courier New', Courier, monospace;
+    padding: 20px 0;
+    overflow-x: hidden;
+  }
+  .phone {
+    width: 390px;
+    max-width: 100vw;
+    height: 844px;
+    background: var(--bg);
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  @media (min-width: 480px) {
+    .phone { border: 1px solid #222; border-radius: 8px; box-shadow: 0 0 60px rgba(255,26,26,0.08), 0 0 120px rgba(0,0,0,0.8); }
+  }
+  @media (max-width: 479px) {
+    body { padding: 0; }
+    .phone { width: 100vw; height: 100svh; border-radius: 0; }
+  }
+
+  /* ── 챕터 탭 ── */
+  .chapter-tabs {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 36px;
+    display: flex;
+    z-index: 100;
+    background: #000;
+    border-bottom: 1px solid #111;
+  }
+  .ch-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+  .ch-tab .t-num { font-size: 5px; color: #2a2a2a; letter-spacing: 0.1em; }
+  .ch-tab .t-name { font-size: 6px; color: #2a2a2a; letter-spacing: 0.06em; }
+  .ch-tab.active-ch2 { border-bottom-color: var(--neon-r); }
+  .ch-tab.active-ch2 .t-num { color: var(--neon-r); }
+  .ch-tab.active-ch2 .t-name { color: var(--amber); }
+  .ch-tab.active-ch3 { border-bottom-color: #00ccff; }
+  .ch-tab.active-ch3 .t-num { color: #00ccff; }
+  .ch-tab.active-ch3 .t-name { color: #88ffcc; }
+  .ch-tab .t-dot {
+    position: absolute;
+    top: 6px; right: 10px;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--neon-g);
+    animation: blink 1s step-end infinite;
+    display: none;
+  }
+  .ch-tab.active-ch2 .t-dot,
+  .ch-tab.active-ch3 .t-dot { display: block; }
+  .ch-divider {
+    width: 1px;
+    background: #111;
+    margin: 8px 0;
+    flex-shrink: 0;
+  }
+
+  /* 스캔라인 */
+  .scanline {
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  /* ── 씬 공통 ── */
+  .scene {
+    position: absolute;
+    top: 36px; left: 0; right: 0; bottom: 0;
+    display: none;
+  }
+  .scene.visible { display: block; }
+
+  .stars {
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 8% 12%, #fff4 0%, transparent 100%),
+      radial-gradient(1px 1px at 22% 6%, #fff3 0%, transparent 100%),
+      radial-gradient(1px 1px at 55% 9%, #fff2 0%, transparent 100%),
+      radial-gradient(1px 1px at 78% 18%, #fff3 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 7%, #fff2 0%, transparent 100%),
+      radial-gradient(1px 1px at 15% 30%, #fff2 0%, transparent 100%),
+      radial-gradient(1px 1px at 42% 25%, #fff3 0%, transparent 100%),
+      radial-gradient(1px 1px at 65% 35%, #fff2 0%, transparent 100%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── HERO ZONE ── */
+  .hero-zone {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 462px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 10;
+  }
+  .hud {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 18px 0;
+  }
+  .hud-col { display: flex; flex-direction: column; gap: 3px; }
+  .hud-col.right { align-items: flex-end; }
+  .hud-col.center { align-items: center; }
+  .hl { font-size: 6px; color: #2a2a2a; }
+  .hv { font-size: 7px; color: var(--amber); text-shadow: 0 0 6px rgba(255,165,0,0.5); }
+  .hvr { font-size: 7px; color: var(--neon-r); text-shadow: 0 0 6px rgba(255,26,26,0.5); }
+  .hvc { font-size: 7px; color: #00ccff; text-shadow: 0 0 6px rgba(0,204,255,0.5); }
+
+  .char-name {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #fff;
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 14px rgba(255,255,255,0.25);
+    min-height: 20px;
+    transition: color 0.2s;
+  }
+  .char-sub-name {
+    font-size: 6px;
+    color: #333;
+    margin-top: 4px;
+    letter-spacing: 0.1em;
+  }
+  .hero-wrap {
+    margin-top: 14px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pixel-hero {
+    display: grid;
+    image-rendering: pixelated;
+    animation: heroFloat 2.8s ease-in-out infinite;
+    transition: filter 0.3s;
+  }
+  @keyframes heroFloat {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-7px); }
+  }
+  .hero-shadow {
+    position: absolute;
+    bottom: -14px;
+    width: 100px; height: 12px;
+    background: radial-gradient(ellipse, rgba(255,26,26,0.25) 0%, transparent 70%);
+    animation: shadowPulse 2.8s ease-in-out infinite;
+  }
+  @keyframes shadowPulse {
+    0%,100% { transform: scaleX(1); opacity: 0.5; }
+    50% { transform: scaleX(0.75); opacity: 0.15; }
+  }
+  .rarity {
+    margin-top: 22px;
+    font-size: 7px;
+    color: var(--amber);
+    letter-spacing: 0.12em;
+    text-shadow: 0 0 6px rgba(255,165,0,0.4);
+    min-height: 14px;
+  }
+  .select-hint {
+    margin-top: 6px;
+    font-size: 7px;
+    color: var(--neon-g);
+    animation: blink 1s step-end infinite;
+    text-shadow: 0 0 8px rgba(0,255,65,0.6);
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ── LOWER PANEL ── */
+  .lower-panel {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 346px;
+    background: #04040a;
+    border-top: 1px solid #ff1a1a22;
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+    overflow: hidden;
+  }
+  .scene-ch3 .lower-panel { border-top-color: #00aaff22; }
+
+  .panel-tab {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 18px 8px;
+    border-bottom: 1px solid #0e0e0e;
+    flex-shrink: 0;
+  }
+  .tab-title { font-size: 7px; color: var(--amber); }
+  .scene-ch3 .tab-title { color: #00ccff; }
+  .tab-count { font-size: 6px; color: #333; }
+  .tab-count span { color: var(--neon-g); }
+
+  .slot-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 5px;
+    padding: 8px 12px;
+    flex-shrink: 0;
+    width: 100%;
+  }
+  .slot-card {
+    width: 100%;
+    aspect-ratio: 1;
+    background: #07070f;
+    border: 1px solid #0f0f0f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
+  }
+  .slot-card:hover { border-color: #333; }
+  .slot-card.active {
+    border-color: var(--amber);
+    background: #0f0a00;
+    box-shadow: 0 0 10px rgba(255,165,0,0.2);
+  }
+  .scene-ch3 .slot-card.active {
+    border-color: #00ccff;
+    background: #00080f;
+    box-shadow: 0 0 10px rgba(0,204,255,0.2);
+  }
+  .slot-card.locked { border-color: #080808; cursor: default; }
+  .mini-art { display: grid; image-rendering: pixelated; }
+  .slot-label {
+    font-size: 4px; color: #2a2a2a;
+    text-align: center; line-height: 1.8;
+  }
+  .slot-card.active .slot-label { color: var(--amber); }
+  .scene-ch3 .slot-card.active .slot-label { color: #00ccff; }
+  .slot-num {
+    position: absolute; top: 3px; right: 4px;
+    font-size: 5px; color: #1a1a1a;
+  }
+  .slot-card.active .slot-num { color: var(--neon-r); }
+  .new-badge {
+    position: absolute; top: 3px; left: 4px;
+    font-size: 4px; color: var(--neon-g);
+    animation: blink 0.7s step-end infinite;
+    display: none;
+  }
+  .slot-card.newly-unlocked .new-badge { display: block; }
+
+  .action-section {
+    flex: 1;
+    padding: 0 18px 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .btn-clear {
+    width: 100%;
+    padding: 12px;
+    background: transparent;
+    border: 1px solid var(--neon-r);
+    color: var(--neon-r);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 7px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 8px rgba(255,26,26,0.6);
+    box-shadow: 0 0 14px rgba(255,26,26,0.08);
+    transition: all 0.15s;
+    position: relative; overflow: hidden;
+  }
+  .scene-ch3 .btn-clear {
+    border-color: #00ccff;
+    color: #00ccff;
+    text-shadow: 0 0 8px rgba(0,204,255,0.6);
+    box-shadow: 0 0 14px rgba(0,204,255,0.08);
+  }
+  .btn-clear::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,26,26,0.05), transparent);
+    animation: scanBtn 2.5s linear infinite;
+  }
+  @keyframes scanBtn {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  .btn-clear:disabled { opacity: 0.4; cursor: default; }
+
+  .nav-bar { display: flex; justify-content: space-around; padding-bottom: 20px; }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+  .nav-ico { font-size: 18px; filter: grayscale(1) brightness(0.2); transition: filter 0.1s; }
+  .nav-ico.on { filter: none; }
+  .nav-lbl { font-size: 5px; color: #1e1e1e; }
+  .nav-lbl.on { color: var(--amber); }
+
+  /* 해금 오버레이 */
+  .unlock-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.88);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 16px; z-index: 200;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .unlock-overlay.show { opacity: 1; pointer-events: all; }
+  .unlock-title {
+    font-size: 9px; color: var(--neon-g);
+    text-shadow: 0 0 14px rgba(0,255,65,0.8);
+    animation: blink 0.5s step-end infinite;
+  }
+  .unlock-char { display: grid; image-rendering: pixelated; }
+  .unlock-name {
+    font-size: 11px; color: var(--amber);
+    text-shadow: 0 0 16px rgba(255,165,0,0.8);
+    text-align: center;
+  }
+  .unlock-sub { font-size: 6px; color: #555; }
+  .unlock-tap { font-size: 7px; color: #333; animation: blink 1s step-end infinite; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="scanline"></div>
+
+  <!-- ── 챕터 탭 ── -->
+  <div class="chapter-tabs">
+    <div class="ch-tab active-ch2" id="tab2" onclick="switchChapter(2)">
+      <span class="t-dot"></span>
+      <span class="t-num">CHAPTER 02</span>
+      <span class="t-name">ARCADE PIXEL</span>
+    </div>
+    <div class="ch-divider"></div>
+    <div class="ch-tab" id="tab3" onclick="switchChapter(3)">
+      <span class="t-dot"></span>
+      <span class="t-num">CHAPTER 03</span>
+      <span class="t-name">CONSOLE SPRITE</span>
+    </div>
+  </div>
+
+  <!-- ══════════════ SCENE CH.2 ══════════════ -->
+  <div class="scene scene-ch2 visible" id="scene2">
+    <div class="stars" style="background-image:radial-gradient(1px 1px at 8% 12%,#ffa50033 0%,transparent 100%),radial-gradient(1px 1px at 25% 8%,#ffa50022 0%,transparent 100%),radial-gradient(1px 1px at 55% 15%,#00ff4122 0%,transparent 100%),radial-gradient(1px 1px at 75% 5%,#ffa50033 0%,transparent 100%),radial-gradient(1px 1px at 90% 22%,#00ff4122 0%,transparent 100%);"></div>
+    <div class="hero-zone">
+      <div class="hud">
+        <div class="hud-col">
+          <span class="hl">CHAPTER</span>
+          <span class="hv">02</span>
+        </div>
+        <div class="hud-col center">
+          <span class="hl">ARCADE PIXEL</span>
+          <span class="hv" style="font-size:6px;">1981 ~ 1986</span>
+        </div>
+        <div class="hud-col right">
+          <span class="hl">SCORE</span>
+          <span class="hvr" id="score2">000000</span>
+        </div>
+      </div>
+      <div class="char-name" id="name2">GALAGA</div>
+      <div class="char-sub-name" id="sub2">GALAGA BOSS</div>
+      <div class="hero-wrap">
+        <div class="pixel-hero" id="hero2"></div>
+        <div class="hero-shadow" id="shadow2"></div>
+      </div>
+      <div class="rarity" id="rarity2">★★★★☆</div>
+      <div class="select-hint">▶ SELECT AVATAR ◀</div>
+    </div>
+    <div class="lower-panel">
+      <div class="panel-tab">
+        <div class="tab-title">MY AVATARS</div>
+        <div class="tab-count" id="count2"><span>01</span> / 15</div>
+      </div>
+      <div class="slot-row" id="slots2"></div>
+      <div class="action-section">
+        <button class="btn-clear" id="btn2" onclick="tryUnlock(2)">▶ STAGE CLEAR — GET AVATAR</button>
+        <div class="nav-bar">
+          <div class="nav-item"><div class="nav-ico">🗺️</div><div class="nav-lbl">MAP</div></div>
+          <div class="nav-item"><div class="nav-ico on">🕹️</div><div class="nav-lbl on">AVATAR</div></div>
+          <div class="nav-item"><div class="nav-ico">🏪</div><div class="nav-lbl">SHOP</div></div>
+          <div class="nav-item"><div class="nav-ico">⚙️</div><div class="nav-lbl">CONFIG</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="unlock-overlay" id="overlay2" onclick="closeOverlay(2)">
+      <div class="unlock-title">NEW AVATAR UNLOCKED!</div>
+      <div class="unlock-char" id="overlayChar2"></div>
+      <div class="unlock-name" id="overlayName2"></div>
+      <div class="unlock-sub" id="overlaySub2"></div>
+      <div class="unlock-tap">— TAP TO CONTINUE —</div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SCENE CH.3 ══════════════ -->
+  <div class="scene scene-ch3" id="scene3">
+    <div class="stars"></div>
+    <div class="hero-zone">
+      <div class="hud">
+        <div class="hud-col">
+          <span class="hl">CHAPTER</span>
+          <span class="hvc">03</span>
+        </div>
+        <div class="hud-col center">
+          <span class="hl">CONSOLE SPRITE</span>
+          <span class="hvc" style="font-size:6px;">1986 ~ 1991</span>
+        </div>
+        <div class="hud-col right">
+          <span class="hl">SCORE</span>
+          <span class="hvc" id="score3">000000</span>
+        </div>
+      </div>
+      <div class="char-name" id="name3">BUB</div>
+      <div class="char-sub-name" id="sub3">BUBBLE BOBBLE</div>
+      <div class="hero-wrap">
+        <div class="pixel-hero" id="hero3"></div>
+        <div class="hero-shadow" id="shadow3"></div>
+      </div>
+      <div class="rarity" id="rarity3">★★★☆☆</div>
+      <div class="select-hint" style="color:#00ccff;text-shadow:0 0 8px rgba(0,204,255,0.6);">▶ SELECT AVATAR ◀</div>
+    </div>
+    <div class="lower-panel">
+      <div class="panel-tab">
+        <div class="tab-title">MY AVATARS</div>
+        <div class="tab-count" id="count3"><span>01</span> / 15</div>
+      </div>
+      <div class="slot-row" id="slots3"></div>
+      <div class="action-section">
+        <button class="btn-clear" id="btn3" onclick="tryUnlock(3)">▶ STAGE CLEAR — GET AVATAR</button>
+        <div class="nav-bar">
+          <div class="nav-item"><div class="nav-ico">🗺️</div><div class="nav-lbl">MAP</div></div>
+          <div class="nav-item"><div class="nav-ico on">🕹️</div><div class="nav-lbl on">AVATAR</div></div>
+          <div class="nav-item"><div class="nav-ico">🏪</div><div class="nav-lbl">SHOP</div></div>
+          <div class="nav-item"><div class="nav-ico">⚙️</div><div class="nav-lbl">CONFIG</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="unlock-overlay" id="overlay3" onclick="closeOverlay(3)">
+      <div class="unlock-title">NEW AVATAR UNLOCKED!</div>
+      <div class="unlock-char" id="overlayChar3"></div>
+      <div class="unlock-name" id="overlayName3"></div>
+      <div class="unlock-sub" id="overlaySub3"></div>
+      <div class="unlock-tap">— TAP TO CONTINUE —</div>
+    </div>
+  </div>
+
+</div><!-- .phone -->
+
+<script>
+// ══════════════════════════════════════════
+// ══════════════════════════════════════════
+// CH.2 캐릭터 데이터 — 10×10 / 저채도 탁한 CRT 팔레트
+// 팔레트: 0=투명 1=메인 2=어두운 3=밝은
+// ══════════════════════════════════════════
+const chars2 = [
+  { name:'GALAGA',      sub:'GALAGA BOSS',      glow:'#556644', rare:4,
+    pal:['transparent','#667755','#334422','#99aa77'],
+    map:[
+      [0,0,1,1,1,1,1,1,0,0],
+      [0,1,1,2,1,1,2,1,1,0],
+      [1,1,1,1,1,1,1,1,1,0],
+      [1,2,1,3,1,1,3,1,2,1],
+      [1,1,1,1,1,1,1,1,1,1],
+      [0,1,2,1,2,1,2,1,1,0],
+      [0,0,1,1,1,1,1,1,0,0],
+      [0,0,0,1,0,0,1,0,0,0],
+      [0,0,1,0,0,0,0,1,0,0],
+      [0,0,0,0,0,0,0,0,0,0],
+    ]},
+  { name:'PAC-MAN',     sub:'PAC-MAN',           glow:'#887744', rare:5,
+    pal:['transparent','#998855','#554433','#ccbb77'],
+    map:[
+      [0,0,1,1,1,1,1,1,0,0],
+      [0,1,1,1,1,1,1,1,1,0],
+      [1,1,1,2,1,1,1,1,1,0],
+      [1,1,1,1,1,1,0,0,0,0],
+      [1,1,1,1,1,0,0,0,0,0],
+      [1,1,1,1,0,0,0,0,0,0],
+      [1,1,1,1,1,0,0,0,0,0],
+      [1,1,1,1,1,1,0,0,0,0],
+      [0,1,1,1,1,1,1,1,1,0],
+      [0,0,1,1,1,1,1,1,0,0],
+    ]},
+  { name:'DIG DUG',     sub:'DIG DUG',           glow:'#667788', rare:3,
+    pal:['transparent','#778899','#445566','#aabbcc'],
+    map:[
+      [0,0,1,1,1,1,1,0,0,0],
+      [0,1,1,2,1,2,1,1,0,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [0,0,3,3,3,3,3,0,0,0],
+      [0,3,3,1,3,1,3,3,0,0],
+      [0,3,3,3,3,3,3,3,0,0],
+      [0,0,1,1,0,0,1,1,0,0],
+      [0,1,1,1,0,0,1,1,1,0],
+      [0,1,1,0,0,0,0,1,1,0],
+      [0,0,0,0,0,0,0,0,0,0],
+    ]},
+  { name:'FROGGER',     sub:'FROGGER',           glow:'#446644', rare:3,
+    pal:['transparent','#446644','#223322','#778866'],
+    map:[
+      [0,3,3,0,0,0,0,3,3,0],
+      [3,3,3,3,0,0,3,3,3,3],
+      [0,1,1,0,0,0,0,1,1,0],
+      [1,1,1,1,1,1,1,1,1,1],
+      [1,2,1,1,1,1,1,1,2,1],
+      [1,1,1,1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,1,1,1,0],
+      [0,0,1,1,0,0,1,1,0,0],
+      [0,1,1,0,0,0,0,1,1,0],
+      [0,0,0,0,0,0,0,0,0,0],
+    ]},
+  { name:'1942',        sub:'PLAYER PLANE',      glow:'#556677', rare:4,
+    pal:['transparent','#667788','#334455','#99aabb'],
+    map:[
+      [0,0,0,1,1,1,1,0,0,0],
+      [0,0,1,1,1,1,1,1,0,0],
+      [0,1,1,1,2,2,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1,1],
+      [1,1,2,1,3,3,1,2,1,1],
+      [1,1,1,1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,1,1,1,0],
+      [0,0,1,1,1,1,1,1,0,0],
+      [0,0,0,2,0,0,2,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0],
+    ]},
+  { name:'CIRCUS',      sub:'CIRCUS CHARLIE',    glow:'#776644', rare:3,
+    pal:['transparent','#887755','#554433','#bbaa77'],
+    map:[
+      [0,0,1,1,1,1,1,0,0,0],
+      [0,1,1,2,1,2,1,1,0,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [0,0,3,1,1,1,3,0,0,0],
+      [0,0,1,1,1,1,1,0,0,0],
+      [0,3,3,3,1,3,3,3,0,0],
+      [0,0,1,1,1,1,1,0,0,0],
+      [0,0,1,1,0,1,1,0,0,0],
+      [0,1,1,0,0,0,1,1,0,0],
+      [0,0,0,0,0,0,0,0,0,0],
+    ]},
+  { name:'PONPOKO',     sub:'PONPOKO',           glow:'#665544', rare:3,
+    pal:['transparent','#776655','#443322','#aa9977'],
+    map:[
+      [2,2,0,0,0,0,0,2,2,0],
+      [2,2,0,0,0,0,0,2,2,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [1,1,3,1,1,1,3,1,1,0],
+      [1,1,1,1,1,1,1,1,1,0],
+      [1,2,1,1,1,1,1,2,1,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [0,0,1,1,0,1,1,0,0,0],
+      [0,1,1,0,0,0,1,1,0,0],
+      [0,0,0,0,0,0,0,0,0,0],
+    ]},
+  { name:'BOMB JACK',   sub:'BOMB JACK',         glow:'#887755', rare:4,
+    pal:['transparent','#998866','#554433','#ccbb99'],
+    map:[
+      [0,0,1,1,1,1,1,0,0,0],
+      [0,1,1,2,1,2,1,1,0,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [3,3,3,1,1,1,3,3,3,0],
+      [3,3,1,1,1,1,1,3,3,0],
+      [0,0,1,1,1,1,1,0,0,0],
+      [0,0,1,1,1,1,1,0,0,0],
+      [0,0,1,1,0,1,1,0,0,0],
+      [0,1,1,0,0,0,1,1,0,0],
+      [0,0,0,0,0,0,0,0,0,0],
+    ]},
+  { name:'DONKEY KONG', sub:'DONKEY KONG',       glow:'#665544', rare:4,
+    pal:['transparent','#776655','#443322','#aa9977'],
+    map:[
+      [0,1,1,1,1,1,1,1,0,0],
+      [1,1,3,1,1,1,3,1,1,0],
+      [1,1,1,1,1,1,1,1,1,0],
+      [0,1,1,2,1,2,1,1,0,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [1,1,1,1,1,1,1,1,1,0],
+      [1,3,1,1,1,1,1,3,1,0],
+      [0,0,1,1,0,1,1,0,0,0],
+      [0,1,1,0,0,0,1,1,0,0],
+      [0,0,0,0,0,0,0,0,0,0],
+    ]},
+  { name:'SPACE INV.',  sub:'SPACE INVADER',     glow:'#556655', rare:3,
+    pal:['transparent','#557755','#334433','#88aa88'],
+    map:[
+      [0,1,0,0,0,0,0,1,0,0],
+      [0,0,1,0,0,0,1,0,0,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [1,1,0,1,1,1,0,1,1,0],
+      [1,1,1,1,1,1,1,1,1,0],
+      [1,2,1,1,1,1,1,2,1,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [0,1,0,0,1,0,0,1,0,0],
+      [1,0,1,0,0,0,1,0,1,0],
+      [0,0,0,0,0,0,0,0,0,0],
+    ]},
+  { name:'BLINKY',      sub:'PAC GHOST',         glow:'#776655', rare:3,
+    pal:['transparent','#887766','#554433','#bbaa99'],
+    map:[
+      [0,0,1,1,1,1,1,0,0,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [1,1,2,2,1,2,2,1,1,0],
+      [1,1,2,3,2,2,3,2,1,0],
+      [1,1,1,2,2,2,2,1,1,0],
+      [1,1,1,1,1,1,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1,0],
+      [1,0,1,0,1,0,1,0,1,0],
+      [0,0,0,0,0,0,0,0,0,0],
+    ]},
+  { name:'MARIO',       sub:'JUMP MAN',          glow:'#775544', rare:5,
+    pal:['transparent','#886655','#553322','#bbaa88'],
+    map:[
+      [0,0,1,1,1,1,1,0,0,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [0,2,2,1,1,1,2,2,0,0],
+      [0,2,1,2,1,2,1,2,0,0],
+      [0,0,3,3,3,3,3,0,0,0],
+      [0,3,3,1,3,1,3,3,0,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [0,0,1,1,0,1,1,0,0,0],
+      [0,2,2,0,0,0,2,2,0,0],
+      [0,0,0,0,0,0,0,0,0,0],
+    ]},
+  { name:'BOMBER',      sub:'BOMBERMAN',         glow:'#778877', rare:3,
+    pal:['transparent','#889988','#445544','#aabbaa'],
+    map:[
+      [0,0,1,1,1,1,1,0,0,0],
+      [0,1,1,2,1,2,1,1,0,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [0,0,1,1,1,1,1,0,0,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [1,1,1,1,1,1,1,1,1,0],
+      [0,0,1,1,0,1,1,0,0,0],
+      [0,0,1,0,3,3,0,1,0,0],
+      [0,1,0,0,0,0,0,1,0,0],
+      [0,0,0,0,0,0,0,0,0,0],
+    ]},
+  { name:'ARKANOID',    sub:'VAUS SHIP',         glow:'#667788', rare:3,
+    pal:['transparent','#778899','#445566','#99aabb'],
+    map:[
+      [0,0,0,0,0,0,0,0,0,0],
+      [0,0,3,3,3,3,3,0,0,0],
+      [0,1,1,1,1,1,1,1,0,0],
+      [0,2,2,2,2,2,2,2,0,0],
+      [0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,1,1,0,0,0,0,0],
+      [0,0,1,1,1,1,0,0,0,0],
+      [0,0,0,1,1,0,0,0,0,0],
+      [1,1,1,1,1,1,1,1,1,1],
+      [2,2,2,2,2,2,2,2,2,2],
+    ]},
+  { name:'XEVIOUS',     sub:'SOLVALOU',          glow:'#667799', rare:4,
+    pal:['transparent','#778899','#445566','#aabbcc'],
+    map:[
+      [0,0,0,1,1,1,1,0,0,0],
+      [0,0,1,1,1,1,1,1,0,0],
+      [0,1,1,1,2,2,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1,1],
+      [1,2,1,3,1,1,3,1,2,1],
+      [1,1,1,1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,1,1,1,0],
+      [0,0,1,1,1,1,1,1,0,0],
+      [0,0,0,2,0,0,2,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0],
+    ]},
+];
+// ══════════════════════════════════════════
+// CH.3 캐릭터 데이터 — 16×16 정밀 도트 / 한국 오락실 레전드
+// 팔레트: 0=투명 1=메인 2=서브 3=피부/얼굴 4=어두운외곽 5=포인트 6=밝은하이라이트 7=추가색
+// ══════════════════════════════════════════
+const chars3 = [
+
+  // 1. 버블룡 Bub — 초록 공룡, 동글동글 실루엣
+  { name:'BUB',         sub:'BUBBLE BOBBLE',     glow:'#00ddff', rare:4,
+    pal:['transparent','#00bb44','#007722','#aaffcc','#004411','#ff4444','#ffff44','#ffffff'],
+    map:[
+      [0,0,0,0,4,4,4,4,4,4,0,0,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,4,1,1,3,3,1,1,3,1,4,0,0,0,0],
+      [0,0,4,1,3,7,3,1,3,7,3,4,0,0,0,0],
+      [0,0,4,1,1,3,3,1,1,3,1,4,0,0,0,0],
+      [0,0,4,1,1,1,5,5,5,1,1,4,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,4,1,2,1,1,1,1,1,1,2,1,4,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,1,4,0,0,0],
+      [0,4,2,1,6,1,1,1,1,6,1,2,4,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,0,4,1,4,0,0,0,4,1,4,0,0,0,0],
+      [0,0,0,4,4,0,0,0,0,0,4,4,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 2. 빌리 리 — 더블드래곤, 청재킷 킥
+  { name:'BILLY',       sub:'DOUBLE DRAGON',     glow:'#ff8833', rare:5,
+    pal:['transparent','#1144cc','#0022aa','#ffccaa','#882200','#ff4422','#ffff44','#ffffff'],
+    map:[
+      [0,0,0,0,0,3,3,3,3,0,0,0,0,0,0,0],
+      [0,0,0,0,3,3,3,3,3,3,0,0,0,0,0,0],
+      [0,0,0,0,3,4,3,3,4,3,0,0,0,0,0,0],
+      [0,0,0,0,3,3,3,3,3,3,0,0,0,0,0,0],
+      [0,0,0,4,5,5,3,3,5,5,4,0,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,1,4,0,0,0],
+      [0,4,2,1,1,1,1,1,1,1,1,2,4,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,0,4,1,1,4,4,1,1,4,0,0,0,0,0],
+      [0,0,0,4,1,4,0,0,4,1,4,0,0,0,0,0],
+      [0,0,0,4,4,0,0,0,0,4,4,0,0,0,0,0],
+      [0,0,0,4,0,0,0,0,0,0,4,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 3. 빌 라이저 — 콘트라, 람보 스타일 근육+총
+  { name:'BILL',        sub:'CONTRA',            glow:'#ff3300', rare:5,
+    pal:['transparent','#ffcc88','#884400','#cc3300','#333333','#ffff44','#888888','#ffffff'],
+    map:[
+      [0,0,0,0,4,4,4,4,4,0,0,0,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,4,0,0,0,0,0,0],
+      [0,0,0,4,1,4,1,4,1,4,0,0,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,4,0,0,0,0,0,0],
+      [0,0,0,0,4,3,3,3,4,0,0,0,0,0,0,0],
+      [0,0,4,3,3,3,3,3,3,3,4,0,0,0,0,0],
+      [0,4,1,1,3,3,3,3,3,1,1,6,6,6,4,0],
+      [4,1,1,1,1,1,1,1,1,1,1,6,6,6,6,4],
+      [4,1,1,1,1,1,1,1,1,1,1,6,4,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,4,2,1,1,1,1,1,2,4,0,0,0,0,0],
+      [0,0,0,4,1,1,4,4,1,1,4,0,0,0,0,0],
+      [0,0,0,4,1,4,0,0,4,1,4,0,0,0,0,0],
+      [0,0,0,4,4,0,0,0,0,4,4,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 4. 닉 — 스노우브라더스, 눈사람 만드는 꼬마
+  { name:'NICK',        sub:'SNOW BROS',         glow:'#aaddff', rare:4,
+    pal:['transparent','#ddeeff','#8899cc','#ffccaa','#334466','#ff4444','#ffff88','#ffffff'],
+    map:[
+      [0,0,0,0,4,4,4,4,4,0,0,0,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,4,0,0,0,0,0,0],
+      [0,0,0,4,1,4,1,4,1,4,0,0,0,0,0,0],
+      [0,0,0,4,1,1,3,1,1,4,0,0,0,0,0,0],
+      [0,0,0,0,4,3,3,3,4,0,0,0,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [4,2,1,1,1,1,1,1,1,1,1,2,4,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,4,5,5,5,5,5,5,5,4,0,0,0,0,0],
+      [0,0,0,4,5,5,5,5,5,4,0,0,0,0,0,0],
+      [0,0,0,4,1,1,4,4,1,1,4,0,0,0,0,0],
+      [0,0,0,4,4,0,0,0,0,4,4,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 5. 해거 — 파이널파이트, 레슬러 시장
+  { name:'HAGGAR',      sub:'FINAL FIGHT',       glow:'#ff6600', rare:5,
+    pal:['transparent','#ffcc88','#cc4400','#3344aa','#222222','#ffff44','#cccccc','#884400'],
+    map:[
+      [0,0,0,0,3,3,3,3,3,0,0,0,0,0,0,0],
+      [0,0,0,3,3,3,3,3,3,3,0,0,0,0,0,0],
+      [0,0,0,3,4,3,3,3,4,3,0,0,0,0,0,0],
+      [0,0,0,3,3,7,3,7,3,3,0,0,0,0,0,0],
+      [0,0,0,0,3,3,3,3,3,0,0,0,0,0,0,0],
+      [0,0,4,2,2,2,2,2,2,2,4,0,0,0,0,0],
+      [0,4,1,1,2,2,2,2,2,1,1,4,0,0,0,0],
+      [4,1,1,1,1,1,1,1,1,1,1,1,4,0,0,0],
+      [4,1,1,1,1,1,1,1,1,1,1,1,4,0,0,0],
+      [4,6,1,1,1,1,1,1,1,1,1,6,4,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,0,4,1,1,1,4,4,1,1,1,4,0,0,0,0],
+      [0,0,0,4,3,4,0,0,4,3,4,0,0,0,0,0],
+      [0,0,0,4,4,0,0,0,0,4,4,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 6. 레오나르도 — TMNT, 파란 닌자거북
+  { name:'LEONARDO',    sub:'TMNT',              glow:'#4488ff', rare:5,
+    pal:['transparent','#226611','#114400','#ffccaa','#1133bb','#ff4444','#ffff44','#aaffaa'],
+    map:[
+      [0,0,0,0,4,4,4,4,4,0,0,0,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,4,0,0,0,0,0,0],
+      [0,0,4,1,1,3,3,1,1,1,4,0,0,0,0,0],
+      [0,0,4,1,3,3,3,3,3,1,4,0,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,4,0,0,0,0,0,0],
+      [0,0,4,4,4,1,1,1,4,4,4,0,0,0,0,0],
+      [0,4,1,4,1,1,1,1,1,4,1,4,0,0,0,0],
+      [4,1,1,1,1,1,1,1,1,1,1,1,4,0,0,0],
+      [4,1,7,1,1,1,1,1,1,1,7,1,4,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,4,5,5,4,4,4,4,5,5,4,0,0,0,0],
+      [0,0,4,5,4,0,0,0,0,4,5,4,0,0,0,0],
+      [0,0,4,4,0,0,0,0,0,0,4,4,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 7. 류 — 스트리트파이터2, 흰 도복 + 빨간 머리띠
+  { name:'RYU',         sub:'STREET FIGHTER II', glow:'#ffffff', rare:5,
+    pal:['transparent','#eeeedd','#999988','#ffccaa','#cc3300','#222222','#884400','#ffffff'],
+    map:[
+      [0,0,0,0,6,6,6,6,6,0,0,0,0,0,0,0],
+      [0,0,0,4,3,3,3,3,3,4,0,0,0,0,0,0],
+      [0,0,0,4,3,5,3,5,3,4,0,0,0,0,0,0],
+      [0,0,0,4,3,3,3,3,3,4,0,0,0,0,0,0],
+      [0,0,0,0,4,4,4,4,4,0,0,0,0,0,0,0],
+      [0,0,0,4,1,1,4,4,1,1,4,0,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,1,4,0,0,0],
+      [4,1,1,1,1,1,1,1,1,1,1,1,1,4,0,0],
+      [4,2,1,1,1,1,1,1,1,1,1,1,2,4,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,1,4,0,0,0],
+      [0,0,4,1,1,1,4,4,1,1,1,4,0,0,0,0],
+      [0,0,4,1,1,4,0,0,4,1,1,4,0,0,0,0],
+      [0,0,4,2,4,0,0,0,0,4,2,4,0,0,0,0],
+      [0,0,4,4,0,0,0,0,0,0,4,4,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 8. 타로 — 레인보우 아일랜드, 무지개 쏘는 꼬마
+  { name:'TARO',        sub:'RAINBOW ISLANDS',   glow:'#ffaa00', rare:4,
+    pal:['transparent','#ffcc44','#cc8800','#ffccaa','#ff4444','#4488ff','#44cc44','#ff88ff'],
+    map:[
+      [0,0,0,0,4,4,4,4,4,0,0,0,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,4,0,0,0,0,0,0],
+      [0,0,0,4,3,4,3,4,3,4,0,0,0,0,0,0],
+      [0,0,0,4,3,3,3,3,3,4,0,0,0,0,0,0],
+      [0,0,0,0,4,1,1,1,4,0,0,0,0,0,0,0],
+      [0,4,5,6,7,1,1,1,1,1,4,0,0,0,0,0],
+      [4,5,6,7,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,4,2,1,1,1,1,1,2,4,0,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,4,0,0,0,0,0,0],
+      [0,0,0,4,1,1,4,4,1,1,4,0,0,0,0,0],
+      [0,0,0,4,4,4,0,0,4,4,4,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 9. 록맨 — 파란 헬멧 + 팔 대포
+  { name:'MEGA MAN',    sub:'ROCKMAN',           glow:'#2299ff', rare:5,
+    pal:['transparent','#2277ee','#114499','#ffccaa','#005588','#ff4444','#88ccff','#ffffff'],
+    map:[
+      [0,0,0,0,4,4,4,4,4,4,0,0,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,0,4,6,1,1,1,1,6,4,0,0,0,0,0],
+      [0,0,0,4,1,4,3,3,4,1,4,0,0,0,0,0],
+      [0,0,0,4,1,1,3,3,1,1,4,0,0,0,0,0],
+      [0,0,0,0,4,1,4,4,1,4,0,0,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [4,4,2,1,1,1,1,1,1,1,1,2,4,0,0,0],
+      [4,4,4,1,1,1,1,1,1,1,1,4,4,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,0,0,4,1,1,4,4,1,1,4,0,0,0,0,0],
+      [0,0,0,4,1,4,0,0,4,1,4,0,0,0,0,0],
+      [0,0,0,4,4,0,0,0,0,4,4,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 10. 스티브 — 선셋라이더스, 카우보이 모자
+  { name:'STEVE',       sub:'SUNSET RIDERS',     glow:'#ffcc00', rare:4,
+    pal:['transparent','#cc8833','#884400','#ffccaa','#223399','#ff4444','#ffff44','#ffffff'],
+    map:[
+      [0,0,0,4,4,4,4,4,4,4,0,0,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,0,0,4,3,3,3,4,0,0,0,0,0,0,0],
+      [0,0,0,0,4,3,4,3,4,0,0,0,0,0,0,0],
+      [0,0,0,0,4,3,3,3,4,0,0,0,0,0,0,0],
+      [0,0,4,5,5,1,1,1,5,5,4,0,0,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [4,1,1,1,1,1,1,1,1,1,1,1,4,0,0,0],
+      [4,2,1,1,1,1,1,1,1,1,1,2,4,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,0,4,1,1,1,4,4,1,1,1,4,0,0,0,0],
+      [0,0,4,4,1,4,0,0,4,1,4,4,0,0,0,0],
+      [0,0,0,4,4,0,0,0,0,4,4,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 11. 스콜피온 — 모탈컴뱃, 노란 닌자
+  { name:'SCORPION',    sub:'MORTAL KOMBAT',     glow:'#ffee00', rare:5,
+    pal:['transparent','#ccaa00','#886600','#ffccaa','#222222','#ff2200','#ffff44','#ffffff'],
+    map:[
+      [0,0,0,0,4,4,4,4,4,0,0,0,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,4,0,0,0,0,0,0],
+      [0,0,0,4,1,4,1,4,1,4,0,0,0,0,0,0],
+      [0,0,0,4,3,3,3,3,3,4,0,0,0,0,0,0],
+      [0,0,0,0,4,1,1,1,4,0,0,0,0,0,0,0],
+      [0,0,0,4,4,1,1,1,4,4,0,0,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,1,4,0,0,0],
+      [4,2,1,1,1,1,1,1,1,1,1,2,4,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,0,4,6,1,1,1,1,1,1,6,4,0,0,0,0],
+      [0,0,0,4,1,1,4,4,1,1,4,0,0,0,0,0],
+      [0,0,0,4,1,4,0,0,4,1,4,0,0,0,0,0],
+      [0,0,0,4,4,0,0,0,0,4,4,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 12. 쿠니오 — 열혈경파, 교복 불량학생
+  { name:'KUNIO',       sub:'NEKKETSU',          glow:'#ff4444', rare:4,
+    pal:['transparent','#3355cc','#112299','#ffccaa','#cc2200','#ffff44','#ffffff','#884400'],
+    map:[
+      [0,0,0,0,4,4,4,4,4,0,0,0,0,0,0,0],
+      [0,0,0,4,3,3,3,3,3,4,0,0,0,0,0,0],
+      [0,0,0,4,3,4,3,4,3,4,0,0,0,0,0,0],
+      [0,0,0,4,3,3,3,3,3,4,0,0,0,0,0,0],
+      [0,0,0,0,4,4,4,4,4,0,0,0,0,0,0,0],
+      [0,0,0,4,6,1,1,1,6,4,0,0,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,1,4,0,0,0],
+      [4,2,1,1,1,1,1,1,1,1,1,2,4,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,0,4,1,1,4,4,1,1,4,0,0,0,0,0],
+      [0,0,0,4,1,4,0,0,4,1,4,0,0,0,0,0],
+      [0,0,0,4,4,0,0,0,0,4,4,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 13. 캡틴 코만도 — 파란 마스크 히어로
+  { name:'CAPTAIN',     sub:'CAPTAIN COMMANDO',  glow:'#4488ff', rare:3,
+    pal:['transparent','#3366cc','#1133aa','#ffccaa','#cc2200','#ffff44','#88ccff','#ffffff'],
+    map:[
+      [0,0,0,0,4,4,4,4,4,4,0,0,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,0,4,6,1,6,1,6,1,4,0,0,0,0,0],
+      [0,0,0,4,1,3,3,3,1,1,4,0,0,0,0,0],
+      [0,0,0,0,4,1,4,4,1,4,0,0,0,0,0,0],
+      [0,0,0,4,5,1,1,1,1,5,4,0,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,1,4,0,0,0],
+      [4,2,1,1,1,1,1,1,1,1,1,2,4,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,0,4,1,1,4,4,1,1,4,0,0,0,0,0],
+      [0,0,0,4,1,4,0,0,4,1,4,0,0,0,0,0],
+      [0,0,0,4,4,0,0,0,0,4,4,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 14. 트윈비 — 노란 귀여운 전투기
+  { name:'TWINBEE',     sub:'TWINBEE',           glow:'#ffee44', rare:3,
+    pal:['transparent','#ffdd00','#cc8800','#ffffff','#ff4444','#3366ff','#ffff88','#222222'],
+    map:[
+      [0,0,0,0,0,0,5,5,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,5,5,5,5,0,0,0,0,0,0,0],
+      [0,0,0,0,5,1,5,5,1,5,0,0,0,0,0,0],
+      [0,0,0,4,1,1,1,1,1,1,4,0,0,0,0,0],
+      [0,0,4,1,1,4,4,4,4,1,1,4,0,0,0,0],
+      [0,0,4,1,1,3,4,4,3,1,1,4,0,0,0,0],
+      [0,0,4,1,1,4,4,4,4,1,1,4,0,0,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,1,4,0,0,0],
+      [4,1,1,2,1,1,1,1,1,1,2,1,1,4,0,0],
+      [4,1,1,1,1,1,1,1,1,1,1,1,1,4,0,0],
+      [0,4,1,1,1,6,1,1,6,1,1,1,4,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,1,4,0,0,0,0],
+      [0,0,0,4,2,4,0,0,4,2,4,0,0,0,0,0],
+      [0,0,0,4,4,0,0,0,0,4,4,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+
+  // 15. R-9 — R-TYPE, 붉은 포스 달린 전투기
+  { name:'R-9',         sub:'R-TYPE',            glow:'#ff2288', rare:4,
+    pal:['transparent','#cc3377','#881144','#ffffff','#ffff44','#333333','#ff88cc','#aaaaff'],
+    map:[
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,4,4,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,4,1,1,4,0,0,0,0,0,0],
+      [0,0,0,0,0,4,1,1,4,1,4,0,0,0,0,0],
+      [0,0,0,0,4,1,1,1,1,1,1,4,0,0,0,0],
+      [0,0,0,4,1,1,2,1,1,2,1,1,4,0,0,0],
+      [0,0,4,1,1,1,1,1,1,1,1,1,1,4,0,0],
+      [0,4,1,1,1,1,1,1,1,1,1,1,1,1,4,0],
+      [4,4,4,1,1,1,3,3,3,1,1,1,4,4,4,0],
+      [0,4,1,1,1,1,1,1,1,1,1,1,1,1,4,0],
+      [0,0,4,1,1,5,1,1,1,5,1,1,1,4,0,0],
+      [0,0,0,4,1,1,1,1,1,1,1,1,4,0,0,0],
+      [0,0,0,0,4,2,4,0,4,2,4,0,0,0,0,0],
+      [0,0,0,0,0,4,0,0,0,4,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ]},
+];
+
+// 상태
+// ══════════════════════════════════════════
+const state = {
+  2: { unlocked:[0], active:0, score:0, newSet: new Set() },
+  3: { unlocked:[0], active:0, score:0, newSet: new Set() },
+};
+let currentCh = 2;
+
+const RARE_STARS = ['','★☆☆☆☆','★★☆☆☆','★★★☆☆','★★★★☆','★★★★★'];
+const phoneW = Math.min(390, window.innerWidth);
+
+// Ch.2: 10×10 투박한 큰 도트 / Ch.3: 16×16 정밀 도트
+const CFG = {
+  2: { grid:10, heroPx: Math.floor(phoneW/20), miniGrid:5, miniPx: Math.max(5, Math.floor(phoneW/56)) },
+  3: { grid:16, heroPx: Math.floor(phoneW/30), miniGrid:8, miniPx: Math.max(3, Math.floor(phoneW/100)) },
+};
+
+function getChars(ch) { return ch === 2 ? chars2 : chars3; }
+
+// ── 챕터 전환 ──
+function switchChapter(ch) {
+  currentCh = ch;
+  document.getElementById('tab2').className = 'ch-tab' + (ch===2?' active-ch2':'');
+  document.getElementById('tab3').className = 'ch-tab' + (ch===3?' active-ch3':'');
+  document.getElementById('scene2').className = 'scene scene-ch2' + (ch===2?' visible':'');
+  document.getElementById('scene3').className = 'scene scene-ch3' + (ch===3?' visible':'');
+}
+
+// ── 렌더 ──
+function renderHero(ch) {
+  const s = state[ch];
+  const chars = getChars(ch);
+  const c = chars[s.active];
+  const cfg = CFG[ch];
+  const el = document.getElementById('hero'+ch);
+  el.innerHTML = '';
+  el.style.cssText = `display:grid;grid-template-columns:repeat(${cfg.grid},${cfg.heroPx}px);grid-template-rows:repeat(${cfg.grid},${cfg.heroPx}px);image-rendering:pixelated;filter:drop-shadow(0 0 16px ${c.glow}99);animation:heroFloat 2.8s ease-in-out infinite;`;
+  c.map.flat().forEach(px => {
+    const d = document.createElement('div');
+    d.style.cssText = `background:${c.pal[px]};width:${cfg.heroPx}px;height:${cfg.heroPx}px;`;
+    el.appendChild(d);
+  });
+  document.getElementById('name'+ch).textContent = c.name;
+  document.getElementById('sub'+ch).textContent = c.sub;
+  document.getElementById('rarity'+ch).textContent = RARE_STARS[c.rare] || '★★★☆☆';
+  document.getElementById('shadow'+ch).style.background =
+    `radial-gradient(ellipse, ${c.glow}44 0%, transparent 70%)`;
+}
+
+function renderSlots(ch) {
+  const s = state[ch];
+  const chars = getChars(ch);
+  const total = chars.length;
+  const row = document.getElementById('slots'+ch);
+  row.innerHTML = '';
+  document.getElementById('count'+ch).innerHTML = `<span>${String(s.unlocked.length).padStart(2,'0')}</span> / ${total}`;
+
+  const order = [
+    ...s.unlocked.slice().sort((a,b)=>a-b),
+    ...Array.from({length:total},(_,i)=>i).filter(i=>!s.unlocked.includes(i))
+  ];
+
+  order.forEach(i => {
+    const isUnlocked = s.unlocked.includes(i);
+    const isActive = s.active === i;
+    const isNew = s.newSet.has(i);
+    const c = chars[i];
+
+    const card = document.createElement('div');
+    card.className = 'slot-card' + (!isUnlocked?' locked':'') + (isActive?' active':'') + (isNew?' newly-unlocked':'');
+
+    const badge = document.createElement('div');
+    badge.className = 'new-badge';
+    badge.textContent = 'NEW';
+    card.appendChild(badge);
+
+    const num = document.createElement('div');
+    num.className = 'slot-num';
+    num.textContent = String(i+1).padStart(2,'0');
+    card.appendChild(num);
+
+    if (isUnlocked) {
+      const cfg = CFG[ch];
+      const mini = document.createElement('div');
+      mini.className = 'mini-art';
+      const mG = cfg.miniGrid, mP = cfg.miniPx;
+      const step = cfg.grid / mG;
+      mini.style.cssText = `display:grid;grid-template-columns:repeat(${mG},${mP}px);grid-template-rows:repeat(${mG},${mP}px);width:${mP*mG}px;height:${mP*mG}px;image-rendering:pixelated;filter:drop-shadow(0 0 4px ${c.glow}66);`;
+      for (let ry=0;ry<mG;ry++) for (let rx=0;rx<mG;rx++) {
+        const pv = c.map[Math.floor(ry*step)][Math.floor(rx*step)];
+        const d = document.createElement('div');
+        d.style.cssText = `background:${c.pal[pv]};width:${mP}px;height:${mP}px;`;
+        mini.appendChild(d);
+      }
+      card.appendChild(mini);
+      const lbl = document.createElement('div');
+      lbl.className = 'slot-label';
+      lbl.textContent = c.name;
+      card.appendChild(lbl);
+      card.onclick = () => {
+        s.active = i;
+        s.newSet.delete(i);
+        renderHero(ch);
+        renderSlots(ch);
+      };
+    } else {
+      const cfg2 = CFG[ch];
+      const sp = document.createElement('div');
+      sp.style.cssText = `width:${cfg2.miniPx*cfg2.miniGrid}px;height:${cfg2.miniPx*cfg2.miniGrid}px;display:flex;align-items:center;justify-content:center;`;
+      sp.innerHTML = `<span style="font-size:14px;color:#1a1a1a;font-family:monospace;">?</span>`;
+      card.appendChild(sp);
+      const lbl = document.createElement('div');
+      lbl.className = 'slot-label';
+      lbl.textContent = '???';
+      card.appendChild(lbl);
+    }
+    row.appendChild(card);
+  });
+}
+
+// ── 해금 ──
+function tryUnlock(ch) {
+  const s = state[ch];
+  const chars = getChars(ch);
+  const locked = Array.from({length:chars.length},(_,i)=>i).filter(i=>!s.unlocked.includes(i));
+  if (!locked.length) {
+    document.getElementById('btn'+ch).textContent = '★ ALL AVATARS COLLECTED ★';
+    document.getElementById('btn'+ch).disabled = true;
+    return;
+  }
+  const pick = locked[Math.floor(Math.random()*locked.length)];
+  s.unlocked.push(pick);
+  s.newSet.add(pick);
+  s.score += 1000 + (chars[pick].rare * 500);
+  document.getElementById('score'+ch).textContent = String(s.score).padStart(6,'0');
+  showOverlay(ch, pick);
+}
+
+function showOverlay(ch, idx) {
+  const c = getChars(ch)[idx];
+  const cfg = CFG[ch];
+  // Ch.2: 10x10 큰 도트 / Ch.3: 16x16 정밀 도트
+  const OPX = ch === 2 ? 18 : 10;
+  const overlayChar = document.getElementById('overlayChar'+ch);
+  overlayChar.innerHTML = '';
+  overlayChar.style.cssText = `display:grid;grid-template-columns:repeat(${cfg.grid},${OPX}px);grid-template-rows:repeat(${cfg.grid},${OPX}px);image-rendering:pixelated;filter:drop-shadow(0 0 20px ${c.glow});`;
+  c.map.flat().forEach(pv => {
+    const d = document.createElement('div');
+    d.style.cssText = `background:${c.pal[pv]};width:${OPX}px;height:${OPX}px;`;
+    overlayChar.appendChild(d);
+  });
+  document.getElementById('overlayName'+ch).textContent = c.name;
+  document.getElementById('overlaySub'+ch).textContent = c.sub + '  ' + RARE_STARS[c.rare];
+  document.getElementById('overlay'+ch).classList.add('show');
+}
+
+function closeOverlay(ch) {
+  document.getElementById('overlay'+ch).classList.remove('show');
+  const s = state[ch];
+  s.active = s.unlocked[s.unlocked.length-1];
+  renderHero(ch);
+  renderSlots(ch);
+}
+
+// ── 초기화 ──
+renderHero(2); renderSlots(2);
+renderHero(3); renderSlots(3);
+</script>
+</body>
+</html>

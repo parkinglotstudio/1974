@@ -1,0 +1,88 @@
+# NO MEMORY Intro Animation Concept Document
+
+## Project Overview
+
+NO MEMORY는 1974년생 플레이어가 디지털 문명의 발전과 함께 성장하는
+nostalgia-based game project입니다.
+
+인트로 애니메이션은 챕터1 플레이를 대체하는 프롤로그 역할을 합니다.
+
+플레이어는 기억이 없는 상태에서 시작하여,
+인간으로 태어나고 성장한 뒤
+처음 디지털(오락실)을 만나는 순간까지를 경험합니다.
+
+---
+
+## Core Theme
+
+Memory before memory.
+
+플레이어는 실제 기억이 없는 유년 시절을 직접 플레이하지 않습니다.
+
+대신,
+
+* 탄생
+* 성장
+* 학교
+* 시간 흐름
+* 첫 디지털 접촉
+
+이 과정을 감성적인 pixel animation으로 압축 전달합니다.
+
+---
+
+## Core Message
+
+인간은 태어나지만,
+플레이어는 첫 코인을 넣는 순간 탄생한다.
+
+---
+
+## Emotional Direction
+
+Mood
+
+* nostalgic
+* emotional
+* playful
+* mysterious
+* digital awakening
+
+느낌
+
+* 어린 시절 기억의 단편
+* 디지털 이전의 공백
+* 첫 디지털 충격
+
+---
+
+## Narrative Flow
+
+1. Void
+2. Signal generation
+3. Title appearance
+4. Birth
+5. Crawling
+6. Standing
+7. Walking
+8. Running
+9. Time progression
+10. School entry
+11. Unknown signal detection
+12. First arcade encounter
+13. Insert Coin
+14. Chapter 02 transition
+
+---
+
+## Important Design Rule
+
+이 인트로는 단순 레트로 영상이 아닙니다.
+
+핵심은:
+
+* 인간 성장
+* 시간 흐름
+* 첫 디지털 각성
+
+입니다.
