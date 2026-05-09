@@ -19,285 +19,305 @@ export default class IntroScene {
     }
 
     async enter() {
-        console.log("Entering Cinematic Intro Scene - Action Mode");
+        console.log("Entering Accelerating Chaos Intro Scene");
         const uiLayer = document.getElementById('ui-layer');
         uiLayer.innerHTML = `
-            <div id="intro-container" class="intro-world">
+            <style>
+                #intro-container {
+                    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                    background: #000; display: flex; align-items: center; justify-content: center;
+                    overflow: hidden; z-index: 10000;
+                }
+                #intro-canvas {
+                    max-width: 100%; max-height: 100%; object-fit: contain;
+                    box-shadow: 0 0 50px rgba(255,255,255,0.1);
+                }
+                #no-memory-tag {
+                    position: absolute; top: 30px; left: 30px;
+                    font-family: 'VT323'; font-size: 32px; color: #fff;
+                    text-shadow: 2px 2px 0 #000; z-index: 10001; pointer-events: none;
+                }
+                #skip-btn {
+                    position: absolute; top: 30px; right: 30px;
+                    background: rgba(255,255,255,0.1); border: 2px solid #fff;
+                    color: #fff; padding: 10px 25px; font-family: 'VT323'; font-size: 24px;
+                    cursor: pointer; z-index: 10001; transition: all 0.2s;
+                }
+                #skip-btn:hover { background: #fff; color: #000; }
+            </style>
+            <div id="intro-container">
                 <canvas id="intro-canvas"></canvas>
-                <div id="intro-ui-overlay"></div>
-                <button id="skip-btn" class="kbtn sm" style="position:absolute; bottom:20px; right:20px; opacity:0.3; z-index:10000; border:1px solid #444; color:#444;">SKIP >></button>
+                <div id="intro-ui-overlay" style="position:absolute; width:100%; height:100%; pointer-events:none;"></div>
+                <div id="no-memory-tag">NO MEMORY</div>
+                <button id="skip-btn">SKIP >></button>
             </div>
         `;
 
         this.canvas = document.getElementById('intro-canvas');
         this.ctx = this.canvas.getContext('2d');
-        this.canvas.width = 400; // Resolution internal
+        this.canvas.width = 400;
         this.canvas.height = 400;
         
         document.getElementById('skip-btn').onclick = () => this.skip();
 
-        this.initBGParticles();
-        this.playSequence();
+        // Assets Loading
+        this.bgImages = [];
+        for (let i = 1; i <= 7; i++) {
+            const img = new Image();
+            img.src = `assets/bg_${i}.jpg`;
+            await new Promise(r => { img.onload = r; img.onerror = r; });
+            this.bgImages.push(img);
+        }
+
+        this.historyImages = {};
+        this.milestones = [1974, 1977, 1980];
+        for (const y of this.milestones) {
+            const img = new Image();
+            img.src = `assets/${y}.png`;
+            await new Promise(r => { img.onload = r; img.onerror = r; });
+            this.historyImages[y] = img;
+        }
+
+        this.balls = [];
+        this.starBursts = [];
+        this.flashCircle = { radius: 0, active: false, x: 200, y: 200 };
+        this.years = [1974, 1975, 1976, 1977, 1978, 1979, 1980];
+        
+        this.currentBgIdx = 0;
+        this.frame = 0;
+        this.lastTick = 0;
+        this.isSkipped = false;
+        this.fps = 60;
+        this.tickInterval = 1000 / this.fps;
+
+        this.startSequence();
         this.animate(0);
     }
 
-    initBGParticles() {
-        this.bgParticles = [];
-        for (let i = 0; i < 100; i++) {
-            this.bgParticles.push({
-                x: Math.random() * 400,
-                y: Math.random() * 400,
-                z: Math.random() * 400,
-                v: Math.random() * 2 + 1
-            });
-        }
-    }
-
-    async playSequence() {
-        for (let i = 0; i < IntroCutscene.length; i++) {
-            if (this.isSkipped) break;
-            this.currentSceneIdx = i;
-            const data = IntroCutscene[i];
-            this.initScene(data);
-            await this.delay(data.duration);
-        }
-        if (!this.isSkipped) this.finish();
-    }
-
-    initScene(data) {
-        this.frame = 0;
-        this.camera.shake = data.type.includes('shatter') ? 15 : 0;
-        this.camera.zoom = data.type.includes('apex') ? 1.8 : 1;
+    async startSequence() {
+        let loopCount = 0;
+        let baseDelay = 2000;
         
-        if (data.type === 'vortex_text') this.createSpiralParticles(data.content);
-        if (data.type === 'dissolve_burst') this.createRadialBurst();
-        
-        if (data.type.includes('action') || data.type.includes('jump')) {
-            this.charState.state = 'run';
-            this.charState.vy = 0;
-            this.charState.ay = 0.6; // Gravity
+        while (!this.isSkipped) {
+            for (let i = 0; i < this.years.length; i++) {
+                if (this.isSkipped) break;
+                
+                this.spawnBall(this.years[i]);
+                
+                // Acceleration: Faster each ball, and even faster each loop
+                let currentDelay = baseDelay - (i * 150) - (loopCount * 200);
+                if (currentDelay < 400) currentDelay = 400; // Cap at max speed
+                
+                await this.delay(currentDelay);
+            }
+            
+            // On first loop end, spawn NEXT ball
+            if (loopCount === 0 && !this.isSkipped) {
+                this.spawnNextBall();
+            }
+            
+            loopCount++;
+            baseDelay -= 300; // Speed up the next full cycle
+            if (baseDelay < 800) baseDelay = 800;
+            
+            await this.delay(500); // Short pause before next cycle
         }
     }
 
-    createSpiralParticles(text) {
-        this.particles = [];
-        this.ctx.font = "bold 60px 'VT323'";
-        const metrics = this.ctx.measureText(text);
-        const tx = (400 - metrics.width) / 2;
-        const ty = 200;
-        
-        for (let i = 0; i < 100; i++) {
-            this.particles.push({
-                x: 200, y: 200,
-                angle: (i / 100) * Math.PI * 8,
-                radius: 300,
-                targetX: tx + Math.random() * metrics.width,
-                targetY: ty + (Math.random() - 0.5) * 40,
-                speed: 2 + Math.random() * 3,
-                active: true, life: 1.0
-            });
-        }
-    }
-
-    createRadialBurst() {
-        this.particles.forEach(p => {
-            const ang = Math.random() * Math.PI * 2;
-            const spd = Math.random() * 10 + 5;
-            p.vx = Math.cos(ang) * spd;
-            p.vy = Math.sin(ang) * spd;
-            p.active = true;
-            p.life = 1.0;
+    spawnBall(year) {
+        this.balls.push({
+            year: year,
+            x: -30, y: 150,
+            vx: 4.5, vy: -12,
+            radius: 25, gravity: 0.7, bounce: 0.75,
+            squash: 1, stretch: 1,
+            state: 'bouncing',
+            isFinal: false
         });
+    }
+
+    spawnNextBall() {
+        this.balls.push({
+            year: 'NEXT',
+            x: -30, y: 150,
+            vx: 5, vy: -14,
+            radius: 35, gravity: 0.7, bounce: 0.8,
+            squash: 1, stretch: 1,
+            state: 'bouncing',
+            isFinal: true,
+            floatFrame: 0
+        });
+    }
+
+    animate(now) {
+        if (this.isSkipped) return;
+        requestAnimationFrame((t) => this.animate(t));
+        if (now - this.lastTick < this.tickInterval) return;
+        this.lastTick = now;
+        this.frame++;
+        this.update();
+        this.draw();
     }
 
     update() {
-        const data = IntroCutscene[this.currentSceneIdx];
-        if (!data) return;
-
-        // Spiral update
-        if (data.type === 'vortex_text') {
-            this.particles.forEach(p => {
-                if (p.radius > 0) p.radius -= p.speed * 2;
-                p.x = 200 + Math.cos(p.angle + this.frame * 0.1) * p.radius;
-                p.y = 200 + Math.sin(p.angle + this.frame * 0.1) * p.radius;
-            });
+        // Flash Circle
+        if (this.flashCircle.active) {
+            this.flashCircle.radius += 20;
+            if (this.flashCircle.radius > 600) this.flashCircle.active = false;
         }
 
-        // Action Physics (Better Jump)
-        if (data.type.includes('action') || data.type.includes('jump')) {
-            // Auto Jump logic for years
-            if (this.frame % 40 === 0 && this.charState.y >= 300) {
-                this.charState.vy = -12; // Jump Force
+        // Star Bursts
+        for (let i = this.starBursts.length - 1; i >= 0; i--) {
+            const s = this.starBursts[i];
+            s.scale += 0.15; s.life -= 0.05;
+            if (s.life <= 0) this.starBursts.splice(i, 1);
+        }
+
+        this.balls.forEach((ball, idx) => {
+            if (ball.isFinal && ball.state === 'final_stop') {
+                ball.floatFrame += 0.05;
+                ball.y = 200 + Math.sin(ball.floatFrame) * 8;
+                return;
             }
 
-            if (this.charState.y < 300) {
-                let grav = 0.6;
-                if (this.charState.vy > 0) grav *= 1.5; // Better Jump: faster fall
-                this.charState.vy += grav;
+            ball.vy += ball.gravity;
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            if (ball.y + ball.radius > 360) {
+                ball.y = 360 - ball.radius;
+                ball.vy *= -ball.bounce;
+                ball.squash = 0.3; ball.stretch = 1.7;
+                
+                this.currentBgIdx = (this.currentBgIdx + 1) % this.bgImages.length;
+                this.flashCircle.active = true;
+                this.flashCircle.x = ball.x;
+                this.flashCircle.y = 360;
+                this.flashCircle.radius = 0;
+                this.starBursts.push({ x: ball.x, y: 360, scale: 0.1, life: 1.0 });
+
+                if (ball.isFinal && ball.x > 180 && ball.x < 220) {
+                    ball.state = 'final_stop';
+                    ball.x = 200; ball.y = 200;
+                    ball.vx = 0; ball.vy = 0;
+                    this.showStartPrompt();
+                }
             } else {
-                this.charState.vy = 0;
-                this.charState.y = 300;
+                ball.squash += (1 - ball.squash) * 0.2;
+                ball.stretch += (1 - ball.stretch) * 0.2;
             }
-            this.charState.y += this.charState.vy;
-        }
-
-        // BG Particles
-        this.bgParticles.forEach(p => {
-            p.x -= (data.speed === 'fast' ? 15 : 5);
-            if (p.x < 0) p.x = 400;
+            if (!ball.isFinal && ball.x > 500) this.balls.splice(idx, 1);
         });
+    }
 
-        if (this.camera.shake > 0) this.camera.shake *= 0.9;
+    showStartPrompt() {
+        const skipBtn = document.getElementById('skip-btn');
+        if (!skipBtn) return;
+        
+        // Transform SKIP button to START button
+        skipBtn.innerHTML = "START CHAPTER 2 >";
+        skipBtn.style.background = "#fff";
+        skipBtn.style.color = "#000";
+        skipBtn.style.fontSize = "28px";
+        skipBtn.style.padding = "15px 35px";
+        skipBtn.style.boxShadow = "0 0 30px #fff";
+        skipBtn.style.animation = "blink-btn 0.8s infinite";
+        
+        // Add dynamic blink animation if not exists
+        if (!document.getElementById('intro-blink-style')) {
+            const style = document.createElement('style');
+            style.id = 'intro-blink-style';
+            style.innerHTML = `
+                @keyframes blink-btn { 
+                    0% { opacity: 0.6; transform: scale(1); } 
+                    50% { opacity: 1; transform: scale(1.05); } 
+                    100% { opacity: 0.6; transform: scale(1); } 
+                }
+            `;
+            document.head.appendChild(style);
+        }
     }
 
     draw() {
-        const data = IntroCutscene[this.currentSceneIdx];
-        if (!data) return;
-
-        this.ctx.save();
         this.ctx.fillStyle = '#000';
         this.ctx.fillRect(0, 0, 400, 400);
 
-        if (this.camera.shake > 0) {
-            this.ctx.translate((Math.random()-0.5)*this.camera.shake, (Math.random()-0.5)*this.camera.shake);
+        if (this.flashCircle.active || this.starBursts.length > 0) {
+            this.ctx.save();
+            this.ctx.beginPath();
+            if (this.flashCircle.active) this.ctx.arc(this.flashCircle.x, this.flashCircle.y, this.flashCircle.radius, 0, Math.PI * 2);
+            this.starBursts.forEach(s => {
+                this.ctx.moveTo(s.x, s.y);
+                this.ctx.arc(s.x, s.y, s.scale * 160, 0, Math.PI * 2);
+            });
+            this.ctx.clip();
+            const img = this.bgImages[this.currentBgIdx];
+            if (img) this.ctx.drawImage(img, 0, 0, 400, 400);
+            this.ctx.restore();
         }
-        
-        this.drawBackground(data);
 
-        this.ctx.fillStyle = '#fff';
-        this.ctx.textAlign = 'center';
-        
-        switch (data.type) {
-            case 'vortex_text':
-                this.drawActiveTitle(data);
-                break;
-            case 'dissolve_burst':
-                this.drawBurstParticles();
-                break;
-            case 'spawn_actor':
-                this.drawSprite(data.state, 200, 300);
-                this.ctx.font = "24px 'VT323'";
-                this.ctx.fillText(data.content, 200, 200);
-                break;
-            case 'action_run':
-                this.drawActionRun(data);
-                break;
-            case 'the_wall':
-                this.drawTheWall(data);
-                break;
-            case 'super_jump_apex':
-                this.drawSuperJump();
-                break;
-            case 'color_shatter':
-                this.drawColorShatter();
-                break;
-            case 'arcade_dive':
-                this.drawArcadeDive();
-                break;
+        if (this.flashCircle.active) {
+            this.ctx.save();
+            this.ctx.beginPath();
+            this.ctx.arc(this.flashCircle.x, this.flashCircle.y, this.flashCircle.radius, 0, Math.PI * 2);
+            this.ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - this.flashCircle.radius/600)})`;
+            this.ctx.lineWidth = 6; this.ctx.stroke();
+            this.ctx.restore();
         }
+
+        this.starBursts.forEach(s => this.drawPixelStar(s.x, s.y, s.scale, s.life));
+
+        this.balls.forEach(ball => {
+            this.ctx.save();
+            this.ctx.translate(ball.x, ball.y);
+            this.ctx.scale(ball.stretch, ball.squash);
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, ball.radius, 0, Math.PI * 2);
+            this.ctx.fillStyle = '#fff'; this.ctx.fill();
+            this.ctx.fillStyle = '#000';
+            this.ctx.font = ball.isFinal ? "bold 22px 'VT323'" : "bold 18px 'VT323'";
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(ball.year, 0, ball.isFinal ? 8 : 6);
+            this.ctx.restore();
+        });
 
         this.drawDitheringBorder();
-        this.ctx.restore();
     }
 
-    drawActionRun(data) {
-        const yearX = 400 - (this.frame * 10) % 600;
-        this.ctx.font = "bold 40px 'VT323'";
-        this.ctx.fillText(data.startYear, yearX, 300);
-        this.ctx.fillRect(0, 305, 400, 2);
-        
-        // Squash and Stretch based on vy
-        let stretch = 1.0;
-        let squash = 1.0;
-        if (this.charState.vy < 0) stretch = 1.2, squash = 0.8;
-        if (this.charState.vy > 0) stretch = 0.8, squash = 1.2;
-        
-        this.drawSprite('run', 100, this.charState.y, stretch, squash);
-    }
-
-    drawTheWall(data) {
-        this.ctx.fillRect(300, 100, 100, 300);
-        this.ctx.font = "40px 'VT323'";
+    drawPixelStar(x, y, scale, life) {
         this.ctx.save();
-        this.ctx.translate(350, 250);
-        this.ctx.rotate(-Math.PI/2);
-        this.ctx.fillText(data.year, 0, 0);
-        this.ctx.restore();
-        this.drawSprite('run', 100, 300);
-    }
-
-    drawSuperJump() {
-        const jumpY = 300 - Math.min(200, this.frame * 10);
-        const apexHold = this.frame > 20 ? 0 : (this.frame > 15 ? 0 : 5);
-        this.drawSprite('run', 250, jumpY + apexHold, 1.5, 0.7);
-        this.ctx.fillRect(300, 100, 100, 300);
-    }
-
-    drawColorShatter() {
-        const colors = ['#0ff', '#f0f', '#ff0'];
-        for (let i = 0; i < 50; i++) {
-            this.ctx.fillStyle = colors[i % 3];
-            this.ctx.fillRect(Math.random() * 400, Math.random() * 400, 10, 10);
+        this.ctx.translate(x, y); this.ctx.scale(scale, scale);
+        this.ctx.strokeStyle = '#fff'; this.ctx.lineWidth = 5;
+        this.ctx.setLineDash([8, 8]); this.ctx.globalAlpha = life;
+        this.ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+            this.ctx.lineTo(Math.cos((18 + i * 72) / 180 * Math.PI) * 100, -Math.sin((18 + i * 72) / 180 * Math.PI) * 100);
+            this.ctx.lineTo(Math.cos((54 + i * 72) / 180 * Math.PI) * 40, -Math.sin((54 + i * 72) / 180 * Math.PI) * 40);
         }
-        this.ctx.fillStyle = '#fff';
-        this.ctx.font = "30px 'VT323'";
-        this.ctx.fillText("AWAKENING", 200, 200);
-    }
-
-    drawArcadeDive() {
-        const r = Math.max(0, 200 - this.frame * 5);
-        this.ctx.strokeStyle = '#0ff';
-        this.ctx.strokeRect(200 - r, 200 - r, r * 2, r * 2);
-        this.ctx.fillStyle = '#fff';
-        this.ctx.fillText("INSERT COIN", 200, 200);
-    }
-
-    drawSprite(state, x, y, stretch = 1, squash = 1) {
-        this.ctx.save();
-        this.ctx.translate(x, y);
-        this.ctx.scale(squash, stretch);
-        this.ctx.fillStyle = '#fff';
-        
-        if (state === 'baby') {
-            this.ctx.fillRect(-15, -10, 30, 15);
-            this.ctx.fillRect(-5, -25, 12, 12);
-        } else {
-            this.ctx.fillRect(-8, -50, 16, 30); // body
-            this.ctx.fillRect(-5, -65, 12, 12); // head
-            this.ctx.fillRect(-10, -20, 8, 20); // legs
-            this.ctx.fillRect(2, -20, 8, 20);
-        }
+        this.ctx.closePath();
+        this.ctx.stroke();
         this.ctx.restore();
     }
 
-    drawBurstParticles() {
-        this.particles.forEach(p => {
-            if (p.active) {
-                p.x += p.vx; p.y += p.vy;
-                p.life -= 0.02;
-                this.ctx.globalAlpha = p.life;
-                this.ctx.fillRect(p.x, p.y, 4, 4);
-            }
+    drawMemorySlide() {
+        const slideWidth = 400;
+        this.bgImages.forEach((img, i) => {
+            if (!img) return;
+            let x = (i * slideWidth) - (this.bgScrollX % (this.bgImages.length * slideWidth));
+            if (x < -slideWidth) x += (this.bgImages.length * slideWidth);
+            this.ctx.save();
+            this.ctx.globalAlpha = 0.5;
+            this.ctx.drawImage(img, x, 50, 400, 300);
+            this.ctx.restore();
         });
-        this.ctx.globalAlpha = 1;
-    }
-
-    drawActiveTitle(data) {
-        this.particles.forEach(p => {
-            this.ctx.fillRect(p.x, p.y, 4, 4);
-        });
-        this.ctx.font = "bold 60px 'VT323'";
-        this.ctx.fillText(data.content, 200, 200);
     }
 
     drawDitheringBorder() {
         this.ctx.fillStyle = '#000';
         for (let i = 0; i < 400; i += 4) {
             for (let j = 0; j < 400; j += 4) {
-                if (i < 20 || i > 380 || j < 20 || j > 380) {
-                    if ((i + j + this.frame) % 8 === 0) {
-                        this.ctx.fillRect(i, j, 4, 4);
-                    }
+                if (i < 10 || i > 390 || j < 10 || j > 390) {
+                    if ((i + j + this.frame) % 8 === 0) this.ctx.fillRect(i, j, 4, 4);
                 }
             }
         }

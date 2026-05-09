@@ -42,10 +42,14 @@
 
 ---
 
-## ⚙️ Core Mechanics
-- **Experience Point (XP)**: 챕터별 활동(게임 플레이, 게시판 글쓰기 등)을 통해 획득.
-- **Economy (Gold)**: PC 통신 및 퀘스트 보상으로 획득하여 아바타 구매 및 강화에 사용.
-- **Metadata Interaction**: 과거의 데이터가 미래 챕터의 단서나 아이템으로 작용하는 유기적 연결.
+## 🚀 Tech & Platform Roadmap
+1. **Multi-Platform Strategy**: 
+   - **Phase 1 (Web)**: HTML5/Canvas 기반의 웹 서비스를 우선 구축하여 접근성 확보.
+   - **Phase 2 (Mobile/PC App)**: **Flutter**를 활용하여 웹 코드를 패키징하거나 전용 앱으로 확장하여 스토어 출시.
+2. **Modular Game Engine**: 
+   - 모든 게임과 씬은 독립된 모듈로 설계하여, 새로운 미니게임을 무한히 추가할 수 있는 구조 유지.
+3. **Server-Side Management**: 
+   - 유저의 자산(Gold, Avatar), 랭킹, PC 통신 데이터는 중앙 서버에서 관리하여 모든 플랫폼에서 데이터 동기화 지원.
 
 ---
 
