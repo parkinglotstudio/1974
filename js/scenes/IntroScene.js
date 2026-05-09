@@ -66,80 +66,87 @@ export default class IntroScene {
 
     initScene(data) {
         this.frame = 0;
-        this.camera.shake = data.effect === 'camera_shake' ? 10 : 0;
-        this.camera.zoom = data.effect === 'zoom_in' ? 1.5 : 1;
+        this.camera.shake = data.type.includes('shatter') ? 15 : 0;
+        this.camera.zoom = data.type.includes('apex') ? 1.8 : 1;
         
-        if (data.effect === 'vortex_decay') this.createVortexParticles(data.main);
-        if (data.type.includes('action')) {
-            this.charState.state = data.state || 'run';
-            this.charState.x = data.type.includes('timeline') ? -20 : 200;
+        if (data.type === 'vortex_text') this.createSpiralParticles(data.content);
+        if (data.type === 'dissolve_burst') this.createRadialBurst();
+        
+        if (data.type.includes('action') || data.type.includes('jump')) {
+            this.charState.state = 'run';
+            this.charState.vy = 0;
+            this.charState.ay = 0.6; // Gravity
         }
     }
 
-    createVortexParticles(text) {
+    createSpiralParticles(text) {
         this.particles = [];
         this.ctx.font = "bold 60px 'VT323'";
         const metrics = this.ctx.measureText(text);
         const tx = (400 - metrics.width) / 2;
         const ty = 200;
         
-        for (let i = 0; i < text.length; i++) {
-            const char = text[i];
-            const cx = tx + i * 35;
-            for (let py = -20; py < 20; py += 3) {
-                for (let px = -12; px < 12; px += 3) {
-                    this.particles.push({
-                        x: cx + px, y: ty + py,
-                        angle: Math.atan2(py, px),
-                        dist: Math.sqrt(px*px + py*py),
-                        speed: Math.random() * 2 + 2,
-                        life: 1.0, active: false
-                    });
-                }
-            }
+        for (let i = 0; i < 100; i++) {
+            this.particles.push({
+                x: 200, y: 200,
+                angle: (i / 100) * Math.PI * 8,
+                radius: 300,
+                targetX: tx + Math.random() * metrics.width,
+                targetY: ty + (Math.random() - 0.5) * 40,
+                speed: 2 + Math.random() * 3,
+                active: true, life: 1.0
+            });
         }
     }
 
-    animate(now) {
-        if (this.isSkipped) return;
-        requestAnimationFrame((t) => this.animate(t));
-
-        if (now - this.lastTick < this.tickInterval) return;
-        this.lastTick = now;
-        this.frame++;
-
-        this.update();
-        this.draw();
+    createRadialBurst() {
+        this.particles.forEach(p => {
+            const ang = Math.random() * Math.PI * 2;
+            const spd = Math.random() * 10 + 5;
+            p.vx = Math.cos(ang) * spd;
+            p.vy = Math.sin(ang) * spd;
+            p.active = true;
+            p.life = 1.0;
+        });
     }
 
     update() {
         const data = IntroCutscene[this.currentSceneIdx];
         if (!data) return;
 
-        // Particle update (Vortex)
-        if (data.effect === 'vortex_decay' && this.frame > 20) {
+        // Spiral update
+        if (data.type === 'vortex_text') {
             this.particles.forEach(p => {
-                p.active = true;
-                p.angle += 0.1;
-                p.dist += p.speed;
-                p.x = 200 + Math.cos(p.angle) * p.dist;
-                p.y = 200 + Math.sin(p.angle) * p.dist;
-                p.life -= 0.015;
+                if (p.radius > 0) p.radius -= p.speed * 2;
+                p.x = 200 + Math.cos(p.angle + this.frame * 0.1) * p.radius;
+                p.y = 200 + Math.sin(p.angle + this.frame * 0.1) * p.radius;
             });
         }
 
-        // BG Particles update
-        this.bgParticles.forEach(p => {
-            if (data.bgEffect === 'speed_lines') {
-                p.x -= p.v * 10;
-                if (p.x < 0) p.x = 400;
-            } else if (data.bgEffect === 'stardust') {
-                p.z -= 2;
-                if (p.z < 1) p.z = 400;
+        // Action Physics (Better Jump)
+        if (data.type.includes('action') || data.type.includes('jump')) {
+            // Auto Jump logic for years
+            if (this.frame % 40 === 0 && this.charState.y >= 300) {
+                this.charState.vy = -12; // Jump Force
             }
+
+            if (this.charState.y < 300) {
+                let grav = 0.6;
+                if (this.charState.vy > 0) grav *= 1.5; // Better Jump: faster fall
+                this.charState.vy += grav;
+            } else {
+                this.charState.vy = 0;
+                this.charState.y = 300;
+            }
+            this.charState.y += this.charState.vy;
+        }
+
+        // BG Particles
+        this.bgParticles.forEach(p => {
+            p.x -= (data.speed === 'fast' ? 15 : 5);
+            if (p.x < 0) p.x = 400;
         });
 
-        // Camera shake
         if (this.camera.shake > 0) this.camera.shake *= 0.9;
     }
 
@@ -151,7 +158,6 @@ export default class IntroScene {
         this.ctx.fillStyle = '#000';
         this.ctx.fillRect(0, 0, 400, 400);
 
-        // Shake & Zoom
         if (this.camera.shake > 0) {
             this.ctx.translate((Math.random()-0.5)*this.camera.shake, (Math.random()-0.5)*this.camera.shake);
         }
@@ -162,31 +168,31 @@ export default class IntroScene {
         this.ctx.textAlign = 'center';
         
         switch (data.type) {
-            case 'cinematic_text':
-                this.ctx.font = "30px 'VT323'";
-                this.ctx.globalAlpha = Math.min(1, this.frame / 15);
-                this.ctx.fillText(data.content, 200, 200);
-                break;
-            case 'pulse_dither':
-                this.drawDitheredPulse(data);
-                break;
-            case 'title_active':
+            case 'vortex_text':
                 this.drawActiveTitle(data);
                 break;
-            case 'growth_active':
-                this.drawActiveGrowth(data);
+            case 'dissolve_burst':
+                this.drawBurstParticles();
                 break;
-            case 'timeline_action':
-                this.drawTimelineAction(data);
+            case 'spawn_actor':
+                this.drawSprite(data.state, 200, 300);
+                this.ctx.font = "24px 'VT323'";
+                this.ctx.fillText(data.content, 200, 200);
                 break;
-            case 'arcade_cinematic':
-                this.drawArcadeCinematic();
+            case 'action_run':
+                this.drawActionRun(data);
                 break;
-            case 'title_cinematic':
-                this.ctx.font = "50px 'VT323'";
-                this.ctx.fillText(data.main, 200, 180);
-                this.ctx.font = "18px 'VT323'";
-                this.ctx.fillText(data.sub, 200, 230);
+            case 'the_wall':
+                this.drawTheWall(data);
+                break;
+            case 'super_jump_apex':
+                this.drawSuperJump();
+                break;
+            case 'color_shatter':
+                this.drawColorShatter();
+                break;
+            case 'arcade_dive':
+                this.drawArcadeDive();
                 break;
         }
 
@@ -194,130 +200,94 @@ export default class IntroScene {
         this.ctx.restore();
     }
 
-    drawBackground(data) {
-        if (data.bgEffect === 'stardust') {
-            this.ctx.fillStyle = '#fff';
-            this.bgParticles.forEach(p => {
-                const sx = (p.x - 200) * (400 / p.z) + 200;
-                const sy = (p.y - 200) * (400 / p.z) + 200;
-                const size = (400 / p.z) * 1.5;
-                if (sx > 0 && sx < 400 && sy > 0 && sy < 400) {
-                    this.ctx.fillRect(sx, sy, size, size);
-                }
-            });
-        } else if (data.bgEffect === 'grid_warp') {
-            this.ctx.strokeStyle = '#222';
-            this.ctx.lineWidth = 1;
-            for (let i = 0; i < 400; i += 40) {
-                this.ctx.beginPath();
-                this.ctx.moveTo(i, 0);
-                this.ctx.bezierCurveTo(i + Math.sin(this.frame*0.1)*50, 200, i, 400, i, 400);
-                this.ctx.stroke();
-                this.ctx.beginPath();
-                this.ctx.moveTo(0, i);
-                this.ctx.lineTo(400, i);
-                this.ctx.stroke();
-            }
-        } else if (data.bgEffect === 'speed_lines') {
-            this.ctx.fillStyle = '#444';
-            this.bgParticles.forEach(p => {
-                this.ctx.fillRect(p.x, p.y, p.v * 20, 1);
-            });
-        }
+    drawActionRun(data) {
+        const yearX = 400 - (this.frame * 10) % 600;
+        this.ctx.font = "bold 40px 'VT323'";
+        this.ctx.fillText(data.startYear, yearX, 300);
+        this.ctx.fillRect(0, 305, 400, 2);
+        
+        // Squash and Stretch based on vy
+        let stretch = 1.0;
+        let squash = 1.0;
+        if (this.charState.vy < 0) stretch = 1.2, squash = 0.8;
+        if (this.charState.vy > 0) stretch = 0.8, squash = 1.2;
+        
+        this.drawSprite('run', 100, this.charState.y, stretch, squash);
     }
 
-    drawDitheredPulse(data) {
-        const r = (this.frame * 8) % 300;
-        this.ctx.strokeStyle = '#fff';
-        for (let i = 0; i < 360; i += 10) {
-            if ((i + this.frame * 5) % 20 < 10) continue;
-            const x = 200 + Math.cos(i * Math.PI / 180) * r;
-            const y = 200 + Math.sin(i * Math.PI / 180) * r;
-            this.ctx.fillRect(x, y, 4, 4);
-        }
-        this.ctx.font = "24px 'VT323'";
-        this.ctx.fillText(data.content, 200, 200);
+    drawTheWall(data) {
+        this.ctx.fillRect(300, 100, 100, 300);
+        this.ctx.font = "40px 'VT323'";
+        this.ctx.save();
+        this.ctx.translate(350, 250);
+        this.ctx.rotate(-Math.PI/2);
+        this.ctx.fillText(data.year, 0, 0);
+        this.ctx.restore();
+        this.drawSprite('run', 100, 300);
     }
 
-    drawActiveTitle(data) {
-        if (this.frame < 25) {
-            this.ctx.font = "bold 60px 'VT323'";
-            const glitch = this.frame % 5 === 0 ? (Math.random()-0.5)*10 : 0;
-            this.ctx.fillText(data.main, 200 + glitch, 200);
+    drawSuperJump() {
+        const jumpY = 300 - Math.min(200, this.frame * 10);
+        const apexHold = this.frame > 20 ? 0 : (this.frame > 15 ? 0 : 5);
+        this.drawSprite('run', 250, jumpY + apexHold, 1.5, 0.7);
+        this.ctx.fillRect(300, 100, 100, 300);
+    }
+
+    drawColorShatter() {
+        const colors = ['#0ff', '#f0f', '#ff0'];
+        for (let i = 0; i < 50; i++) {
+            this.ctx.fillStyle = colors[i % 3];
+            this.ctx.fillRect(Math.random() * 400, Math.random() * 400, 10, 10);
         }
+        this.ctx.fillStyle = '#fff';
+        this.ctx.font = "30px 'VT323'";
+        this.ctx.fillText("AWAKENING", 200, 200);
+    }
+
+    drawArcadeDive() {
+        const r = Math.max(0, 200 - this.frame * 5);
+        this.ctx.strokeStyle = '#0ff';
+        this.ctx.strokeRect(200 - r, 200 - r, r * 2, r * 2);
+        this.ctx.fillStyle = '#fff';
+        this.ctx.fillText("INSERT COIN", 200, 200);
+    }
+
+    drawSprite(state, x, y, stretch = 1, squash = 1) {
+        this.ctx.save();
+        this.ctx.translate(x, y);
+        this.ctx.scale(squash, stretch);
+        this.ctx.fillStyle = '#fff';
+        
+        if (state === 'baby') {
+            this.ctx.fillRect(-15, -10, 30, 15);
+            this.ctx.fillRect(-5, -25, 12, 12);
+        } else {
+            this.ctx.fillRect(-8, -50, 16, 30); // body
+            this.ctx.fillRect(-5, -65, 12, 12); // head
+            this.ctx.fillRect(-10, -20, 8, 20); // legs
+            this.ctx.fillRect(2, -20, 8, 20);
+        }
+        this.ctx.restore();
+    }
+
+    drawBurstParticles() {
         this.particles.forEach(p => {
-            if (p.active && p.life > 0) {
+            if (p.active) {
+                p.x += p.vx; p.y += p.vy;
+                p.life -= 0.02;
                 this.ctx.globalAlpha = p.life;
                 this.ctx.fillRect(p.x, p.y, 4, 4);
             }
         });
-        this.ctx.globalAlpha = 1.0;
+        this.ctx.globalAlpha = 1;
     }
 
-    drawActiveGrowth(data) {
-        const x = 200;
-        const y = 250;
-        this.drawSprite(data.state, x, y);
-        this.ctx.font = "20px 'VT323'";
-        this.ctx.fillText(data.content, 200, 150);
-    }
-
-    drawTimelineAction(data) {
-        const years = [1974, 1975, 1976, 1977, 1978, 1979, 1980];
-        this.ctx.fillStyle = '#444';
-        this.ctx.fillRect(0, 300, 400, 2);
-        
-        years.forEach((y, i) => {
-            const x = (i * 250 - this.frame * 15) % (years.length * 250);
-            if (x > -100 && x < 500) {
-                this.ctx.fillStyle = '#fff';
-                this.ctx.font = "30px 'VT323'";
-                this.ctx.fillText(y, x, 280);
-                this.ctx.fillRect(x - 50, 300, 100, 4);
-            }
+    drawActiveTitle(data) {
+        this.particles.forEach(p => {
+            this.ctx.fillRect(p.x, p.y, 4, 4);
         });
-        this.drawSprite('run', 200, 300);
-    }
-
-    drawArcadeCinematic() {
-        const cx = 200; const cy = 200;
-        this.ctx.strokeStyle = '#fff';
-        this.ctx.strokeRect(cx - 60, cy - 100, 120, 200);
-        
-        const colors = ['#0ff', '#f0f', '#ff0'];
-        const c = colors[Math.floor(this.frame / 2) % 3];
-        this.ctx.fillStyle = c;
-        this.ctx.shadowBlur = 20; this.ctx.shadowColor = c;
-        this.ctx.fillRect(cx - 50, cy - 90, 100, 80);
-        this.ctx.shadowBlur = 0;
-
-        this.ctx.fillStyle = '#fff';
-        this.ctx.font = "18px 'VT323'";
-        this.ctx.fillText("INSERT COIN", cx, cy + 30);
-        this.drawSprite('idle', cx - 30, cy + 100);
-    }
-
-    drawSprite(state, x, y) {
-        this.ctx.fillStyle = '#fff';
-        const f = Math.floor(this.frame / 2) % 2;
-        if (state === 'baby') {
-            this.ctx.fillRect(x - 15, y - 10, 30, 15);
-            this.ctx.fillRect(x - 5, y - 25, 12, 12);
-        } else if (state === 'run') {
-            const bob = f === 0 ? 0 : -5;
-            this.ctx.fillRect(x - 8, y - 50 + bob, 16, 30);
-            this.ctx.fillRect(x - 5, y - 65 + bob, 12, 12);
-            if (f === 0) {
-                this.ctx.fillRect(x - 15, y - 20, 10, 20);
-                this.ctx.fillRect(x + 5, y - 20, 10, 20);
-            } else {
-                this.ctx.fillRect(x - 5, y - 20, 10, 25);
-            }
-        } else {
-            this.ctx.fillRect(x - 6, y - 40, 12, 25);
-            this.ctx.fillRect(x - 4, y - 55, 10, 10);
-            this.ctx.fillRect(x - (f === 0 ? 8 : 2), y - 15, 6, 15);
-        }
+        this.ctx.font = "bold 60px 'VT323'";
+        this.ctx.fillText(data.content, 200, 200);
     }
 
     drawDitheringBorder() {
