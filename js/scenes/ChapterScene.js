@@ -42,9 +42,15 @@ export default class ChapterScene {
             let titleText = this.db.getMsg('CH_INFO').replace('[chapter_name]', chapterData.name);
             uiLayer.innerHTML = `
                 ${timelineHtml}
-                <div class="hud" style="padding-top: 50px;">
-                    <div>${titleText}</div>
-                    <div>SCORE: ${this.gm.state.score}</div>
+                <div class="hud" style="padding-top: 60px; pointer-events: none;">
+                    <div style="pointer-events: none;">${titleText}</div>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                        <div style="pointer-events: none;">SCORE: ${this.gm.state.score}</div>
+                        <div style="display: flex; gap: 10px; pointer-events: auto;">
+                            <div id="pixel-tool-btn" style="background: rgba(0,255,255,0.1); border: 1px solid #0ff; color: #0ff; padding: 5px 15px; cursor: pointer; font-size: 14px; text-shadow: 0 0 5px #0ff;">[ PIXEL TOOL ]</div>
+                            <div id="reset-btn">RESET SAVE DATA</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="ui-content" style="height: calc(100% - 40px); display: flex; flex-direction: column; justify-content: flex-start; align-items: center; gap: 10px; padding-top: 20px; overflow-y: auto;">
                     <div class="title-text" style="color: ${chapterData.theme_color}; text-shadow: 0 0 10px ${chapterData.theme_color}; font-size: 3rem;">
@@ -67,6 +73,23 @@ export default class ChapterScene {
                 card.appendChild(nameLabel);
                 gallery.appendChild(card);
             });
+
+            const resetBtn = document.getElementById('reset-btn');
+            if(resetBtn) {
+                resetBtn.onclick = () => {
+                    if(confirm("정말 모든 데이터를 초기화하고 10,000G로 다시 시작할까요?")) {
+                        this.gm.resetGameData();
+                    }
+                };
+            }
+
+            const ptBtn = document.getElementById('pixel-tool-btn');
+            if(ptBtn) {
+                ptBtn.onclick = () => {
+                    this.exit();
+                    this.gm.changeScene('PixelToolScene');
+                };
+            }
         } else {
             // Chapter 2 & 3
             let starsHtml = chapterId === 2 ? 

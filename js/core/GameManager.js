@@ -3,6 +3,8 @@ import IntroScene from '../scenes/IntroScene.js';
 import ChapterScene from '../scenes/ChapterScene.js';
 import PCCommunicationScene from '../scenes/PCCommunicationScene.js';
 import PacmanScene from '../scenes/PacmanScene.js';
+import PixelToolScene from '../scenes/PixelToolScene.js';
+
 
 export default class GameManager {
     constructor(db) {
@@ -12,8 +14,10 @@ export default class GameManager {
             'IntroScene': new IntroScene(this),
             'ChapterScene': new ChapterScene(this),
             'PCCommunicationScene': new PCCommunicationScene(this),
-            'PacmanScene': new PacmanScene(this)
+            'PacmanScene': new PacmanScene(this),
+            'PixelToolScene': new PixelToolScene(this)
         };
+
         this.currentScene = null;
         
         // Initial Game State
@@ -85,5 +89,18 @@ export default class GameManager {
             if (!this.state.owned_avatars) this.state.owned_avatars = {};
             if (this.state.gold === undefined) this.state.gold = 10000;
         }
+    }
+
+    resetGameData() {
+        this.state = {
+            currentChapter: 1,
+            score: 0,
+            gold: 10000,
+            unlockedAvatars: [],
+            owned_avatars: {}
+        };
+        this.saveState();
+        this.initDefaultAvatars();
+        location.reload();
     }
 }

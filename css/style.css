@@ -473,3 +473,24 @@ canvas#main-canvas {
     display: none;
 }
 .slot-card.newly-unlocked .new-badge { display: block; }
+
+/* RESET DATA BUTTON STYLE */
+#reset-btn {
+    pointer-events: auto !important;
+    cursor: pointer;
+    color: #ff4444;
+    border: 1px solid #ff4444;
+    padding: 4px 10px;
+    font-size: 12px;
+    border-radius: 4px;
+    background: rgba(255, 0, 0, 0.15);
+    text-shadow: 0 0 8px #ff4444;
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.2);
+    transition: all 0.2s;
+    z-index: 1000;
+}
+#reset-btn:hover {
+    background: rgba(255, 0, 0, 0.3);
+    box-shadow: 0 0 15px #ff4444;
+    transform: scale(1.05);
+}

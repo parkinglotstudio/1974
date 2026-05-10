@@ -44,13 +44,33 @@ export default class IntroScene {
                     cursor: pointer; z-index: 10001; transition: all 0.2s;
                 }
                 #skip-btn:hover { background: #fff; color: #000; }
+                #intro-reset-btn {
+                    position: absolute; top: 85px; right: 30px;
+                    background: rgba(255,0,0,0.1); border: 2px solid #ff4444;
+                    color: #ff4444; padding: 5px 15px; font-family: 'VT323'; font-size: 18px;
+                    cursor: pointer; z-index: 10001; transition: all 0.2s;
+                    text-shadow: 0 0 5px #ff4444;
+                }
+                #intro-reset-btn:hover { background: #ff4444; color: #fff; box-shadow: 0 0 15px #ff4444; }
+                #intro-pixel-tool-btn {
+                    position: absolute; top: 125px; right: 30px;
+                    background: rgba(0,255,255,0.1); border: 2px solid #0ff;
+                    color: #0ff; padding: 5px 15px; font-family: 'VT323'; font-size: 18px;
+                    cursor: pointer; z-index: 10001; transition: all 0.2s;
+                    text-shadow: 0 0 5px #0ff;
+                }
+                #intro-pixel-tool-btn:hover { background: #0ff; color: #000; box-shadow: 0 0 15px #0ff; }
             </style>
+
             <div id="intro-container">
                 <canvas id="intro-canvas"></canvas>
                 <div id="intro-ui-overlay" style="position:absolute; width:100%; height:100%; pointer-events:none;"></div>
                 <div id="no-memory-tag">NO MEMORY</div>
                 <button id="skip-btn">SKIP >></button>
+                <button id="intro-reset-btn">RESET DATA</button>
+                <button id="intro-pixel-tool-btn">PIXEL TOOL</button>
             </div>
+
         `;
 
         this.canvas = document.getElementById('intro-canvas');
@@ -59,6 +79,16 @@ export default class IntroScene {
         this.canvas.height = 400;
         
         document.getElementById('skip-btn').onclick = () => this.skip();
+        document.getElementById('intro-reset-btn').onclick = () => {
+            if(confirm("정말 모든 데이터를 초기화하고 10,000G로 다시 시작할까요?")) {
+                this.gm.resetGameData();
+            }
+        };
+        document.getElementById('intro-pixel-tool-btn').onclick = () => {
+            this.exit();
+            this.gm.changeScene('PixelToolScene');
+        };
+
 
         // Assets Loading
         this.bgImages = [];
