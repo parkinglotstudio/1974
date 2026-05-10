@@ -60,7 +60,15 @@ export default class GameManager {
 
     start() {
         console.log("Game Manager Started.");
-        // If save says chapter > 1, maybe skip intro? For now, always intro to test flow.
+        
+        // Check for persisted scene from a full refresh (like from Pixel Tool)
+        const lastScene = sessionStorage.getItem('lastScene');
+        if (lastScene && this.scenes[lastScene]) {
+            sessionStorage.removeItem('lastScene'); // Use once and clear
+            this.changeScene(lastScene);
+            return;
+        }
+
         this.changeScene('IntroScene');
     }
 

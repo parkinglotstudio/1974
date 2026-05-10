@@ -99,7 +99,7 @@ export default class PixelToolScene {
             .dot:nth-child(3) { animation-delay: 0.4s; }
             @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
 
-            #pt-toolbar { padding: 10px 20px; background: #252526; border-top: 1px solid #3e3e42; display: flex; align-items: center; gap: 20px; flex-shrink: 0; }
+            #pt-toolbar { padding: 10px 20px; background: #252526; border-top: 1px solid #3e3e42; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; flex-shrink: 0; }
             .tool-item { display: flex; align-items: center; gap: 10px; font-size: 12px; }
             select, input[type="text"].small { border: 1px solid #444; background: #333; color: #eee; padding: 4px 8px; border-radius: 4px; }
             button { padding: 6px 14px; border-radius: 4px; border: 1px solid #444; background: #333; color: #fff; cursor: pointer; font-size: 12px; font-weight: 600; }
@@ -110,8 +110,11 @@ export default class PixelToolScene {
         </style>
         <div id="pt-container">
             <div id="pt-header">
-                <h1>PIXEL ART PRO 3.5 AI</h1>
-                <div class="tool-item"><button id="pt-back-btn">EXIT TOOL</button></div>
+                <h1>PIXEL ART PRO 4.0 AI</h1>
+                <div class="tool-item" style="gap:10px;">
+                    <button id="pt-full-refresh-btn" style="background:#d32f2f; border:none;">🔄 FULL REFRESH</button>
+                    <button id="pt-back-btn">EXIT TOOL</button>
+                </div>
             </div>
             <div id="pt-body">
                 <div id="pt-left">
@@ -159,12 +162,12 @@ export default class PixelToolScene {
                     <span style="color:#888;">PATH:</span>
                     <input type="text" id="pt-folder" class="small" style="width:120px;" value="assets/pixelart/">
                 </div>
-                <div class="tool-item" style="flex:1; justify-content:center;">
+                <div class="tool-item" style="flex:1; justify-content:center; gap:5px;">
                     <input type="text" id="pt-filename" class="small" style="width:150px;" placeholder="filename">
                     <button id="pt-save-btn" class="success">SAVE JSON</button>
-                    <button id="pt-load-json-btn" class="primary" style="margin-left:5px;">LOAD JSON</button>
+                    <button id="pt-load-json-btn" class="primary">LOAD JSON</button>
+                    <button id="pt-load-btn" style="background:#6a1b9a; border:none;">LOAD PNG</button>
                 </div>
-                <div class="tool-item"><button id="pt-load-btn">LOAD PNG</button></div>
                 <div class="tool-item">
                     <span style="color:#888;">FPS:</span>
                     <input type="range" id="pt-fps" min="1" max="12" value="4">
@@ -178,6 +181,10 @@ export default class PixelToolScene {
 
     bindEvents() {
         document.getElementById('pt-back-btn').onclick = () => this.exit();
+        document.getElementById('pt-full-refresh-btn').onclick = () => {
+            sessionStorage.setItem('lastScene', 'PixelToolScene');
+            location.reload();
+        };
         document.getElementById('pt-load-btn').onclick = () => document.getElementById('pt-hidden-file').click();
         document.getElementById('pt-hidden-file').onchange = (e) => this.handleUpload(e);
         document.getElementById('pt-save-btn').onclick = () => this.save();

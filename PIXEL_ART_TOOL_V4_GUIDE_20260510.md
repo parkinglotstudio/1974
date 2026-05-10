@@ -30,6 +30,10 @@
 - **Duplicate Protection:** 저장 시 동일한 파일명이 존재할 경우 사용자에게 덮어쓰기 여부를 확인하는 세이프티 가드가 작동합니다.
 - **Path Management:** `assets/pixelart/` 외에도 사용자가 원하는 폴더 경로를 지정하여 파일을 관리할 수 있습니다.
 
+### 5. Session Persistence (세션 유지 기능)
+- **Full Refresh Button:** 툴 상단의 `🔄 FULL REFRESH` 버튼을 통해 브라우저를 완전히 새로고침하더라도 작업 중이던 툴로 즉시 복귀할 수 있습니다.
+- **Scene Recovery:** `sessionStorage`를 활용하여 마지막 활성 장면을 기억하고, 게임 재부팅 시 인트로를 생략하고 해당 장면으로 자동 이동하는 로직이 구현되어 있습니다.
+
 ---
 
 ## 🛠️ Technical Stack (사용 기술)
