@@ -194,18 +194,20 @@ export default class ChapterScene {
                 const isOwned = !!this.gm.state.owned_avatars[avatar.id];
                 
                 // Extract visual properties from the new JSON structure
-                const visualData = avatar.visual || avatar; 
-                // Since AvatarRenderer expects pixel_map, palette, image_url at the root of the object:
                 const renderData = {
-                    pixel_map: visualData.pixel_map,
-                    palette: visualData.palette,
-                    image_url: visualData.image_url,
+                    ...avatar.visual,
                     glow: avatar.glow
                 };
                 
                 let mapWidth = 16;
-                if(renderData.pixel_map && renderData.pixel_map[0]) mapWidth = renderData.pixel_map[0].length;
-                const miniScale = mapWidth > 16 ? 1 : 2; 
+                if (renderData.pixel_data) {
+                    mapWidth = renderData.pixel_data.width;
+                } else if (renderData.pixel_map && renderData.pixel_map[0]) {
+                    mapWidth = renderData.pixel_map[0].length;
+                }
+                
+                // For the slot, we want it to fit within ~50px
+                const miniScale = Math.max(1, Math.floor(50 / mapWidth));
                 
                 const miniCanvas = AvatarRenderer.renderToCanvas(renderData, false, false, miniScale);
                 if (miniCanvas.tagName === 'IMG') {
@@ -300,18 +302,21 @@ export default class ChapterScene {
         const heroContainer = document.getElementById('hero-canvas-container');
         heroContainer.innerHTML = '';
         
-        const visualData = avatar.visual || avatar;
         const renderData = {
-            pixel_map: visualData.pixel_map,
-            palette: visualData.palette,
-            image_url: visualData.image_url,
+            ...avatar.visual,
             glow: avatar.glow
         };
 
         let mapWidth = 16;
-        if(renderData.pixel_map && renderData.pixel_map[0]) mapWidth = renderData.pixel_map[0].length;
+        if (renderData.pixel_data) {
+            mapWidth = renderData.pixel_data.width;
+        } else if (renderData.pixel_map && renderData.pixel_map[0]) {
+            mapWidth = renderData.pixel_map[0].length;
+        }
+
         // Auto calculate scale to fit ~280px (increased from 200)
-        const bigScale = Math.floor(280 / mapWidth);
+        // If image is very large (like 136), scale might be 1 or 2.
+        const bigScale = Math.max(1, Math.floor(280 / mapWidth));
         
         const bigCanvas = AvatarRenderer.renderToCanvas(renderData, false, false, bigScale);
         if (bigCanvas.tagName === 'IMG') {

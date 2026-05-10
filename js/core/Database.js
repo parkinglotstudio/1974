@@ -11,7 +11,20 @@ export default class Database {
         
         try {
             const res = await fetch('data/avatars.json');
-            this.avatars = await res.json();
+            const rawAvatars = await res.json();
+            
+            // 외부 픽셀 JSON 로드 처리
+            for (const av of rawAvatars) {
+                if (av.visual && av.visual.pixel_json) {
+                    try {
+                        const pRes = await fetch(`assets/pixelart/${av.visual.pixel_json}`);
+                        av.visual.pixel_data = await pRes.json();
+                    } catch (pe) {
+                        console.warn(`Failed to load pixel art: ${av.visual.pixel_json}`, pe);
+                    }
+                }
+            }
+            this.avatars = rawAvatars;
             console.log("Avatars loaded:", this.avatars.length);
         } catch(e) {
             console.error("Failed to load avatars.json", e);

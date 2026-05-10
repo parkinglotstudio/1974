@@ -438,10 +438,20 @@ canvas#main-canvas {
     border-color: #00ccff;
     background: #00080f;
 }
-.mini-art { display: grid; image-rendering: pixelated; }
+.mini-art { 
+    display: block; 
+    image-rendering: pixelated; 
+    max-width: 90%; 
+    max-height: 45px; 
+    object-fit: contain;
+}
 .slot-label {
-    font-size: 11px; color: #2a2a2a;
-    text-align: center; line-height: 1.8;
+    font-size: 8px; color: #2a2a2a;
+    text-align: center; line-height: 1.2;
+    width: 90%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .slot-card.active .slot-label { color: #ffa500; }
 .scene-ch3 .slot-card.active .slot-label { color: #00ccff; }
