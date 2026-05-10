@@ -4,6 +4,7 @@ export default class ChapterScene {
     constructor(gameManager) {
         this.gm = gameManager;
         this.db = gameManager.db;
+        this.heroAnimTimer = null;
     }
 
     enter(chapterId) {
@@ -302,6 +303,11 @@ export default class ChapterScene {
         const heroContainer = document.getElementById('hero-canvas-container');
         heroContainer.innerHTML = '';
         
+        if (this.heroAnimTimer) {
+            clearInterval(this.heroAnimTimer);
+            this.heroAnimTimer = null;
+        }
+        
         const renderData = {
             ...avatar.visual,
             glow: avatar.glow
@@ -335,6 +341,19 @@ export default class ChapterScene {
         
         heroContainer.appendChild(bigCanvas);
 
+        // Start Animation if multiple frames exist
+        const pd = renderData.pixel_data;
+        if (pd && pd.frames && pd.frames.length > 1) {
+            let currentFrame = 0;
+            const fps = pd.fps || 4;
+            this.heroAnimTimer = setInterval(() => {
+                currentFrame = (currentFrame + 1) % pd.frames.length;
+                const frameCanvas = AvatarRenderer.renderToCanvas(renderData, !isOwned, false, bigScale, currentFrame);
+                heroContainer.innerHTML = '';
+                heroContainer.appendChild(frameCanvas);
+            }, 1000 / fps);
+        }
+
         // Update Action Button
         const actionBtn = document.getElementById('hero-action-btn');
         if (actionBtn) {
@@ -364,6 +383,10 @@ export default class ChapterScene {
     }
 
     exit() {
+        if (this.heroAnimTimer) {
+            clearInterval(this.heroAnimTimer);
+            this.heroAnimTimer = null;
+        }
         document.getElementById('ui-layer').innerHTML = '';
         const container = document.getElementById('game-container');
         container.className = '';

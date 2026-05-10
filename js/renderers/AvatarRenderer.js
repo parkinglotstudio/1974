@@ -1,5 +1,5 @@
 export default class AvatarRenderer {
-    static renderToCanvas(avatarData, isLocked, isMonochrome, scale = 4) {
+    static renderToCanvas(avatarData, isLocked, isMonochrome, scale = 4, frameIdx = 0) {
         if (avatarData.image_url) {
             const img = new Image();
             img.src = avatarData.image_url;
@@ -10,18 +10,20 @@ export default class AvatarRenderer {
         const canvas = document.createElement('canvas');
 
         // New logic: Support for external pixel data (coordinate based)
-        // Checks both root and .visual for robustness
         const pixelData = avatarData.pixel_data || (avatarData.visual ? avatarData.visual.pixel_data : null);
 
         if (pixelData) {
             const data = pixelData;
-            canvas.width  = data.width * scale;
-            canvas.height = data.height * scale;
+            // Use specific frame if frames exist
+            const pixels = data.pixels || (data.frames && data.frames[frameIdx] ? data.frames[frameIdx].pixels : (data.frames ? data.frames[0].pixels : []));
+            
+            canvas.width  = (data.width || 128) * scale;
+            canvas.height = (data.height || 128) * scale;
 
             const ctx = canvas.getContext('2d');
             ctx.imageSmoothingEnabled = false;
 
-            for (const [x, y, color] of data.pixels) {
+            for (const [x, y, color] of pixels) {
                 if (isLocked) {
                     ctx.fillStyle = '#222222';
                 } else if (isMonochrome) {

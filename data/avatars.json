@@ -1,4 +1,4 @@
-﻿[
+[
     {
         "id":  101,
         "chapter_id":  2,
@@ -36,7 +36,7 @@
                        "base_atk":  10
                    },
         "visual":  {
-                       "pixel_json":  "pixel-large-8bit-1778369284084.json"
+                       "pixel_json":  "ch1_ani.json"
                    }
     },
     {

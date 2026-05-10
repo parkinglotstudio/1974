@@ -204,6 +204,9 @@ canvas#main-canvas {
     z-index: 100;
     pointer-events: none;
 }
+#game-container.no-crt::after {
+    display: none;
+}
 
 /* Popups */
 #popup-layer {
