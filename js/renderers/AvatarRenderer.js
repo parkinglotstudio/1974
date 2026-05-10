@@ -14,8 +14,7 @@ export default class AvatarRenderer {
 
         if (pixelData) {
             const data = pixelData;
-            // Use specific frame if frames exist
-            const pixels = data.pixels || (data.frames && data.frames[frameIdx] ? data.frames[frameIdx].pixels : (data.frames ? data.frames[0].pixels : []));
+            const palette = data.palette || [];
             
             canvas.width  = (data.width || 128) * scale;
             canvas.height = (data.height || 128) * scale;
@@ -23,15 +22,37 @@ export default class AvatarRenderer {
             const ctx = canvas.getContext('2d');
             ctx.imageSmoothingEnabled = false;
 
-            for (const [x, y, color] of pixels) {
-                if (isLocked) {
-                    ctx.fillStyle = '#222222';
-                } else if (isMonochrome) {
-                    ctx.fillStyle = '#00ff41';
-                } else {
-                    ctx.fillStyle = color;
+            // 1. Check for pixel_map (dense grid) first
+            const currentFrame = data.frames && data.frames[frameIdx] ? data.frames[frameIdx] : (data.frames ? data.frames[0] : data);
+            const pixelMap = currentFrame.pixel_map || data.pixel_map;
+
+            if (pixelMap) {
+                for (let y = 0; y < pixelMap.length; y++) {
+                    for (let x = 0; x < pixelMap[y].length; x++) {
+                        const val = pixelMap[y][x];
+                        if (val === 0 || val === null) continue; // Skip empty
+                        
+                        if (isLocked) ctx.fillStyle = '#222222';
+                        else if (isMonochrome) ctx.fillStyle = '#00ff41';
+                        else ctx.fillStyle = (typeof val === 'number') ? (palette[val] || '#ffffff') : val;
+
+                        if (ctx.fillStyle === 'transparent') continue;
+                        ctx.fillRect(x * scale, y * scale, scale, scale);
+                    }
                 }
-                ctx.fillRect(x * scale, y * scale, scale, scale);
+            } else {
+                // 2. Fallback to coordinate-based pixels list
+                const pixels = currentFrame.pixels || [];
+                for (const [x, y, colorOrIdx] of pixels) {
+                    if (isLocked) ctx.fillStyle = '#222222';
+                    else if (isMonochrome) ctx.fillStyle = '#00ff41';
+                    else {
+                        ctx.fillStyle = (typeof colorOrIdx === 'number') ? (palette[colorOrIdx] || '#ffffff') : colorOrIdx;
+                    }
+
+                    if (ctx.fillStyle === 'transparent') continue;
+                    ctx.fillRect(x * scale, y * scale, scale, scale);
+                }
             }
             return canvas;
         }

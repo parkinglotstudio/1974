@@ -22,6 +22,9 @@ export default class PixelToolScene {
 
         this.chatLog = [{ sender: 'Dani', text: '오빠! 나 왔어~ 💋 무엇을 도와줄까? 어떤 프레임을 고쳐볼까?' }];
         this.previewTimer = null;
+        this.isPlaying = false;
+        this.playFrameIdx = 0;
+        this.originalFrameIdx = 0;
     }
 
     createNewFrame(size) {
@@ -81,6 +84,15 @@ export default class PixelToolScene {
             #pt-canvas-container { width: 100%; height: 100%; cursor: crosshair; }
             #pt-editor-canvas { background-color: #fff; position: absolute; box-shadow: 0 0 40px rgba(0,0,0,0.4); }
             
+            #pt-play-controls {
+                position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+                background: rgba(37, 37, 38, 0.9); padding: 10px 20px; border-radius: 30px;
+                display: flex; gap: 15px; border: 1px solid #007bff; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                backdrop-filter: blur(5px); z-index: 100;
+            }
+            .play-btn { background: #28a745 !important; border-radius: 50% !important; width: 40px; height: 40px; padding: 0 !important; display: flex; align-items: center; justify-content: center; font-size: 18px !important; color: #fff !important; }
+            .stop-btn { background: #dc3545 !important; border-radius: 50% !important; width: 40px; height: 40px; padding: 0 !important; display: flex; align-items: center; justify-content: center; font-size: 18px !important; color: #fff !important; }
+            
             #pt-right { width: 340px; background: #252526; border-left: 1px solid #3e3e42; display: flex; flex-direction: column; }
             #pt-chat-header { padding: 15px; border-bottom: 1px solid #3e3e42; display: flex; align-items: center; gap: 10px; }
             .dani-avatar { width: 24px; height: 24px; background: #007bff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; }
@@ -107,6 +119,20 @@ export default class PixelToolScene {
             button.success { background: #28a745; color: #fff; border: none; }
             
             .zoom-info { position: absolute; bottom: 20px; right: 20px; background: rgba(0,0,0,0.6); color: #fff; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+            
+            /* New Frame Management Styles */
+            .frame-insert-btn { 
+                height: 24px; width: 24px; margin: -2px auto; 
+                background: #007bff; color: #fff; border-radius: 50%; 
+                display: flex; align-items: center; justify-content: center; 
+                font-size: 16px; font-weight: bold; cursor: pointer; 
+                z-index: 5; transition: transform 0.2s;
+                box-shadow: 0 0 5px rgba(0,123,255,0.5);
+            }
+            .frame-insert-btn:hover { transform: scale(1.2); background: #0056b3; }
+            
+            .pt-section-label { display: flex; justify-content: space-between; align-items: center; }
+            .frame-count { font-size: 9px; color: #007bff; border: 1px solid #007bff; padding: 1px 4px; border-radius: 3px; }
         </style>
         <div id="pt-container">
             <div id="pt-header">
@@ -119,10 +145,13 @@ export default class PixelToolScene {
             <div id="pt-body">
                 <div id="pt-left">
                     <div class="pt-section-label">PREVIEW</div>
-                    <div style="height:140px; display:flex; align-items:center; justify-content:center; background:#1a1a1a; border-bottom:1px solid #333; overflow:hidden;">
-                        <canvas id="pt-preview-canvas" style="image-rendering:pixelated; width:120px; height:120px;"></canvas>
+                    <div style="height:280px; display:flex; align-items:center; justify-content:center; background:#1a1a1a; border-bottom:1px solid #333; overflow:hidden;">
+                        <canvas id="pt-preview-canvas" style="image-rendering:pixelated; width:260px; height:260px;"></canvas>
                     </div>
-                    <div class="pt-section-label">TIMELINE (5 FRAMES)</div>
+                    <div class="pt-section-label">
+                        TIMELINE 
+                        <span class="frame-count" id="pt-frame-count">1/1</span>
+                    </div>
                     <div id="pt-timeline"></div>
                     <div style="padding:10px;">
                         <button id="pt-dup-btn" class="primary" style="width:100%;">DUPLICATE TO NEXT</button>
@@ -133,6 +162,10 @@ export default class PixelToolScene {
                 <div id="pt-main">
                     <div id="pt-canvas-container">
                         <canvas id="pt-editor-canvas"></canvas>
+                    </div>
+                    <div id="pt-play-controls">
+                        <button id="pt-play-start" class="play-btn" title="Play Animation">▶</button>
+                        <button id="pt-play-stop" class="stop-btn" title="Stop & Edit">■</button>
                     </div>
                     <div class="zoom-info" id="pt-zoom-display">100%</div>
                 </div>
@@ -200,6 +233,8 @@ export default class PixelToolScene {
             this.resetView();
             this.renderFrameSlots();
         };
+        document.getElementById('pt-play-start').onclick = () => this.startPlayback();
+        document.getElementById('pt-play-stop').onclick = () => this.stopPlayback();
 
         const container = document.getElementById('pt-canvas-container');
         container.onwheel = (e) => this.handleWheel(e);
@@ -269,7 +304,31 @@ export default class PixelToolScene {
         }
     }
 
+    startPlayback() {
+        if (this.isPlaying) return;
+        this.isPlaying = true;
+        this.originalFrameIdx = this.currentFrameIdx;
+        this.playFrameIdx = 0;
+        
+        const tick = () => {
+            if (!this.isPlaying || !this.isActive) return;
+            this.currentFrameIdx = this.playFrameIdx;
+            this.renderEditor();
+            this.playFrameIdx = (this.playFrameIdx + 1) % this.frames.length;
+            setTimeout(tick, 1000 / this.fps);
+        };
+        tick();
+    }
+
+    stopPlayback() {
+        this.isPlaying = false;
+        this.currentFrameIdx = this.originalFrameIdx;
+        this.renderEditor();
+        this.renderFrameSlots();
+    }
+
     setPixel(x, y, color) {
+        if (this.isPlaying) return; // Disable editing during play
         const frame = this.frames[this.currentFrameIdx];
         frame.pixels = frame.pixels.filter(p => p[0] !== x || p[1] !== y);
         if(color) frame.pixels.push([x, y, color]);
@@ -293,7 +352,8 @@ export default class PixelToolScene {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        if (drawScale > 4) {
+        // Grid only when NOT playing
+        if (!this.isPlaying && drawScale > 4) {
             ctx.strokeStyle = 'rgba(0,0,0,0.06)';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -315,13 +375,99 @@ export default class PixelToolScene {
     }
 
     duplicateFrame() {
-        const next = (this.currentFrameIdx + 1) % 5;
+        if (this.frames.length >= 10) return alert("오빠! 프레임은 최대 10개까지만 만들 수 있어! 💋");
+        
+        const nextIdx = this.currentFrameIdx + 1;
         // Deep copy the current frame to the next slot
-        this.frames[next] = JSON.parse(JSON.stringify(this.frames[this.currentFrameIdx]));
-        this.currentFrameIdx = next;
+        const newFrame = JSON.parse(JSON.stringify(this.frames[this.currentFrameIdx]));
+        this.frames.splice(nextIdx, 0, newFrame);
+        this.currentFrameIdx = nextIdx;
+        
         this.renderFrameSlots();
         this.renderEditor();
-        console.log("DUPLICATED TO SLOT", next);
+        console.log("DUPLICATED TO SLOT", nextIdx);
+    }
+
+    insertIntermediateFrame(idx) {
+        if (this.frames.length >= 10) return alert("오빠! 프레임은 최대 10개까지만 만들 수 있어! 💋");
+        
+        const f1 = this.frames[idx];
+        const f2 = this.frames[idx + 1];
+        
+        const midFrame = this.interpolateFrames(f1, f2);
+        this.frames.splice(idx + 1, 0, midFrame);
+        this.currentFrameIdx = idx + 1;
+        
+        this.renderFrameSlots();
+        this.renderEditor();
+        console.log("INTERPOLATED FRAME INSERTED AT", idx + 1);
+    }
+
+    interpolateFrames(f1, f2) {
+        const p1 = f1.pixels;
+        const p2 = f2.pixels;
+        const midPixels = [];
+        
+        // 1. Spatial Hash for Frame 2 (Optimize lookup to O(N))
+        const cellSize = 10;
+        const grid2 = new Map();
+        p2.forEach(p => {
+            const gx = Math.floor(p[0] / cellSize);
+            const gy = Math.floor(p[1] / cellSize);
+            const key = `${gx},${gy}`;
+            if (!grid2.has(key)) grid2.set(key, []);
+            grid2.get(key).push(p);
+        });
+
+        const matchedIn2 = new Set();
+
+        // 2. Map Frame 1 to Frame 2
+        p1.forEach(pix1 => {
+            let nearest = null;
+            let minDist = 40; // Max search radius for action
+            
+            const gx = Math.floor(pix1[0] / cellSize);
+            const gy = Math.floor(pix1[1] / cellSize);
+            
+            // Search nearby cells
+            for (let ox = -2; ox <= 2; ox++) {
+                for (let oy = -2; oy <= 2; oy++) {
+                    const cell = grid2.get(`${gx + ox},${gy + oy}`);
+                    if (!cell) continue;
+                    cell.forEach(pix2 => {
+                        if (pix1[2] === pix2[2]) { // Same color check
+                            const d = Math.sqrt(Math.pow(pix1[0] - pix2[0], 2) + Math.pow(pix1[1] - pix2[1], 2));
+                            if (d < minDist) {
+                                minDist = d;
+                                nearest = pix2;
+                            }
+                        }
+                    });
+                }
+            }
+
+            if (nearest) {
+                midPixels.push([
+                    Math.round((pix1[0] + nearest[0]) / 2),
+                    Math.round((pix1[1] + nearest[1]) / 2),
+                    pix1[2]
+                ]);
+                matchedIn2.add(nearest);
+            } else {
+                // Disappearing: Fade out via dither
+                if ((pix1[0] + pix1[1]) % 2 === 0) midPixels.push([...pix1]);
+            }
+        });
+
+        // 3. Add appearing pixels from Frame 2
+        p2.forEach(pix2 => {
+            if (!matchedIn2.has(pix2)) {
+                // Appearing: Fade in via dither
+                if ((pix2[0] + pix2[1]) % 2 === 1) midPixels.push([...pix2]);
+            }
+        });
+
+        return { width: f1.width, height: f1.height, pixels: midPixels };
     }
 
     handleUpload(e) {
@@ -378,22 +524,45 @@ export default class PixelToolScene {
                 const data = JSON.parse(ev.target.result);
                 this.canvasSize = data.width || 128;
                 this.fps = data.fps || 4;
-                document.getElementById('pt-fps').value = this.fps;
-                document.getElementById('pt-fps-val').innerText = this.fps;
+                const palette = data.palette || [];
+
+                const processPixels = (f) => {
+                    if (f.pixel_map) {
+                        const pixels = [];
+                        for (let y = 0; y < f.pixel_map.length; y++) {
+                            for (let x = 0; x < f.pixel_map[y].length; x++) {
+                                const val = f.pixel_map[y][x];
+                                if (val === 0 || val === null) continue;
+                                const color = (typeof val === 'number') ? (palette[val] || '#ffffff') : val;
+                                pixels.push([x, y, color]);
+                            }
+                        }
+                        return pixels;
+                    }
+                    if (f.pixels) {
+                        return f.pixels.map(p => {
+                            const color = (typeof p[2] === 'number') ? (palette[p[2]] || '#ffffff') : p[2];
+                            return [p[0], p[1], color];
+                        });
+                    }
+                    return [];
+                };
 
                 if(data.frames) {
-                    this.frames = data.frames.map(f => ({ width: this.canvasSize, height: this.canvasSize, pixels: f.pixels }));
+                    this.frames = data.frames.map(f => ({ width: this.canvasSize, height: this.canvasSize, pixels: processPixels(f) }));
                 } else {
-                    this.frames = [{ width: this.canvasSize, height: this.canvasSize, pixels: data.pixels }];
+                    this.frames = [{ width: this.canvasSize, height: this.canvasSize, pixels: processPixels(data) }];
                 }
                 
                 this.currentFrameIdx = 0;
+                document.getElementById('pt-fps').value = this.fps;
+                document.getElementById('pt-fps-val').innerText = this.fps;
                 document.getElementById('pt-size-select').value = this.canvasSize;
                 document.getElementById('pt-filename').value = file.name.replace('.json','');
                 this.resetView();
                 this.renderFrameSlots();
-                console.log("LOCAL JSON LOADED:", file.name);
             } catch(err) {
+                console.error(err);
                 alert("오빠! 이 JSON 파일 형식이 좀 이상한 것 같아. 확인해줘! 💋");
             }
         };
@@ -402,29 +571,63 @@ export default class PixelToolScene {
 
     renderFrameSlots() {
         const list = document.getElementById('pt-timeline');
+        const countDisplay = document.getElementById('pt-frame-count');
         if(!list) return;
+        
         list.innerHTML = '';
-        for(let i=0; i<5; i++) {
-            const frame = this.frames[i] || null;
+        if(countDisplay) countDisplay.innerText = `${this.currentFrameIdx + 1}/${this.frames.length}`;
+
+        this.frames.forEach((frame, i) => {
+            // 1. Draw the Frame Slot
             const slot = document.createElement('div');
             slot.className = `frame-slot ${i === this.currentFrameIdx ? 'active' : ''}`;
+            
             if(frame && frame.pixels.length > 0) {
                 const mini = document.createElement('canvas');
                 mini.width = frame.width; mini.height = frame.height;
                 const mctx = mini.getContext('2d');
-                for(const [px, py, col] of frame.pixels) { mctx.fillStyle = col; mctx.fillRect(px, py, 1, 1); }
+                for(const [px, py, col] of frame.pixels) { 
+                    mctx.fillStyle = col; 
+                    mctx.fillRect(px, py, 1, 1); 
+                }
                 slot.appendChild(mini);
             } else {
-                slot.innerHTML = '<span style="color:#333; font-size:16px;">+</span>';
+                slot.innerHTML = `<span style="color:#333; font-size:12px;">F${i+1}</span>`;
             }
+            
             slot.onclick = () => {
-                if(!this.frames[i]) this.frames[i] = this.createNewFrame(this.canvasSize);
                 this.currentFrameIdx = i;
                 this.renderFrameSlots();
                 this.renderEditor();
             };
+            
+            // Add right-click to delete
+            slot.oncontextmenu = (e) => {
+                e.preventDefault();
+                if (this.frames.length <= 1) return;
+                if (confirm(`오빠! ${i+1}번 프레임을 삭제할까? 🤔`)) {
+                    this.frames.splice(i, 1);
+                    this.currentFrameIdx = Math.min(this.currentFrameIdx, this.frames.length - 1);
+                    this.renderFrameSlots();
+                    this.renderEditor();
+                }
+            };
+
             list.appendChild(slot);
-        }
+
+            // 2. Draw "+" Button between frames
+            if (i < this.frames.length - 1 && this.frames.length < 10) {
+                const addBtn = document.createElement('div');
+                addBtn.className = 'frame-insert-btn';
+                addBtn.innerHTML = '+';
+                addBtn.title = "알고리즘 믹스로 중간 프레임 생성";
+                addBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.insertIntermediateFrame(i);
+                };
+                list.appendChild(addBtn);
+            }
+        });
     }
 
     startPreviewLoop() {
@@ -480,24 +683,58 @@ export default class PixelToolScene {
         if(!filename) return alert("파일 이름을 정해줘, 오빠! 💋");
         
         const fullFn = filename.endsWith('.json') ? filename : filename + '.json';
-        
-        // Duplicate check
         if (this.fileList.includes(fullFn)) {
             if (!confirm(`오빠! '${fullFn}' 파일이 이미 있어. 덮어쓸까? 🤔`)) return;
         }
 
-        const data = { width: this.canvasSize, height: this.canvasSize, fps: this.fps, frames: this.frames.filter(f => f.pixels.length > 0).map(f => ({ pixels: f.pixels })) };
+        // 1. Build Global Palette & Filter background (white)
+        const paletteMap = new Map();
+        const palette = ['transparent']; // Reserve index 0 for transparency/empty
+        const getIdx = (col) => {
+            if (!paletteMap.has(col)) {
+                paletteMap.set(col, palette.length);
+                palette.push(col);
+            }
+            return paletteMap.get(col);
+        };
+
+        const validFrames = this.frames.filter(f => f.pixels.length > 0);
+        const optimizedFrames = validFrames.map(f => {
+            // Filter out white (#ffffff)
+            const filteredPixels = f.pixels.filter(p => p[2].toLowerCase() !== '#ffffff' && p[2].toLowerCase() !== '#fff');
+            
+            // Check density to decide format (Dense: > 40%)
+            const density = filteredPixels.length / (this.canvasSize * this.canvasSize);
+            
+            if (density > 0.4) {
+                // Dense: Use pixel_map (Grid)
+                const map = Array(this.canvasSize).fill(0).map(() => Array(this.canvasSize).fill(0));
+                for (const [px, py, col] of filteredPixels) {
+                    map[py][px] = getIdx(col);
+                }
+                return { pixel_map: map };
+            } else {
+                // Sparse: Use pixels list
+                return { pixels: filteredPixels.map(p => [p[0], p[1], getIdx(p[2])]) };
+            }
+        });
+
+        const data = { 
+            width: this.canvasSize, 
+            height: this.canvasSize, 
+            fps: this.fps, 
+            palette: palette,
+            frames: optimizedFrames 
+        };
         
-        // Ensure path includes folder
         const path = folder + fullFn;
-        
         await fetch('/api/save-pixelart', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify({ filename: fullFn, content: JSON.stringify(data), folder }) 
         });
         
-        alert("저장 완료! ✨ 오빠 멋져!");
+        alert("최적화 저장 완료! ✨ 용량이 확 줄었을 거야, 오빠!");
         this.refreshFileList();
     }
 
@@ -532,9 +769,7 @@ export default class PixelToolScene {
         try {
             const folder = document.getElementById('pt-folder')?.value || 'assets/pixelart/';
             const fullFn = filename.endsWith('.json') ? filename : filename + '.json';
-            
-            // Construct path based on the folder input
-            const path = `/${folder}${fullFn}`.replace(/\/+/g, '/'); // Ensure no double slashes
+            const path = `/${folder}${fullFn}`.replace(/\/+/g, '/');
             
             const res = await fetch(path);
             if (!res.ok) throw new Error("File not found");
@@ -542,21 +777,43 @@ export default class PixelToolScene {
             const data = await res.json();
             this.canvasSize = data.width || 128;
             this.fps = data.fps || 4;
-            document.getElementById('pt-fps').value = this.fps;
-            document.getElementById('pt-fps-val').innerText = this.fps;
+            const palette = data.palette || [];
+
+            const processPixels = (f) => {
+                if (f.pixel_map) {
+                    const pixels = [];
+                    for (let y = 0; y < f.pixel_map.length; y++) {
+                        for (let x = 0; x < f.pixel_map[y].length; x++) {
+                            const val = f.pixel_map[y][x];
+                            if (val === 0 || val === null) continue;
+                            const color = (typeof val === 'number') ? (palette[val] || '#ffffff') : val;
+                            pixels.push([x, y, color]);
+                        }
+                    }
+                    return pixels;
+                }
+                if (f.pixels) {
+                    return f.pixels.map(p => {
+                        const color = (typeof p[2] === 'number') ? (palette[p[2]] || '#ffffff') : p[2];
+                        return [p[0], p[1], color];
+                    });
+                }
+                return [];
+            };
 
             if(data.frames) {
-                this.frames = data.frames.map(f => ({ width: this.canvasSize, height: this.canvasSize, pixels: f.pixels }));
+                this.frames = data.frames.map(f => ({ width: this.canvasSize, height: this.canvasSize, pixels: processPixels(f) }));
             } else {
-                this.frames = [{ width: this.canvasSize, height: this.canvasSize, pixels: data.pixels }];
+                this.frames = [{ width: this.canvasSize, height: this.canvasSize, pixels: processPixels(data) }];
             }
             
             this.currentFrameIdx = 0;
+            document.getElementById('pt-fps').value = this.fps;
+            document.getElementById('pt-fps-val').innerText = this.fps;
             document.getElementById('pt-size-select').value = this.canvasSize;
             document.getElementById('pt-filename').value = fullFn.replace('.json','');
             this.resetView();
             this.renderFrameSlots();
-            console.log("LOADED:", path);
         } catch(e) {
             console.error("Load failed:", e);
             alert("오빠! 파일을 불러오지 못했어. 경로랑 이름을 다시 확인해줘! 💋");

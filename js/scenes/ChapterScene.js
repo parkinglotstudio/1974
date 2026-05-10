@@ -211,10 +211,9 @@ export default class ChapterScene {
                 const miniScale = Math.max(1, Math.floor(50 / mapWidth));
                 
                 const miniCanvas = AvatarRenderer.renderToCanvas(renderData, false, false, miniScale);
-                if (miniCanvas.tagName === 'IMG') {
-                    miniCanvas.style.maxWidth = '40px';
-                    miniCanvas.style.maxHeight = '40px';
-                }
+                miniCanvas.style.width = '40px';
+                miniCanvas.style.height = '40px';
+                miniCanvas.style.objectFit = 'contain';
                 miniCanvas.className = 'mini-art';
                 if (avatar.glow) miniCanvas.style.filter = `drop-shadow(0 0 3px ${avatar.glow}66)`;
                 if (!isOwned) {
@@ -325,11 +324,9 @@ export default class ChapterScene {
         const bigScale = Math.max(1, Math.floor(280 / mapWidth));
         
         const bigCanvas = AvatarRenderer.renderToCanvas(renderData, false, false, bigScale);
-        if (bigCanvas.tagName === 'IMG') {
-            bigCanvas.style.width = '260px';
-            bigCanvas.style.height = '260px';
-            bigCanvas.style.objectFit = 'contain';
-        }
+        bigCanvas.style.width = '260px';
+        bigCanvas.style.height = '260px';
+        bigCanvas.style.objectFit = 'contain';
         if (avatar.glow) {
             bigCanvas.style.filter = `drop-shadow(0 0 16px ${avatar.glow}99)`;
         }
@@ -349,6 +346,12 @@ export default class ChapterScene {
             this.heroAnimTimer = setInterval(() => {
                 currentFrame = (currentFrame + 1) % pd.frames.length;
                 const frameCanvas = AvatarRenderer.renderToCanvas(renderData, !isOwned, false, bigScale, currentFrame);
+                frameCanvas.style.width = '260px';
+                frameCanvas.style.height = '260px';
+                frameCanvas.style.objectFit = 'contain';
+                if (avatar.glow) frameCanvas.style.filter = `drop-shadow(0 0 16px ${avatar.glow}99)`;
+                if (!isOwned) frameCanvas.style.filter += ' grayscale(100%) brightness(0.5)';
+                
                 heroContainer.innerHTML = '';
                 heroContainer.appendChild(frameCanvas);
             }, 1000 / fps);
