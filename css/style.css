@@ -169,8 +169,7 @@ canvas#main-canvas {
     cursor: pointer;
     text-transform: uppercase;
     transition: all 0.2s;
-    text-shadow: 0 0 5px var(--theme-primary);
-    box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
+    /* Removed text-shadow and box-shadow for clarity */
 }
 
 .btn:hover {
@@ -186,24 +185,7 @@ canvas#main-canvas {
     50% { opacity: 0; }
 }
 
-/* CRT Overlay Effect */
-#game-container::after {
-    content: " ";
-    display: block;
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
-    background: linear-gradient(
-        to bottom,
-        rgba(18, 16, 16, 0) 50%,
-        rgba(0, 0, 0, 0.25) 50%
-    );
-    background-size: 100% 4px;
-    z-index: 100;
-    pointer-events: none;
-}
+/* CRT Overlay Effect Removed */
 #game-container.no-crt::after {
     display: none;
 }

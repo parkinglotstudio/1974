@@ -52,10 +52,16 @@ while ($listener.IsListening) {
 
         # API: list
         if ($path -eq "/api/list-pixelart" -and $method -eq "GET") {
-            $dir = Join-Path $rootPath "assets\pixelart"
-            if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }
-            $files = Get-ChildItem $dir -Filter "*.json" | Sort-Object LastWriteTime -Descending | Select-Object -ExpandProperty Name
-            Send-Json $response $files
+            $folder = $request.QueryString["folder"]
+            if ($null -eq $folder -or $folder -eq "") { $folder = "assets\pixelart" }
+            # Ensure folder doesn't escape root for security
+            $dir = Join-Path $rootPath $folder.Replace("/", "\").TrimStart("\")
+            if (-not (Test-Path $dir)) { 
+                Send-Json $response @{ error = "Folder not found: $folder" } 404
+            } else {
+                $files = Get-ChildItem $dir -Filter "*.json" | Sort-Object LastWriteTime -Descending | Select-Object -ExpandProperty Name
+                Send-Json $response $files
+            }
 
         # API: save
         } elseif ($path -eq "/api/save-pixelart" -and $method -eq "POST") {
