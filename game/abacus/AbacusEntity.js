@@ -46,17 +46,18 @@ export default class AbacusEntity {
     }
 
     // row: 0~4 (0이 중간선에 가장 가까운 알)
+    // 주판 규칙: 올릴 때(1) row보다 위쪽(더 작은 index, 중간선 방향) 알도 올라옴
+    //           내릴 때(0) row보다 아래쪽(더 큰 index, 중간선 반대) 알도 내려옴
     toggleLower(col, row) {
         if (col < 0 || col > 2 || row < 0 || row > 4) return;
         const lower = this.state[col].lower;
         const newVal = lower[row] ^ 1;
         lower[row] = newVal;
 
-        // 주판 연동 규칙: 올릴 때 아래쪽 알도 올라옴, 내릴 때 위쪽 알도 내려옴
         if (newVal === 1) {
-            for (let r = row + 1; r < 5; r++) lower[r] = 1;
+            for (let r = 0; r < row; r++) lower[r] = 1;
         } else {
-            for (let r = 0; r < row; r++) lower[r] = 0;
+            for (let r = row + 1; r < 5; r++) lower[r] = 0;
         }
     }
 

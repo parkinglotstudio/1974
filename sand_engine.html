@@ -170,6 +170,7 @@
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            position: relative;
         }
         #sand-canvas {
             display: block;
@@ -177,6 +178,12 @@
             image-rendering: crisp-edges;
             background: #000;
             cursor: crosshair;
+        }
+        #game-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            pointer-events: none;
+            image-rendering: pixelated;
         }
         .phone-homebar {
             height: 20px;
@@ -467,6 +474,7 @@
                 </div>
                 <div class="phone-canvas-wrap" id="phoneCanvasWrap">
                     <canvas id="sand-canvas" width="320" height="240"></canvas>
+                    <canvas id="game-overlay" width="320" height="240"></canvas>
                 </div>
                 <div class="phone-homebar">
                     <div class="homebar-line"></div>
@@ -547,6 +555,7 @@ const phoneOuter = document.getElementById('phoneOuter');
 const phoneCanvasWrap = document.getElementById('phoneCanvasWrap');
 const resInfo = document.getElementById('resInfo');
 const canvas = document.getElementById('sand-canvas');
+const overlay = document.getElementById('game-overlay');
 
 function applyRes(tab) {
     resTabs.forEach(t => t.classList.remove('active'));
@@ -557,19 +566,23 @@ function applyRes(tab) {
     const ratio = h / w;
     const ppi = w >= 768 ? '@2x' : w <= 375 ? '@2x' : '@3x';
 
+    let displayW, displayH;
     if (w >= 768) {
         phoneOuter.style.width = '240px';
         phoneOuter.style.borderRadius = '14px';
-        canvas.style.width = '240px';
-        canvas.style.height = Math.round(240 * ratio) + 'px';
-        phoneCanvasWrap.style.height = Math.round(240 * ratio) + 'px';
+        displayW = 240;
+        displayH = Math.round(240 * ratio);
     } else {
         phoneOuter.style.width = PHONE_W + 'px';
         phoneOuter.style.borderRadius = '28px';
-        canvas.style.width = PHONE_W + 'px';
-        canvas.style.height = Math.round(PHONE_W * (240 / 320)) + 'px';
-        phoneCanvasWrap.style.height = Math.round(PHONE_W * (240 / 320)) + 'px';
+        displayW = PHONE_W;
+        displayH = Math.round(PHONE_W * (240 / 320));
     }
+    canvas.style.width  = displayW + 'px';
+    canvas.style.height = displayH + 'px';
+    overlay.style.width  = displayW + 'px';
+    overlay.style.height = displayH + 'px';
+    phoneCanvasWrap.style.height = displayH + 'px';
     resInfo.textContent = `${name} · ${w}×${h} · ${ppi}`;
 }
 
@@ -654,20 +667,41 @@ async function main() {
     // 팔레트명 표시
     document.getElementById('stPalette').textContent = 'palette_1bit';
 
-    // 캔버스 클릭 → 엔티티 선택
+    // 캔버스 클릭 → 주판알 토글 or 엔티티 선택
     canvas.addEventListener('click', (e) => {
         const rect = canvas.getBoundingClientRect();
         const gx = Math.floor((e.clientX - rect.left) * engine.gameWidth  / rect.width);
         const gy = Math.floor((e.clientY - rect.top)  * engine.gameHeight / rect.height);
         const hit = hitTest(gx, gy, engine);
-        if (hit) {
+
+        if (hit?.type === 'ABACUS_BEAD') {
+            // 게임 모드: 주판알 토글
+            const { col, position, row } = hit.props;
+            const colIdx = col === '100' ? 0 : col === '10' ? 1 : 2;
+            if (position === 'upper') {
+                abacusScene.abacus.toggleUpper(colIdx, row - 1);
+            } else {
+                abacusScene.abacus.toggleLower(colIdx, row - 1);
+            }
+            // 엔티티 상태 동기화
+            const idMap = {};
+            for (const [id] of engine.entities._entities) idMap[id] = id;
+            abacusScene.abacus.syncEntities(engine.entities, idMap);
+
+            const val = abacusScene.abacus.getValue();
+            log(`주판: ${val}  (클릭: ${hit.id})`, 'ok');
+
+            // 정답 자동 체크
+            if (abacusScene._problem && val === abacusScene._problem.answer) {
+                abacusScene._checkAnswer();
+            }
+        } else if (hit) {
             ctrl.select(hit);
             selectedInfo.textContent = `${hit.type ?? hit.id} @ (${gx},${gy})`;
             log(`선택: ${hit.type ?? hit.id} #${hit.id}  (${gx},${gy})`, 'ok');
         } else {
             ctrl.deselect();
             selectedInfo.textContent = '선택된 에셋 없음';
-            log(`선택 해제  (${gx},${gy})`);
         }
     });
 
@@ -697,17 +731,78 @@ async function main() {
     termInput.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
     document.getElementById('termSend').addEventListener('click', send);
 
-    window._engine = engine;
-    window._ctrl   = ctrl;
+    window._engine       = engine;
+    window._ctrl         = ctrl;
+    window._abacusScene  = abacusScene;
 
     log('[Sand Engine v0.3] 초기화 완료');
     log('scene: abacus_game.scene.json 로드', 'ok');
     log(`엔티티 ${engine.entities._entities.size}개 배치 완료`, 'ok');
     log('렌더 루프 시작 (60fps)', 'ok');
     log('─────────────────────────────');
-    log('에셋 클릭 또는 명령어를 입력하세요');
+    log('주판알 클릭으로 조작하세요');
 
     updateState();
+    renderGameUI();
+}
+
+// ── 게임 UI 오버레이 ─────────────────────────────────────────
+const overlayCtx = overlay.getContext('2d');
+
+function renderGameUI() {
+    requestAnimationFrame(renderGameUI);
+    const scene = window._abacusScene;
+    if (!scene) return;
+
+    const W = overlay.width;
+    const H = overlay.height;
+    overlayCtx.clearRect(0, 0, W, H);
+
+    // 문제 표시
+    const prob = scene._problem;
+    if (prob) {
+        overlayCtx.font = 'bold 14px monospace';
+        overlayCtx.fillStyle = '#ffffff';
+        overlayCtx.textAlign = 'center';
+        overlayCtx.fillText(`${prob.a} + ${prob.b} = ?`, W / 2, 36);
+    }
+
+    // 현재 주판 값
+    const val = scene.abacus.getValue();
+    overlayCtx.font = '10px monospace';
+    overlayCtx.fillStyle = 'rgba(255,255,255,0.5)';
+    overlayCtx.textAlign = 'center';
+    overlayCtx.fillText(`현재: ${val}`, W / 2, 50);
+
+    // 타이머 바
+    const timerRatio = Math.max(0, scene.timer / (30));
+    const barW = Math.round((W - 20) * timerRatio);
+    const barColor = timerRatio > 0.4 ? '#4CAF50' : timerRatio > 0.2 ? '#FF9800' : '#F44336';
+    overlayCtx.fillStyle = 'rgba(0,0,0,0.4)';
+    overlayCtx.fillRect(10, 6, W - 20, 6);
+    overlayCtx.fillStyle = barColor;
+    overlayCtx.fillRect(10, 6, barW, 6);
+
+    // 점수 + 콤보
+    const st = scene.score?.state ?? {};
+    overlayCtx.font = 'bold 10px monospace';
+    overlayCtx.fillStyle = '#FFD700';
+    overlayCtx.textAlign = 'left';
+    overlayCtx.fillText(`${st.score ?? 0}pt`, 10, H - 8);
+    if ((st.combo ?? 0) >= 2) {
+        overlayCtx.fillStyle = '#FF6B35';
+        overlayCtx.textAlign = 'right';
+        overlayCtx.fillText(`×${st.combo} COMBO`, W - 10, H - 8);
+    }
+
+    // 열 이름 (百 十 一)
+    const colLabels = [['百', 134], ['十', 159], ['一', 184]];
+    overlayCtx.font = '8px monospace';
+    overlayCtx.fillStyle = 'rgba(255,255,255,0.35)';
+    overlayCtx.textAlign = 'center';
+    for (const [label, x] of colLabels) {
+        overlayCtx.fillText(label, x + 1, 77);
+    }
 }
 
 // ── 히트 테스트 ──────────────────────────────────────────────
