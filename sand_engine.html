@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sand Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            background: #EDEBE4;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* ── 헤더 ─────────────────────────────────────── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+            background: #fff;
+            border-bottom: 1px solid #E0DDD6;
+            flex-shrink: 0;
+            height: 44px;
+        }
+        .header-logo {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1A1A18;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: .03em;
+        }
+        .header-logo span {
+            font-size: 10px;
+            font-weight: 400;
+            color: #AAA;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .header-scene {
+            font-size: 10px;
+            color: #888;
+            background: #F5F5F0;
+            border: .5px solid #D0CEC7;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .header-actions { display: flex; gap: 6px; }
+        .hbtn {
+            font-size: 10px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: .5px solid #D0CEC7;
+            background: #F5F5F0;
+            color: #555;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .hbtn:hover { background: #ECEAE3; }
+        .hbtn.primary { background: #1A1A18; color: #fff; border-color: #1A1A18; }
+        .hbtn.primary:hover { background: #2A2A26; }
+
+        /* ── 메인 레이아웃 ─────────────────────────────── */
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        /* ── 왼쪽 — 미리보기 패널 ──────────────────────── */
+        .preview-panel {
+            width: 300px;
+            flex-shrink: 0;
+            background: #E8E5DE;
+            border-right: 1px solid #D0CEC7;
+            display: flex;
+            flex-direction: column;
+            padding: 12px;
+            gap: 10px;
+            overflow-y: auto;
+        }
+        .preview-label {
+            font-size: 9px;
+            font-weight: 600;
+            color: #999;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* 해상도 선택 */
+        .res-tabs {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .res-tab {
+            font-size: 9px;
+            padding: 3px 7px;
+            border-radius: 5px;
+            border: .5px solid #C8C5BC;
+            background: #fff;
+            color: #888;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1.4;
+            text-align: center;
+            transition: all .1s;
+        }
+        .res-tab:hover { background: #F5F5F0; }
+        .res-tab.active { background: #1A1A18; color: #fff; border-color: #1A1A18; }
+
+        /* 폰 외곽 */
+        .phone-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+        .phone-outer {
+            background: #fff;
+            border-radius: 28px;
+            border: 7px solid #1A1A18;
+            box-shadow:
+                0 0 0 1px rgba(0,0,0,.1),
+                0 6px 20px rgba(0,0,0,.15);
+            overflow: hidden;
+            position: relative;
+            width: 220px;
+            transition: all .2s;
+        }
+        .phone-notch {
+            position: absolute;
+            top: 0; left: 50%;
+            transform: translateX(-50%);
+            width: 64px; height: 18px;
+            background: #1A1A18;
+            border-radius: 0 0 12px 12px;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        .notch-cam { width: 6px; height: 6px; border-radius: 50%; background: #2A2A28; }
+        .notch-speaker { width: 20px; height: 2px; border-radius: 2px; background: #2A2A28; }
+        .phone-statusbar {
+            height: 24px;
+            background: #0A0A0A;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            padding: 0 12px 3px;
+            font-size: 7px;
+            color: rgba(255,255,255,.4);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .phone-canvas-wrap {
+            background: #0A0A0A;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        #sand-canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            background: #000;
+            cursor: crosshair;
+        }
+        .phone-homebar {
+            height: 20px;
+            background: #0A0A0A;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .homebar-line { width: 60px; height: 2px; background: rgba(255,255,255,.2); border-radius: 2px; }
+        .res-info {
+            font-size: 9px;
+            color: #AAA;
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* 엔진 상태 */
+        .engine-state {
+            background: #fff;
+            border-radius: 8px;
+            border: .5px solid #D0CEC7;
+            padding: 8px 10px;
+        }
+        .engine-state-title {
+            font-size: 9px;
+            color: #AAA;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .state-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            padding: 2px 0;
+        }
+        .state-row .sk { color: #888; }
+        .state-row .sv { font-weight: 600; color: #1A1A18; font-family: 'JetBrains Mono', monospace; }
+
+        /* ── 오른쪽 — 엔진 패널 ────────────────────────── */
+        .engine-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        /* 레이어 토글 바 */
+        .layer-bar {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 12px;
+            border-bottom: 1px solid #E0DDD6;
+            background: #FAFAF7;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+        .layer-bar-label { font-size: 9px; color: #AAA; font-family: 'JetBrains Mono', monospace; }
+        .layer-btn {
+            font-size: 9px;
+            padding: 3px 8px;
+            border-radius: 5px;
+            border: .5px solid #D0CEC7;
+            background: #fff;
+            color: #888;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all .1s;
+        }
+        .layer-btn.on { background: #1A1A18; color: #fff; border-color: #1A1A18; }
+        .layer-sep { width: 1px; height: 14px; background: #D0CEC7; margin: 0 2px; }
+        .pal-btn {
+            font-size: 9px;
+            padding: 3px 8px;
+            border-radius: 5px;
+            border: .5px solid #D0CEC7;
+            background: #fff;
+            color: #C8922A;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all .1s;
+        }
+        .pal-btn:hover { background: #FFF8EE; }
+        .layer-info {
+            font-size: 9px;
+            color: #AAA;
+            margin-left: auto;
+            font-family: 'JetBrains Mono', monospace;
+            white-space: nowrap;
+        }
+
+        /* 컨트롤 패널 */
+        .control-panel {
+            border-bottom: 1px solid #D0CEC7;
+            background: #fff;
+            padding: 8px 12px;
+            flex-shrink: 0;
+            min-height: 52px;
+        }
+        .cp-empty {
+            font-size: 11px;
+            color: #CCC;
+            text-align: center;
+            padding: 6px 0;
+        }
+        .cp-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 7px;
+        }
+        .cp-title {
+            font-size: 10px;
+            font-weight: 600;
+            color: #1A1A18;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .cp-title .cp-id { color: #AAA; font-weight: 400; }
+        .cp-type {
+            font-size: 9px;
+            background: #EAE4D8;
+            color: #5A4A2A;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .cp-buttons { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+        .cp-btn {
+            font-size: 11px;
+            padding: 5px 11px;
+            border-radius: 7px;
+            border: .5px solid #D0CEC7;
+            background: #F5F5F0;
+            color: #1A1A18;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all .1s;
+        }
+        .cp-btn:hover { background: #ECEAE3; }
+        .cp-btn.primary { background: #1A1A18; color: #fff; border-color: #1A1A18; }
+        .cp-btn.primary:hover { background: #2A2A26; }
+        .cp-add {
+            font-size: 11px;
+            padding: 5px 9px;
+            border-radius: 7px;
+            border: .5px dashed #C8C5BC;
+            background: transparent;
+            color: #AAA;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .cp-add:hover { background: #F5F5F0; color: #555; }
+
+        /* 버튼 추가 폼 */
+        .cp-add-form {
+            display: flex;
+            gap: 4px;
+            margin-top: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .cp-add-form.hidden { display: none; }
+        .cp-input {
+            font-size: 10px;
+            padding: 3px 6px;
+            border: .5px solid #D0CEC7;
+            border-radius: 5px;
+            background: #FAFAF7;
+            color: #1A1A18;
+            font-family: 'JetBrains Mono', monospace;
+            outline: none;
+        }
+        .cp-input:focus { border-color: #C8922A; }
+        #cp-label-in { width: 60px; }
+        #cp-action-in { width: 110px; }
+        #cp-icon-in { width: 32px; }
+
+        /* 터미널 */
+        .terminal-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #FAFAF7;
+        }
+        .terminal-log {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            line-height: 1.8;
+            min-height: 0;
+        }
+        .log-line { margin-bottom: 1px; }
+        .log-system { color: #AAA; }
+        .log-ok { color: #5A9A20; }
+        .log-err { color: #C8410A; }
+        .log-user { color: #1A1A18; }
+        .log-ai { color: #C8922A; }
+
+        .terminal-input {
+            border-top: 1px solid #E0DDD6;
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #fff;
+            flex-shrink: 0;
+        }
+        .terminal-prompt {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #C8922A;
+            font-weight: 700;
+            flex-shrink: 0;
+            user-select: none;
+        }
+        .terminal-field {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #1A1A18;
+            background: transparent;
+        }
+        .terminal-field::placeholder { color: #CCC; }
+        .terminal-send {
+            width: 26px; height: 26px;
+            border-radius: 6px;
+            background: #1A1A18;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+        .terminal-send:hover { background: #C8922A; }
+    </style>
+</head>
+<body>
+
+<!-- ① 헤더 -->
+<div class="header">
+    <div class="header-logo">
+        🏖 Sand Engine
+        <span>v0.3 · Antigravity 1974</span>
+    </div>
+    <div class="header-scene" id="sceneLabel">📋 abacus_game.scene.json</div>
+    <div class="header-actions">
+        <button class="hbtn" id="btnPause">⏸ 정지</button>
+        <button class="hbtn" id="btnReset">↺ 리셋</button>
+        <button class="hbtn primary" id="btnPlay">▶ 실행</button>
+    </div>
+</div>
+
+<!-- ② 메인 -->
+<div class="main">
+
+    <!-- 왼쪽 — 미리보기 -->
+    <div class="preview-panel">
+        <div class="preview-label">미리보기</div>
+
+        <!-- 해상도 탭 -->
+        <div class="res-tabs" id="resTabs">
+            <button class="res-tab active" data-w="390" data-h="844" data-name="iPhone 14">iPhone 14<br>390×844</button>
+            <button class="res-tab" data-w="375" data-h="667" data-name="SE">SE<br>375×667</button>
+            <button class="res-tab" data-w="412" data-h="915" data-name="Android">Android<br>412×915</button>
+            <button class="res-tab" data-w="360" data-h="800" data-name="Galaxy">Galaxy<br>360×800</button>
+            <button class="res-tab" data-w="768" data-h="1024" data-name="iPad">iPad<br>768×1024</button>
+        </div>
+
+        <!-- 폰 프레임 -->
+        <div class="phone-wrap">
+            <div class="phone-outer" id="phoneOuter">
+                <div class="phone-notch">
+                    <div class="notch-cam"></div>
+                    <div class="notch-speaker"></div>
+                </div>
+                <div class="phone-statusbar">
+                    <span>9:41</span>
+                    <span>▮▮▮ WiFi ■■■</span>
+                </div>
+                <div class="phone-canvas-wrap" id="phoneCanvasWrap">
+                    <canvas id="sand-canvas" width="320" height="240"></canvas>
+                </div>
+                <div class="phone-homebar">
+                    <div class="homebar-line"></div>
+                </div>
+            </div>
+            <div class="res-info" id="resInfo">iPhone 14 · 390×844 · @3x</div>
+        </div>
+
+        <!-- 엔진 상태 -->
+        <div class="engine-state">
+            <div class="engine-state-title">엔진 상태</div>
+            <div class="state-row"><span class="sk">FPS</span><span class="sv" id="stFps">—</span></div>
+            <div class="state-row"><span class="sk">엔티티</span><span class="sv" id="stEntities">—</span></div>
+            <div class="state-row"><span class="sk">팔레트</span><span class="sv" id="stPalette">—</span></div>
+            <div class="state-row"><span class="sk">카메라X</span><span class="sv" id="stCamera">0</span></div>
+        </div>
+    </div>
+
+    <!-- 오른쪽 — 엔진 패널 -->
+    <div class="engine-panel">
+
+        <!-- 레이어 토글 바 -->
+        <div class="layer-bar">
+            <span class="layer-bar-label">레이어:</span>
+            <button class="layer-btn on" id="l0btn" onclick="toggleLayer(0)">L0 원경</button>
+            <button class="layer-btn on" id="l1btn" onclick="toggleLayer(1)">L1 근경</button>
+            <button class="layer-btn on" id="l2btn" onclick="toggleLayer(2)">L2 게임</button>
+            <button class="layer-btn on" id="l3btn" onclick="toggleLayer(3)">L3 UI</button>
+            <div class="layer-sep"></div>
+            <button class="pal-btn" onclick="switchPalette('palette_1bit')">1-bit</button>
+            <button class="pal-btn" onclick="switchPalette('palette_neon')">네온</button>
+            <button class="pal-btn" onclick="switchPalette('palette_night')">밤</button>
+            <div class="layer-info" id="selectedInfo">선택된 에셋 없음</div>
+        </div>
+
+        <!-- 컨트롤 패널 -->
+        <div class="control-panel" id="controlPanel">
+            <div class="cp-empty">캔버스에서 에셋을 클릭하면 컨트롤이 표시됩니다</div>
+        </div>
+
+        <!-- 터미널 -->
+        <div class="terminal-panel">
+            <div class="terminal-log" id="termLog"></div>
+            <div class="terminal-input">
+                <span class="terminal-prompt">Sand&gt;</span>
+                <input class="terminal-field" id="termInput"
+                    placeholder="명령어 입력 또는 노션 URL 붙여넣기..."
+                    autocomplete="off" spellcheck="false">
+                <button class="terminal-send" id="termSend">↑</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+import SandEngine    from './engine/SandEngine.js';
+import ControlSystem from './engine/control/ControlSystem.js';
+import AbacusScene   from './game/abacus/AbacusScene.js';
+
+// ── 로그 ────────────────────────────────────────────────────
+const termLog = document.getElementById('termLog');
+function log(msg, type = 'system') {
+    const div = document.createElement('div');
+    div.className = 'log-line log-' + type;
+    const prefix = type === 'ok'  ? '[✓] '   :
+                   type === 'err' ? '[✗] '   :
+                   type === 'ai'  ? 'Claude: ':
+                   type === 'user'? '> '     : '';
+    div.textContent = prefix + msg;
+    termLog.appendChild(div);
+    termLog.scrollTop = termLog.scrollHeight;
+}
+
+// ── 해상도 탭 ────────────────────────────────────────────────
+const PHONE_W = 220;
+const resTabs = document.querySelectorAll('.res-tab');
+const phoneOuter = document.getElementById('phoneOuter');
+const phoneCanvasWrap = document.getElementById('phoneCanvasWrap');
+const resInfo = document.getElementById('resInfo');
+const canvas = document.getElementById('sand-canvas');
+
+function applyRes(tab) {
+    resTabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const w = parseInt(tab.dataset.w);
+    const h = parseInt(tab.dataset.h);
+    const name = tab.dataset.name;
+    const ratio = h / w;
+    const ppi = w >= 768 ? '@2x' : w <= 375 ? '@2x' : '@3x';
+
+    if (w >= 768) {
+        phoneOuter.style.width = '240px';
+        phoneOuter.style.borderRadius = '14px';
+        canvas.style.width = '240px';
+        canvas.style.height = Math.round(240 * ratio) + 'px';
+        phoneCanvasWrap.style.height = Math.round(240 * ratio) + 'px';
+    } else {
+        phoneOuter.style.width = PHONE_W + 'px';
+        phoneOuter.style.borderRadius = '28px';
+        canvas.style.width = PHONE_W + 'px';
+        canvas.style.height = Math.round(PHONE_W * (240 / 320)) + 'px';
+        phoneCanvasWrap.style.height = Math.round(PHONE_W * (240 / 320)) + 'px';
+    }
+    resInfo.textContent = `${name} · ${w}×${h} · ${ppi}`;
+}
+
+resTabs.forEach(tab => tab.addEventListener('click', () => applyRes(tab)));
+applyRes(resTabs[0]);
+
+// ── 레이어 토글 ──────────────────────────────────────────────
+const layerState = { 0: true, 1: true, 2: true, 3: true };
+window.toggleLayer = (n) => {
+    layerState[n] = !layerState[n];
+    document.getElementById('l' + n + 'btn').classList.toggle('on', layerState[n]);
+    if (window._engine) {
+        window._engine.layers.setVisible(n, layerState[n]);
+    }
+    log(`레이어 ${n} ${layerState[n] ? '켜짐' : '꺼짐'}`);
+};
+
+// ── 팔레트 교체 ──────────────────────────────────────────────
+window.switchPalette = (name) => {
+    if (window._engine) {
+        window._engine.palette_mgr.load(`assets/palettes/${name}.json`)
+            .then(() => log(`팔레트 변경: ${name}`, 'ok'))
+            .catch(() => log(`팔레트 없음: ${name}`, 'err'));
+    }
+    document.getElementById('stPalette').textContent = name;
+};
+
+// ── 엔진 상태 업데이트 ───────────────────────────────────────
+let _lastFrameTime = performance.now();
+let _frameCount = 0;
+function updateState() {
+    const eng = window._engine;
+    if (!eng) return;
+    _frameCount++;
+    const now = performance.now();
+    if (now - _lastFrameTime >= 500) {
+        document.getElementById('stFps').textContent = Math.round(_frameCount * 1000 / (now - _lastFrameTime));
+        document.getElementById('stEntities').textContent = eng.entities._entities.size;
+        document.getElementById('stCamera').textContent = Math.round(eng.cameraX ?? 0);
+        _frameCount = 0;
+        _lastFrameTime = now;
+    }
+    requestAnimationFrame(updateState);
+}
+
+// ── 메인 ────────────────────────────────────────────────────
+async function main() {
+    const controlPanel = document.getElementById('controlPanel');
+    const selectedInfo = document.getElementById('selectedInfo');
+
+    const engine = new SandEngine({
+        canvas,
+        gameWidth:  320,
+        gameHeight: 240,
+    });
+
+    const canvasWrap = document.getElementById('phoneCanvasWrap');
+    engine.scale.calculate(canvas.offsetWidth || 220, canvas.offsetHeight || 165);
+    engine.canvas.width  = engine.gameWidth;
+    engine.canvas.height = engine.gameHeight;
+    engine.scale.applyToCanvas(canvas);
+    engine.input.attach();
+
+    window.addEventListener('resize', () => {
+        engine.scale.update(canvas.offsetWidth, canvas.offsetHeight, canvas);
+        engine.layers.resize(engine.gameWidth, engine.gameHeight);
+        engine.entities.resize(engine.gameWidth, engine.gameHeight);
+    });
+
+    const ctrl = new ControlSystem(engine, controlPanel);
+
+    // 씬 로드
+    const abacusScene = new AbacusScene();
+    engine.scenes.register('abacus_game', abacusScene);
+    await abacusScene.onInit(engine);
+    await abacusScene.onEnter(engine);
+    engine.scenes._stack.push(abacusScene);
+    engine.scenes._inited.add('abacus_game');
+
+    engine.start();
+
+    // 팔레트명 표시
+    document.getElementById('stPalette').textContent = 'palette_1bit';
+
+    // 캔버스 클릭 → 엔티티 선택
+    canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const gx = Math.floor((e.clientX - rect.left) * engine.gameWidth  / rect.width);
+        const gy = Math.floor((e.clientY - rect.top)  * engine.gameHeight / rect.height);
+        const hit = hitTest(gx, gy, engine);
+        if (hit) {
+            ctrl.select(hit);
+            selectedInfo.textContent = `${hit.type ?? hit.id} @ (${gx},${gy})`;
+            log(`선택: ${hit.type ?? hit.id} #${hit.id}  (${gx},${gy})`, 'ok');
+        } else {
+            ctrl.deselect();
+            selectedInfo.textContent = '선택된 에셋 없음';
+            log(`선택 해제  (${gx},${gy})`);
+        }
+    });
+
+    // 헤더 버튼
+    document.getElementById('btnPlay').addEventListener('click', () => {
+        engine.start();
+        log('실행', 'ok');
+    });
+    document.getElementById('btnPause').addEventListener('click', () => {
+        engine.stop?.();
+        log('정지');
+    });
+    document.getElementById('btnReset').addEventListener('click', () => {
+        engine.entities._entities.forEach(e => e.setState?.(Object.keys(e.asm?.states ?? {})[0] ?? 'idle'));
+        log('전체 리셋', 'ok');
+    });
+
+    // 터미널 입력
+    const termInput = document.getElementById('termInput');
+    const send = () => {
+        const text = termInput.value.trim();
+        if (!text) return;
+        log(text, 'user');
+        termInput.value = '';
+        handleCommand(text, engine, ctrl);
+    };
+    termInput.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+    document.getElementById('termSend').addEventListener('click', send);
+
+    window._engine = engine;
+    window._ctrl   = ctrl;
+
+    log('[Sand Engine v0.3] 초기화 완료');
+    log('scene: abacus_game.scene.json 로드', 'ok');
+    log(`엔티티 ${engine.entities._entities.size}개 배치 완료`, 'ok');
+    log('렌더 루프 시작 (60fps)', 'ok');
+    log('─────────────────────────────');
+    log('에셋 클릭 또는 명령어를 입력하세요');
+
+    updateState();
+}
+
+// ── 히트 테스트 ──────────────────────────────────────────────
+function hitTest(gx, gy, engine) {
+    const cameraX = engine.cameraX ?? 0;
+    let topHit = null, topLayer = -1;
+    for (const entity of engine.entities._entities.values()) {
+        if (!entity.visible) continue;
+        if (!entity.pw || !entity.ph) continue;
+        const ex = entity.layer === 2 ? entity.x - cameraX : entity.x;
+        const ey = entity.y;
+        if (gx >= ex && gx < ex + entity.pw && gy >= ey && gy < ey + entity.ph) {
+            if (entity.layer >= topLayer) { topLayer = entity.layer; topHit = entity; }
+        }
+    }
+    return topHit;
+}
+
+// ── 명령어 처리 ──────────────────────────────────────────────
+function handleCommand(text, engine, ctrl) {
+    const cmd = text.toLowerCase();
+    if (cmd === 'reset' || cmd === '리셋') {
+        const sel = ctrl.selected;
+        if (sel) { sel.setState?.(Object.keys(sel.asm?.states ?? {})[0] ?? 'idle'); log('리셋 완료', 'ok'); }
+        else log('에셋을 먼저 선택하세요');
+    } else if (cmd.startsWith('state:')) {
+        const state = cmd.slice(6).trim();
+        ctrl.selected?.setState?.(state);
+        log(`상태 변경: ${state}`, 'ok');
+    } else if (cmd === 'list' || cmd === '목록') {
+        for (const [id, e] of engine.entities._entities)
+            log(`  ${id}  ${e.type ?? '?'}  (${e.x},${e.y})`);
+    } else if (cmd.startsWith('palette:')) {
+        switchPalette(cmd.slice(8).trim());
+    } else {
+        log(`알 수 없는 명령: ${text}`, 'err');
+    }
+}
+
+main().catch(err => {
+    console.error(err);
+    log('오류: ' + err.message, 'err');
+});
+</script>
+</body>
+</html>
