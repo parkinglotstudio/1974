@@ -4,383 +4,555 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sand Engine</title>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=DotGothic16&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
             background: #EDEBE4;
-            min-height: 100vh;
+            height: 100vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            height: 100vh;
         }
 
-        /* ── 헤더 ─────────────────────────────────────── */
+        /* ── 헤더 ────────────────────────────────────────────── */
         .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px 16px;
+            padding: 0 16px;
             background: #fff;
             border-bottom: 1px solid #E0DDD6;
             flex-shrink: 0;
             height: 44px;
         }
         .header-logo {
-            font-size: 13px;
-            font-weight: 700;
-            color: #1A1A18;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            letter-spacing: .03em;
+            font-size: 13px; font-weight: 700; color: #1A1A18;
+            display: flex; align-items: center; gap: 8px; letter-spacing:.03em;
         }
         .header-logo span {
-            font-size: 10px;
-            font-weight: 400;
-            color: #AAA;
+            font-size: 10px; font-weight: 400; color: #AAA;
             font-family: 'JetBrains Mono', monospace;
         }
         .header-scene {
-            font-size: 10px;
-            color: #888;
-            background: #F5F5F0;
-            border: .5px solid #D0CEC7;
-            border-radius: 6px;
-            padding: 4px 10px;
+            font-size: 10px; color: #888;
+            background: #F5F5F0; border: .5px solid #D0CEC7;
+            border-radius: 6px; padding: 4px 10px;
             font-family: 'JetBrains Mono', monospace;
         }
         .header-actions { display: flex; gap: 6px; }
         .hbtn {
-            font-size: 10px;
-            padding: 4px 10px;
-            border-radius: 6px;
-            border: .5px solid #D0CEC7;
-            background: #F5F5F0;
-            color: #555;
-            cursor: pointer;
-            font-family: inherit;
+            font-size: 10px; padding: 4px 10px; border-radius: 6px;
+            border: .5px solid #D0CEC7; background: #F5F5F0; color: #555;
+            cursor: pointer; font-family: inherit;
         }
         .hbtn:hover { background: #ECEAE3; }
         .hbtn.primary { background: #1A1A18; color: #fff; border-color: #1A1A18; }
         .hbtn.primary:hover { background: #2A2A26; }
 
-        /* ── 메인 레이아웃 ─────────────────────────────── */
-        .main {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-            min-height: 0;
+        /* ── 전체 작업 영역 ───────────────────────────────────── */
+        .workspace {
+            flex: 1; display: flex; flex-direction: column;
+            overflow: hidden; min-height: 0;
         }
 
-        /* ── 왼쪽 — 미리보기 패널 ──────────────────────── */
+        /* 상단 3분할 패널 행 */
+        .panels-row {
+            flex: 1; display: flex; flex-direction: row;
+            overflow: hidden; min-height: 0; min-width: 0;
+        }
+
+        /* ── 리사이저 ─────────────────────────────────────────── */
+        .v-resizer {
+            width: 5px; flex-shrink: 0;
+            background: #D0CEC7; cursor: col-resize;
+            transition: background .15s; user-select: none;
+            position: relative; z-index: 10;
+        }
+        .v-resizer:hover, .v-resizer.active { background: #C8922A; }
+
+        .h-resizer {
+            height: 5px; flex-shrink: 0;
+            background: #D0CEC7; cursor: row-resize;
+            transition: background .15s; user-select: none;
+            position: relative; z-index: 10;
+        }
+        .h-resizer:hover, .h-resizer.active { background: #C8922A; }
+
+        /* ── 왼쪽 — 씬뷰 패널 ────────────────────────────── */
         .preview-panel {
-            width: 300px;
-            flex-shrink: 0;
-            background: #E8E5DE;
-            border-right: 1px solid #D0CEC7;
-            display: flex;
-            flex-direction: column;
-            padding: 12px;
-            gap: 10px;
-            overflow-y: auto;
+            width: 300px; min-width: 180px;
+            flex-shrink: 0; background: #E8E5DE;
+            display: flex; flex-direction: column; overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+        .preview-panel.playing {
+            box-shadow: inset 0 0 0 3px #3A8A3A;
+        }
+        .preview-top {
+            padding: 10px 12px 8px;
+            display: flex; flex-direction: column; gap: 8px;
+            flex-shrink: 0; border-bottom: .5px solid #D0CEC7;
+        }
+        .zoom-bar { display: flex; align-items: center; gap: 5px; }
+        .zoom-btn {
+            width: 22px; height: 22px; border-radius: 5px;
+            border: .5px solid #C8C5BC; background: #fff;
+            color: #555; font-size: 14px; font-weight: 700;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            line-height: 1; flex-shrink: 0;
+        }
+        .zoom-btn:hover { background: #ECEAE3; }
+        .zoom-label {
+            font-size: 9px; font-family: 'JetBrains Mono', monospace;
+            color: #888; min-width: 36px; text-align: center;
+        }
+        .zoom-fit {
+            font-size: 9px; padding: 3px 7px; border-radius: 5px;
+            border: .5px solid #C8C5BC; background: #fff; color: #888;
+            cursor: pointer; font-family: 'JetBrains Mono', monospace;
+        }
+        .zoom-fit:hover { background: #ECEAE3; color: #1A1A18; }
+        .preview-viewport {
+            flex: 1; overflow: hidden; position: relative;
+            background: #C8C5BC; cursor: grab;
+        }
+        .preview-viewport.grabbing { cursor: grabbing; }
+        .preview-stage {
+            position: absolute; top: 0; left: 0;
+            width: 100%; transform-origin: 0 0;
         }
         .preview-label {
-            font-size: 9px;
-            font-weight: 600;
-            color: #999;
-            letter-spacing: .1em;
-            text-transform: uppercase;
+            font-size: 9px; font-weight: 600; color: #999;
+            letter-spacing: .1em; text-transform: uppercase;
             font-family: 'JetBrains Mono', monospace;
         }
-
-        /* 해상도 선택 */
-        .res-tabs {
-            display: flex;
-            gap: 4px;
-            flex-wrap: wrap;
-        }
+        .res-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
         .res-tab {
-            font-size: 9px;
-            padding: 3px 7px;
-            border-radius: 5px;
-            border: .5px solid #C8C5BC;
-            background: #fff;
-            color: #888;
-            cursor: pointer;
-            font-family: 'JetBrains Mono', monospace;
-            line-height: 1.4;
-            text-align: center;
-            transition: all .1s;
+            font-size: 9px; padding: 3px 7px; border-radius: 5px;
+            border: .5px solid #C8C5BC; background: #fff; color: #888;
+            cursor: pointer; font-family: 'JetBrains Mono', monospace;
+            line-height: 1.4; text-align: center; transition: all .1s;
         }
         .res-tab:hover { background: #F5F5F0; }
         .res-tab.active { background: #1A1A18; color: #fff; border-color: #1A1A18; }
-
-        /* 폰 외곽 */
-        .phone-wrap {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-        }
+        .phone-wrap { width: 100%; padding: 8px; box-sizing: border-box; }
         .phone-outer {
-            background: #fff;
-            border-radius: 28px;
-            border: 7px solid #1A1A18;
-            box-shadow:
-                0 0 0 1px rgba(0,0,0,.1),
-                0 6px 20px rgba(0,0,0,.15);
-            overflow: hidden;
-            position: relative;
-            width: 220px;
-            transition: all .2s;
+            background: #fff; border-radius: 24px;
+            border: 6px solid #1A1A18;
+            box-shadow: 0 0 0 1px rgba(0,0,0,.1), 0 6px 24px rgba(0,0,0,.25);
+            overflow: hidden; position: relative; width: 100%; box-sizing: border-box;
         }
         .phone-notch {
-            position: absolute;
-            top: 0; left: 50%;
-            transform: translateX(-50%);
-            width: 64px; height: 18px;
-            background: #1A1A18;
-            border-radius: 0 0 12px 12px;
-            z-index: 10;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
+            position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+            width: 64px; height: 18px; background: #1A1A18;
+            border-radius: 0 0 12px 12px; z-index: 10;
+            display: flex; align-items: center; justify-content: center; gap: 4px;
         }
         .notch-cam { width: 6px; height: 6px; border-radius: 50%; background: #2A2A28; }
         .notch-speaker { width: 20px; height: 2px; border-radius: 2px; background: #2A2A28; }
         .phone-statusbar {
-            height: 24px;
-            background: #0A0A0A;
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-            padding: 0 12px 3px;
-            font-size: 7px;
-            color: rgba(255,255,255,.4);
+            height: 24px; background: #0A0A0A;
+            display: flex; align-items: flex-end; justify-content: space-between;
+            padding: 0 12px 3px; font-size: 7px; color: rgba(255,255,255,.4);
             font-family: 'JetBrains Mono', monospace;
         }
         .phone-canvas-wrap {
-            background: #0A0A0A;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            position: relative;
+            background: #0A0A0A; position: relative; width: 100%; overflow: hidden;
         }
         #sand-canvas {
-            display: block;
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
-            background: #000;
-            cursor: crosshair;
+            display: block; image-rendering: pixelated; image-rendering: crisp-edges;
+            background: #000; cursor: crosshair;
+            width: 100%; height: 100%; position: absolute; top: 0; left: 0;
         }
         #game-overlay {
-            position: absolute;
-            top: 0; left: 0;
-            pointer-events: none;
-            image-rendering: pixelated;
+            position: absolute; top: 0; left: 0;
+            pointer-events: auto; image-rendering: pixelated;
+        }
+        #text-canvas {
+            position: absolute; top: 0; left: 0;
+            pointer-events: none; image-rendering: pixelated;
+            cursor: pointer; width: 100%; height: 100%;
         }
         .phone-homebar {
-            height: 20px;
-            background: #0A0A0A;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            height: 20px; background: #0A0A0A;
+            display: flex; align-items: center; justify-content: center;
         }
         .homebar-line { width: 60px; height: 2px; background: rgba(255,255,255,.2); border-radius: 2px; }
         .res-info {
-            font-size: 9px;
-            color: #AAA;
-            text-align: center;
+            font-size: 9px; color: #AAA; text-align: center;
             font-family: 'JetBrains Mono', monospace;
+        }
+        /* ── 씬 탭 스트립 ──────────────────────────────────── */
+        .scene-tabbar {
+            height: 30px; flex-shrink: 0;
+            background: #1E1E1A; border-top: 1px solid #3A3A36;
+            display: flex; align-items: stretch; gap: 0; overflow: hidden;
+        }
+        .scene-tabs {
+            display: flex; align-items: stretch;
+            overflow-x: auto; flex: 1; gap: 1px;
+            scrollbar-width: none;
+        }
+        .scene-tabs::-webkit-scrollbar { display: none; }
+        .scene-tab {
+            background: #2A2A26; border: none; border-right: 1px solid #3A3A36;
+            color: #777; font-size: 10px; font-family: 'JetBrains Mono', monospace;
+            padding: 0 14px; cursor: pointer; white-space: nowrap;
+            transition: background 0.15s, color 0.15s;
+        }
+        .scene-tab:hover  { background: #353530; color: #CCC; }
+        .scene-tab.active { background: #3A3A36; color: #FFD080; border-bottom: 2px solid #FFD080; }
+        .scene-tab-add {
+            background: transparent; border: none; border-left: 1px solid #3A3A36;
+            color: #555; font-size: 14px; padding: 0 12px; cursor: pointer;
+            flex-shrink: 0;
+        }
+        .scene-tab-add:hover { color: #CCC; background: #2A2A26; }
+
+        /* 씬 에디터 플레이 중 동결 오버레이 */
+        .scene-editor-frozen {
+            position: absolute; inset: 0; z-index: 10;
+            pointer-events: all;
+            border: 3px solid #3A8A3A;
+        }
+        .scene-editor-frozen::after {
+            content: '▶ PLAYING';
+            position: absolute; top: 8px; right: 10px;
+            background: rgba(58,138,58,0.85); color: #7FE07F;
+            font-size: 9px; font-family: 'JetBrains Mono', monospace;
+            padding: 2px 8px; border-radius: 3px;
         }
 
-        /* 엔진 상태 */
         .engine-state {
-            background: #fff;
-            border-radius: 8px;
-            border: .5px solid #D0CEC7;
-            padding: 8px 10px;
+            background: #fff; border-top: .5px solid #D0CEC7;
+            padding: 8px 12px; flex-shrink: 0;
         }
-        .engine-state-title {
-            font-size: 9px;
-            color: #AAA;
-            letter-spacing: .08em;
-            text-transform: uppercase;
-            margin-bottom: 6px;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        .state-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 10px;
-            padding: 2px 0;
-        }
+        .state-row { display: flex; justify-content: space-between; font-size: 10px; padding: 2px 0; }
         .state-row .sk { color: #888; }
         .state-row .sv { font-weight: 600; color: #1A1A18; font-family: 'JetBrains Mono', monospace; }
 
-        /* ── 오른쪽 — 엔진 패널 ────────────────────────── */
-        .engine-panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            min-width: 0;
+        /* ── 중앙 — 작업 캔버스 패널 ─────────────────────────── */
+        .canvas-panel {
+            flex: 1; display: flex; flex-direction: column;
+            overflow: hidden; min-width: 0; background: #222;
         }
 
-        /* 레이어 토글 바 */
-        .layer-bar {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            padding: 6px 12px;
-            border-bottom: 1px solid #E0DDD6;
-            background: #FAFAF7;
+        /* 작업 캔버스 툴바 */
+        .canvas-toolbar {
+            height: 38px; flex-shrink: 0;
+            background: #2A2A26; border-bottom: 1px solid #3A3A36;
+            display: flex; align-items: center; gap: 6px; padding: 0 10px;
+            overflow: hidden;
+        }
+        .ct-label {
+            font-size: 9px; color: #888; font-family: 'JetBrains Mono', monospace;
             flex-shrink: 0;
-            flex-wrap: wrap;
         }
-        .layer-bar-label { font-size: 9px; color: #AAA; font-family: 'JetBrains Mono', monospace; }
-        .layer-btn {
-            font-size: 9px;
-            padding: 3px 8px;
-            border-radius: 5px;
-            border: .5px solid #D0CEC7;
-            background: #fff;
-            color: #888;
-            cursor: pointer;
+        .ct-sep { width: 1px; height: 16px; background: #3A3A36; flex-shrink: 0; }
+        .ct-btn {
+            font-size: 9px; padding: 3px 7px; border-radius: 4px;
+            border: .5px solid #4A4A46; background: #333; color: #AAA;
+            cursor: pointer; font-family: 'JetBrains Mono', monospace;
+            transition: all .1s; flex-shrink: 0;
+        }
+        .ct-btn:hover { background: #444; color: #EEE; }
+        .ct-btn.active { background: #C8922A; color: #fff; border-color: #C8922A; }
+        .ct-breadcrumb {
+            font-size: 9px; color: #666; font-family: 'JetBrains Mono', monospace;
+            margin-left: auto; flex-shrink: 0;
+        }
+        .ct-breadcrumb .ct-bc-cur { color: #AAA; }
+
+        /* 작업 캔버스 뷰포트 */
+        .work-viewport {
+            flex: 1; overflow: hidden; position: relative;
+            background: #E4E2DC; cursor: default;
+        }
+        .work-stage {
+            position: absolute; top: 50%; left: 50%;
+            transform-origin: 0 0;
+        }
+        #work-canvas {
+            display: block; image-rendering: pixelated; image-rendering: crisp-edges;
+            cursor: default;
+        }
+
+        /* 엔티티 툴팁 */
+        #entityTooltip {
+            position: fixed; z-index: 9999;
+            background: rgba(0,0,0,0.85); color: #EEE;
+            font-size: 9px; font-family: 'JetBrains Mono', monospace;
+            padding: 3px 7px; border-radius: 4px; pointer-events: none;
+            display: none; white-space: nowrap;
+        }
+
+        /* 하단 컨트롤 패널 (선택 에셋) */
+        .work-control {
+            flex-shrink: 0; background: #2A2A26;
+            border-top: 1px solid #3A3A36;
+            padding: 6px 10px; min-height: 34px;
+            display: flex; align-items: center; gap: 8px; overflow: hidden;
+        }
+        .wc-empty { font-size: 10px; color: #555; font-family: 'JetBrains Mono', monospace; }
+        .wc-info { font-size: 10px; color: #AAA; font-family: 'JetBrains Mono', monospace; }
+        .wc-type {
+            font-size: 9px; background: #1A4A8A; color: #7AC0FF;
+            border-radius: 3px; padding: 1px 5px;
             font-family: 'JetBrains Mono', monospace;
-            transition: all .1s;
         }
-        .layer-btn.on { background: #1A1A18; color: #fff; border-color: #1A1A18; }
-        .layer-sep { width: 1px; height: 14px; background: #D0CEC7; margin: 0 2px; }
+        .wc-type.visual { background: #3A3A3A; color: #888; }
+        .wc-type.ui-type { background: #4A3A1A; color: #C8922A; }
+        .wc-coords { font-size: 9px; color: #666; font-family: 'JetBrains Mono', monospace; }
+
+        /* ── 오른쪽 — 레이어 패널 ────────────────────────────── */
+        .layer-panel {
+            width: 200px; min-width: 140px; flex-shrink: 0;
+            background: #F5F5F0; border-left: .5px solid #D0CEC7;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .layer-panel-header {
+            padding: 8px 10px 6px; border-bottom: .5px solid #D0CEC7;
+            flex-shrink: 0; background: #fff;
+        }
+        .lp-title {
+            font-size: 9px; font-weight: 700; color: #888;
+            letter-spacing: .1em; text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace; margin-bottom: 6px;
+        }
+        .lp-pal-row { display: flex; gap: 4px; flex-wrap: wrap; }
         .pal-btn {
-            font-size: 9px;
-            padding: 3px 8px;
-            border-radius: 5px;
-            border: .5px solid #D0CEC7;
-            background: #fff;
-            color: #C8922A;
-            cursor: pointer;
-            font-family: 'JetBrains Mono', monospace;
-            transition: all .1s;
+            font-size: 9px; padding: 2px 6px; border-radius: 4px;
+            border: .5px solid #D0CEC7; background: #fff; color: #C8922A;
+            cursor: pointer; font-family: 'JetBrains Mono', monospace; transition: all .1s;
         }
         .pal-btn:hover { background: #FFF8EE; }
-        .layer-info {
-            font-size: 9px;
-            color: #AAA;
-            margin-left: auto;
-            font-family: 'JetBrains Mono', monospace;
-            white-space: nowrap;
+
+        .layer-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+        .layer-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 10px;
+            cursor: pointer; transition: background .1s; position: relative;
+        }
+        .layer-item:hover { background: #ECEAE3; }
+        .layer-item.active { background: #EAE4D8; }
+        .layer-thumb-wrap {
+            width: 44px; height: 44px; flex-shrink: 0;
+            background: #C8C5BC; border-radius: 4px; overflow: hidden;
+            border: 1px solid #D0CEC7; display: flex; align-items: center; justify-content: center;
+        }
+        .layer-thumb-wrap canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+        .layer-meta { flex: 1; min-width: 0; }
+        .layer-name { font-size: 10px; font-weight: 600; color: #1A1A18; margin-bottom: 2px; }
+        .layer-scale { font-size: 9px; color: #AAA; font-family: 'JetBrains Mono', monospace; }
+        .layer-toggle {
+            width: 28px; height: 16px; flex-shrink: 0;
+            background: #1A1A18; border-radius: 8px;
+            position: relative; cursor: pointer; transition: background .15s;
+        }
+        .layer-toggle.off { background: #CCC; }
+        .layer-toggle::after {
+            content: ''; position: absolute;
+            width: 12px; height: 12px; border-radius: 50%;
+            background: #fff; top: 2px; left: 14px; transition: left .15s;
+        }
+        .layer-toggle.off::after { left: 2px; }
+
+        /* ── 하단 바 ──────────────────────────────────────────── */
+        .bottom-bar {
+            height: 180px; flex-shrink: 0;
+            display: flex; flex-direction: row;
+            border-top: 1px solid #D0CEC7; overflow: hidden;
         }
 
-        /* 컨트롤 패널 */
-        .control-panel {
-            border-bottom: 1px solid #D0CEC7;
-            background: #fff;
-            padding: 8px 12px;
-            flex-shrink: 0;
-            min-height: 52px;
+        /* 에셋 브라우저 */
+        .asset-panel {
+            flex: 1; display: flex; flex-direction: column;
+            overflow: hidden; background: #FAFAF7; min-width: 0;
         }
-        .cp-empty {
-            font-size: 11px;
-            color: #CCC;
-            text-align: center;
-            padding: 6px 0;
+        .asset-header {
+            height: 32px; flex-shrink: 0;
+            background: #fff; border-bottom: .5px solid #D0CEC7;
+            display: flex; align-items: center; gap: 8px; padding: 0 12px;
         }
-        .cp-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 7px;
-        }
-        .cp-title {
-            font-size: 10px;
-            font-weight: 600;
-            color: #1A1A18;
+        .asset-title {
+            font-size: 9px; font-weight: 700; color: #888;
+            letter-spacing: .1em; text-transform: uppercase;
             font-family: 'JetBrains Mono', monospace;
         }
-        .cp-title .cp-id { color: #AAA; font-weight: 400; }
-        .cp-type {
-            font-size: 9px;
-            background: #EAE4D8;
-            color: #5A4A2A;
-            border-radius: 4px;
-            padding: 2px 6px;
-            font-weight: 600;
+        .asset-tab {
+            font-size: 9px; padding: 2px 8px; border-radius: 4px;
+            border: .5px solid #D0CEC7; background: #fff; color: #888;
+            cursor: pointer; font-family: 'JetBrains Mono', monospace;
+        }
+        .asset-tab.active { background: #1A1A18; color: #fff; border-color: #1A1A18; }
+        .asset-status {
+            font-size: 9px; color: #CCC;
+            font-family: 'JetBrains Mono', monospace; margin-left: auto;
+        }
+        .asset-grid {
+            flex: 1; overflow-y: auto; overflow-x: hidden;
+            padding: 6px 8px; display: flex; flex-wrap: wrap;
+            align-content: flex-start; gap: 6px;
+        }
+        .asset-card {
+            width: 72px; flex-shrink: 0;
+            background: #fff; border: 1px solid #E0DDD6;
+            border-radius: 6px; overflow: hidden;
+            cursor: pointer; transition: all .1s;
+            display: flex; flex-direction: column;
+        }
+        .asset-card:hover { border-color: #C8922A; box-shadow: 0 2px 6px rgba(200,146,42,.2); }
+        .asset-card-thumb {
+            width: 72px; height: 54px;
+            background: #1A1A18; image-rendering: pixelated;
+            display: block;
+        }
+        .asset-card-name {
+            font-size: 7px; color: #888; padding: 2px 4px;
             font-family: 'JetBrains Mono', monospace;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .cp-buttons { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
-        .cp-btn {
-            font-size: 11px;
-            padding: 5px 11px;
-            border-radius: 7px;
-            border: .5px solid #D0CEC7;
-            background: #F5F5F0;
-            color: #1A1A18;
-            cursor: pointer;
-            font-family: inherit;
-            transition: all .1s;
+        .asset-loading {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            font-size: 10px; color: #CCC; font-family: 'JetBrains Mono', monospace;
         }
-        .cp-btn:hover { background: #ECEAE3; }
-        .cp-btn.primary { background: #1A1A18; color: #fff; border-color: #1A1A18; }
-        .cp-btn.primary:hover { background: #2A2A26; }
-        .cp-add {
-            font-size: 11px;
-            padding: 5px 9px;
-            border-radius: 7px;
-            border: .5px dashed #C8C5BC;
-            background: transparent;
-            color: #AAA;
-            cursor: pointer;
-            font-family: inherit;
+        .asset-card.selected {
+            border-color: #C8922A;
+            box-shadow: 0 0 0 2px rgba(200,146,42,.4);
         }
-        .cp-add:hover { background: #F5F5F0; color: #555; }
+        .asset-card.no-target {
+            opacity: 0.45; cursor: not-allowed;
+        }
+        .asset-refresh {
+            font-size: 9px; padding: 2px 6px; border-radius: 4px;
+            border: .5px solid #D0CEC7; background: #fff; color: #888;
+            cursor: pointer; font-family: 'JetBrains Mono', monospace;
+        }
+        .asset-refresh:hover { background: #F5F5F0; color: #1A1A18; }
 
-        /* 버튼 추가 폼 */
-        .cp-add-form {
-            display: flex;
-            gap: 4px;
-            margin-top: 6px;
-            align-items: center;
+        /* 에셋 카드 메타 & 가이드 */
+        .asset-card-meta {
+            display: flex; gap: 3px; padding: 2px 4px 3px;
             flex-wrap: wrap;
         }
-        .cp-add-form.hidden { display: none; }
-        .cp-input {
-            font-size: 10px;
-            padding: 3px 6px;
-            border: .5px solid #D0CEC7;
-            border-radius: 5px;
-            background: #FAFAF7;
-            color: #1A1A18;
-            font-family: 'JetBrains Mono', monospace;
-            outline: none;
+        .asset-meta-tag {
+            font-size: 7px; padding: 1px 4px; border-radius: 2px;
+            font-family: 'JetBrains Mono', monospace; line-height: 1.4;
         }
-        .cp-input:focus { border-color: #C8922A; }
-        #cp-label-in { width: 60px; }
-        #cp-action-in { width: 110px; }
-        #cp-icon-in { width: 32px; }
+        .tag-size   { background: #E8E5DE; color: #5A4A2A; }
+        .tag-fps    { background: #DCEEFF; color: #0A3B7A; }
+        .tag-frames { background: #EAF3DE; color: #3B6D11; }
+
+        /* 레이어 해상도 표시 */
+        .layer-res {
+            font-size: 8px; color: #BBB; font-family: 'JetBrains Mono', monospace;
+            margin-top: 1px;
+        }
+
+        /* 레이어 + 자식 목록을 감싸는 래퍼 */
+        .layer-wrap { border-bottom: .5px solid #E0DDD6; }
+
+        /* 계단형 자식 목록 영역 */
+        .layer-children {
+            background: #EDEAE2; padding: 3px 0 5px 0;
+        }
+
+        /* + 텍스트 박스 버튼 */
+        .layer-add-text {
+            display: flex; align-items: center; gap: 5px;
+            width: calc(100% - 16px); margin: 3px 8px 4px;
+            padding: 3px 7px; font-size: 8px; color: #999;
+            border: .5px dashed #C8C5BC; border-radius: 3px;
+            background: none; cursor: pointer; text-align: left;
+            font-family: 'JetBrains Mono', monospace; transition: all .1s;
+        }
+        .layer-add-text:hover { color: #C8922A; border-color: #C8922A; background: #FFF8EE; }
+        .layer-add-text-icon {
+            font-size: 9px; font-weight: 700; color: #C87FFF; width: 10px;
+            text-align: center; flex-shrink: 0;
+        }
+
+        /* 엔티티 자식 행 */
+        .layer-child-item {
+            display: flex; align-items: center; gap: 5px;
+            padding: 3px 8px 3px 16px; font-size: 8px; color: #666;
+            cursor: pointer; font-family: 'JetBrains Mono', monospace;
+            white-space: nowrap; overflow: hidden; transition: background .08s;
+        }
+        .layer-child-item:hover { background: #E4E0D6; color: #1A1A18; }
+        .layer-child-item.lci-selected { background: #EAD8A0; color: #1A1A18; }
+        .layer-child-icon {
+            width: 10px; text-align: center; flex-shrink: 0;
+            font-size: 8px; color: #AAA; font-weight: 600;
+        }
+        .layer-child-icon.lci-text { color: #C87FFF; }
+        .layer-child-icon.lci-sprite { color: #5AC8FA; }
+        .layer-child-name {
+            flex: 1; overflow: hidden; text-overflow: ellipsis;
+        }
+        .layer-child-size {
+            color: #BBB; font-size: 7px; flex-shrink: 0; margin-left: 2px;
+        }
+
+        /* 그룹 헤더 행 */
+        .lci-group-header {
+            display: flex; align-items: center; gap: 5px;
+            padding: 3px 8px 3px 10px; font-size: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer; user-select: none;
+            color: #8A7A5A; font-weight: 700;
+            transition: background .08s;
+        }
+        .lci-group-header:hover { background: #E4E0D6; color: #5A4A2A; }
+        .lci-group-arrow { font-size: 8px; width: 9px; flex-shrink: 0; }
+        .lci-group-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+        .lci-group-count { color: #BBB; font-size: 7px; flex-shrink: 0; }
+
+        /* 그룹 내부 엔티티 (한 단계 더 들여쓰기) */
+        .layer-child-item.lci-grouped { padding-left: 26px; }
+
+        /* Antigravity 가이드 오버레이 */
+        .ag-guide {
+            position: fixed; z-index: 9998; width: 180px;
+            background: #1A1A18; border: 1px solid #3A3A36;
+            border-radius: 6px; padding: 8px; pointer-events: none;
+            display: none; font-family: 'JetBrains Mono', monospace;
+        }
+        .ag-guide-title {
+            font-size: 8px; font-weight: 700; color: #C8922A;
+            letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px;
+        }
+        .ag-row { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+        .ag-dot  {
+            width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+        }
+        .ag-dot.lock { background: #C8410A; }
+        .ag-dot.pal  { background: #C8922A; }
+        .ag-dot.free { background: #5A9A20; }
+        .ag-text { font-size: 8px; color: #AAA; }
+
+        /* 인스펙터 내보내기 버튼 */
+        .insp-export {
+            font-size: 9px; padding: 3px 8px; border-radius: 4px;
+            border: .5px solid #4A4A46; background: #2A2A26; color: #AAA;
+            cursor: pointer; font-family: 'JetBrains Mono', monospace;
+            margin-left: auto; flex-shrink: 0; transition: all .1s;
+        }
+        .insp-export:hover { background: #C8922A; color: #fff; border-color: #C8922A; }
 
         /* 터미널 */
         .terminal-panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            background: #FAFAF7;
+            width: 320px; flex-shrink: 0;
+            display: flex; flex-direction: column;
+            border-left: .5px solid #D0CEC7; background: #FAFAF7;
         }
         .terminal-log {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px 14px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            line-height: 1.8;
-            min-height: 0;
+            flex: 1; overflow-y: auto; padding: 6px 12px;
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            line-height: 1.7; min-height: 0;
         }
         .log-line { margin-bottom: 1px; }
         .log-system { color: #AAA; }
@@ -388,336 +560,2519 @@
         .log-err { color: #C8410A; }
         .log-user { color: #1A1A18; }
         .log-ai { color: #C8922A; }
-
         .terminal-input {
-            border-top: 1px solid #E0DDD6;
-            padding: 8px 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: #fff;
-            flex-shrink: 0;
+            border-top: 1px solid #E0DDD6; padding: 6px 10px;
+            display: flex; align-items: center; gap: 6px;
+            background: #fff; flex-shrink: 0;
         }
         .terminal-prompt {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            color: #C8922A;
-            font-weight: 700;
-            flex-shrink: 0;
-            user-select: none;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            color: #C8922A; font-weight: 700; flex-shrink: 0; user-select: none;
         }
         .terminal-field {
-            flex: 1;
-            border: none;
-            outline: none;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            color: #1A1A18;
-            background: transparent;
+            flex: 1; border: none; outline: none;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            color: #1A1A18; background: transparent;
         }
         .terminal-field::placeholder { color: #CCC; }
         .terminal-send {
-            width: 26px; height: 26px;
-            border-radius: 6px;
-            background: #1A1A18;
-            color: #fff;
-            border: none;
-            cursor: pointer;
-            font-size: 12px;
-            flex-shrink: 0;
+            width: 24px; height: 24px; border-radius: 5px;
+            background: #1A1A18; color: #fff; border: none;
+            cursor: pointer; font-size: 11px; flex-shrink: 0;
         }
         .terminal-send:hover { background: #C8922A; }
+
+        /* ── 컨트롤 패널 (레거시 — 숨김) ─────────────────────── */
+        .control-panel { display: none; }
+
+        /* ── 드릴다운 팔레트 툴바 ────────────────────────────── */
+        .drill-palette-row {
+            display: none; align-items: center; gap: 5px;
+            padding: 0 10px; background: #222; border-bottom: 1px solid #3A3A36;
+            height: 32px; flex-shrink: 0;
+        }
+        .drill-palette-row.visible { display: flex; }
+        .drill-pal-label {
+            font-size: 9px; color: #666;
+            font-family: 'JetBrains Mono', monospace; flex-shrink: 0;
+        }
+        .drill-color-swatch {
+            width: 18px; height: 18px; border-radius: 3px;
+            border: 1.5px solid transparent; cursor: pointer;
+            flex-shrink: 0; transition: transform .1s;
+        }
+        .drill-color-swatch:hover { transform: scale(1.2); }
+        .drill-color-swatch.active { border-color: #C8922A; transform: scale(1.15); }
+        .drill-color-swatch.transparent-swatch {
+            background: repeating-conic-gradient(#555 0% 25%, #333 0% 50%) 0 0 / 8px 8px;
+        }
+        .drill-sep { width: 1px; height: 16px; background: #3A3A36; flex-shrink: 0; }
+        .drill-frame-btn {
+            font-size: 9px; padding: 2px 6px; border-radius: 3px;
+            border: .5px solid #4A4A46; background: #2A2A26; color: #888;
+            cursor: pointer; font-family: 'JetBrains Mono', monospace;
+        }
+        .drill-frame-btn.active { background: #C8922A; color: #fff; border-color: #C8922A; }
+        .drill-tool-btn {
+            font-size: 9px; padding: 2px 7px; border-radius: 3px;
+            border: .5px solid #4A4A46; background: #2A2A26; color: #888;
+            cursor: pointer; font-family: 'JetBrains Mono', monospace;
+        }
+        .drill-tool-btn.active { background: #3A3A36; color: #EEE; }
+
+        /* ── 인스펙터 ─────────────────────────────────────────── */
+        .inspector {
+            display: flex; align-items: center; gap: 10px;
+            flex: 1; overflow: hidden;
+        }
+        .insp-name {
+            font-size: 10px; font-weight: 700; color: #EEE;
+            font-family: 'JetBrains Mono', monospace;
+            flex-shrink: 0; max-width: 120px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .insp-badge {
+            font-size: 8px; padding: 2px 6px; border-radius: 3px;
+            background: #1A4A8A; color: #7AC0FF; flex-shrink: 0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .insp-badge.visual { background: #333; color: #888; }
+        .insp-badge.ui     { background: #4A3A1A; color: #C8922A; }
+        .insp-sep { width: 1px; height: 16px; background: #3A3A36; flex-shrink: 0; }
+        .insp-field {
+            display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+        }
+        .insp-label {
+            font-size: 9px; color: #666; font-family: 'JetBrains Mono', monospace;
+            flex-shrink: 0; width: 10px; text-align: right;
+        }
+        .insp-input {
+            width: 46px; height: 22px;
+            background: #1A1A18; border: 1px solid #3A3A36;
+            border-radius: 4px; color: #EEE; padding: 0 5px;
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            outline: none; text-align: right;
+        }
+        .insp-input:focus { border-color: #C8922A; background: #222; }
+        .insp-layer-badge {
+            font-size: 9px; color: #666; font-family: 'JetBrains Mono', monospace;
+            flex-shrink: 0; margin-left: auto;
+        }
+
+        /* 레이어 솔로 */
+        .layer-item.solo { background: #E8E0CC; }
+        .layer-item.solo .layer-name { color: #C8922A; }
+        .layer-toggle-solo {
+            font-size: 9px; padding: 2px 5px; border-radius: 3px;
+            border: .5px solid #D0CEC7; background: transparent; color: #CCC;
+            cursor: pointer; font-family: 'JetBrains Mono', monospace;
+            transition: all .1s; flex-shrink: 0;
+        }
+        .layer-toggle-solo:hover { background: #EAE4D8; color: #C8922A; }
+        .layer-toggle-solo.active { background: #C8922A; color: #fff; border-color: #C8922A; }
+
+        /* ── 레이어 피커 팝업 ────────────────────────────────── */
+        .layer-picker {
+            position: fixed; z-index: 10000;
+            background: #1E1E1A; border: 1px solid #3A3A36;
+            border-radius: 8px; padding: 12px; width: 220px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.6);
+            font-family: 'JetBrains Mono', monospace; display: none;
+        }
+        .layer-picker-title {
+            font-size: 9px; color: #888; letter-spacing: .1em;
+            text-transform: uppercase; margin-bottom: 8px;
+        }
+        .layer-picker-btn {
+            display: flex; align-items: center; gap: 8px;
+            width: 100%; padding: 7px 8px; margin-bottom: 4px;
+            background: #2A2A26; border: 1px solid #3A3A36;
+            border-radius: 4px; cursor: pointer; color: #AAA;
+            font-size: 10px; font-family: inherit; transition: all .1s;
+            text-align: left;
+        }
+        .layer-picker-btn:hover { background: #3A3A36; color: #EEE; border-color: #555; }
+        .layer-picker-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .layer-picker-sub { color: #555; font-size: 9px; margin-left: auto; }
+        .layer-picker-cancel {
+            width: 100%; padding: 4px; margin-top: 4px;
+            background: transparent; border: none; color: #555;
+            font-size: 9px; font-family: inherit; cursor: pointer;
+        }
+        .layer-picker-cancel:hover { color: #888; }
+
+        /* ── 컨텍스트 메뉴 ───────────────────────────────────── */
+        .ctx-menu {
+            position: fixed; z-index: 10001;
+            background: #1E1E1A; border: 1px solid #3A3A36;
+            border-radius: 6px; padding: 4px; min-width: 170px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.6);
+            font-family: 'JetBrains Mono', monospace; display: none;
+        }
+        .ctx-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 10px; border-radius: 4px;
+            font-size: 10px; color: #AAA; cursor: pointer; white-space: nowrap;
+        }
+        .ctx-item:hover { background: #2A2A26; color: #EEE; }
+        .ctx-item.danger { color: #C8410A; }
+        .ctx-item.danger:hover { background: #3A1A1A; color: #FF8A80; }
+        .ctx-item.disabled { color: #444; cursor: default; }
+        .ctx-item.disabled:hover { background: transparent; }
+        .ctx-sep { height: 1px; background: #3A3A36; margin: 3px 4px; }
+        .ctx-key { margin-left: auto; color: #555; font-size: 9px; }
+
+        /* 드래그 중 에셋 카드 */
+        .asset-card.dragging { opacity: 0.5; }
+
+        /* 드롭 대상 강조 (에셋 교체 가능) */
+        #work-canvas.drop-replace { cursor: copy; }
+
+        /* ── 씬 플로우 연결 패널 위치 ─────────────────────────── */
+        /* 포커스 모드 — 플로우 복귀 버튼 */
+        #btnFlowBack {
+            display: none; font-size: 10px; padding: 4px 10px; border-radius: 6px;
+            border: .5px solid #C8922A; background: rgba(200,146,42,0.12); color: #C8922A;
+            cursor: pointer; font-family: inherit;
+        }
+        #btnFlowBack:hover { background: rgba(200,146,42,0.22); }
+        .flow-conn-panel {
+            position: absolute; top: 10px; right: 10px; width: 190px;
+            z-index: 20;
+            background: #1E1E1A; border: 1px solid #3A3A36; border-radius: 6px;
+            padding: 10px; font-family: 'JetBrains Mono', monospace;
+            font-size: 9px; color: #AAA; display: none; pointer-events: all;
+        }
+        .flow-panel-title { font-weight: 700; color: #C8922A; font-size: 8px;
+            margin-bottom: 8px; letter-spacing: .08em; text-transform: uppercase; }
+        .flow-panel-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+        .flow-panel-label { color: #666; width: 40px; flex-shrink: 0; }
+        .flow-panel-sel {
+            flex: 1; background: #2A2A26; border: 1px solid #3A3A36; color: #CCC;
+            font-size: 8px; font-family: 'JetBrains Mono', monospace;
+            padding: 2px 4px; border-radius: 2px; cursor: pointer;
+        }
+        .flow-panel-del {
+            margin-top: 8px; width: 100%; padding: 3px;
+            background: #2A1A1A; border: 1px solid #6A3030; color: #FF8A80;
+            font-size: 8px; font-family: 'JetBrains Mono', monospace;
+            border-radius: 3px; cursor: pointer;
+        }
     </style>
 </head>
 <body>
 
+<!-- 툴팁 -->
+<div id="entityTooltip"></div>
+
+<!-- 레이어 피커 (에셋 드롭 시 레이어 선택) -->
+<div class="layer-picker" id="layerPicker">
+    <div class="layer-picker-title">레이어 선택</div>
+    <button class="layer-picker-btn" data-layer="0">
+        <div class="layer-picker-dot" style="background:#5080FF;"></div>
+        L0 원경 <span class="layer-picker-sub">패럴랙스 0.15</span>
+    </button>
+    <button class="layer-picker-btn" data-layer="1">
+        <div class="layer-picker-dot" style="background:#50C864;"></div>
+        L1 근경 <span class="layer-picker-sub">패럴랙스 0.6</span>
+    </button>
+    <button class="layer-picker-btn" data-layer="2">
+        <div class="layer-picker-dot" style="background:#FFC83C;"></div>
+        L2 게임 <span class="layer-picker-sub">충돌 레이어</span>
+    </button>
+    <button class="layer-picker-btn" data-layer="3">
+        <div class="layer-picker-dot" style="background:#C864FF;"></div>
+        L3 UI <span class="layer-picker-sub">고정 HUD</span>
+    </button>
+    <button class="layer-picker-cancel" id="layerPickerCancel">취소</button>
+</div>
+
+<!-- 컨텍스트 메뉴 -->
+<div class="ctx-menu" id="ctxMenu">
+    <div class="ctx-item" id="ctxReplace">↻ 스프라이트 교체</div>
+    <div class="ctx-item" id="ctxDuplicate">⎘ 복제<span class="ctx-key">Ctrl+D</span></div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" id="ctxMoveL0">→ L0 원경</div>
+    <div class="ctx-item" id="ctxMoveL1">→ L1 근경</div>
+    <div class="ctx-item" id="ctxMoveL2">→ L2 게임</div>
+    <div class="ctx-item" id="ctxMoveL3">→ L3 UI</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item danger" id="ctxDelete">✕ 삭제<span class="ctx-key">Del</span></div>
+</div>
+
+<!-- Antigravity 가이드 오버레이 -->
+<div class="ag-guide" id="agGuide">
+    <div class="ag-guide-title">Antigravity 가이드</div>
+    <div class="ag-row"><div class="ag-dot lock"></div><span class="ag-text" id="agLockLine">크기/fps/프레임수 — 변경 불가</span></div>
+    <div class="ag-row"><div class="ag-dot pal"></div><span class="ag-text" id="agPalLine">팔레트 — 지정 색상 안에서만</span></div>
+    <div class="ag-row"><div class="ag-dot free"></div><span class="ag-text">pixels — 자유롭게 수정 가능</span></div>
+    <div style="margin-top:6px;padding-top:5px;border-top:.5px solid #3A3A36;font-size:7px;color:#555;line-height:1.5;" id="agMeta"></div>
+</div>
+
+<!-- 텍스트 엔티티 생성 다이얼로그 -->
+<div id="textDialog" style="
+    display:none; position:fixed; z-index:10000;
+    top:50%; left:50%; transform:translate(-50%,-50%);
+    background:#1E1E1A; border:1px solid #3A3A36; border-radius:8px;
+    padding:16px; width:260px; font-family:'JetBrains Mono',monospace; font-size:9px; color:#AAA;">
+    <div style="font-weight:700;color:#C8922A;font-size:8px;letter-spacing:.08em;margin-bottom:12px;">T+ 텍스트 엔티티 추가</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+            <span style="width:44px;color:#666;">타입</span>
+            <select id="tdType" style="flex:1;background:#2A2A26;border:1px solid #3A3A36;color:#CCC;font-size:8px;font-family:'JetBrains Mono',monospace;padding:2px 4px;border-radius:2px;">
+                <option value="TEXT_DIALOG">TEXT_DIALOG — 대화창</option>
+                <option value="TEXT_UI">TEXT_UI — 인게임 UI</option>
+                <option value="TEXT_TITLE">TEXT_TITLE — 제목</option>
+                <option value="TEXT_TOAST">TEXT_TOAST — 잠깐 알림</option>
+                <option value="TEXT_SUBTITLE">TEXT_SUBTITLE — 자막</option>
+            </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <span style="width:44px;color:#666;">내용</span>
+            <input id="tdText" type="text" value="텍스트 입력" style="flex:1;background:#2A2A26;border:1px solid #3A3A36;color:#EEE;font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 6px;border-radius:2px;">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <span style="width:44px;color:#666;">크기</span>
+            <input id="tdSize" type="number" value="14" min="6" max="72" style="width:50px;background:#2A2A26;border:1px solid #3A3A36;color:#CCC;font-size:9px;font-family:'JetBrains Mono',monospace;padding:2px 4px;border-radius:2px;">
+            <span style="color:#666;">색상</span>
+            <input id="tdColor" type="color" value="#ffffff" style="width:32px;height:20px;border:none;background:none;cursor:pointer;">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <span style="width:44px;color:#666;">레이어</span>
+            <select id="tdLayer" style="flex:1;background:#2A2A26;border:1px solid #3A3A36;color:#CCC;font-size:8px;font-family:'JetBrains Mono',monospace;padding:2px 4px;border-radius:2px;">
+                <option value="3">L3 UI (기본)</option>
+                <option value="2">L2 게임</option>
+                <option value="1">L1 근경</option>
+                <option value="0">L0 원경</option>
+            </select>
+        </div>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:12px;">
+        <button onclick="confirmTextDialog()" style="flex:1;padding:5px;background:#1A4A1A;border:1px solid #3A8A3A;color:#7FE07F;font-size:9px;font-family:'JetBrains Mono',monospace;border-radius:3px;cursor:pointer;">추가</button>
+        <button onclick="document.getElementById('textDialog').style.display='none'" style="flex:1;padding:5px;background:#2A2A26;border:1px solid #3A3A36;color:#888;font-size:9px;font-family:'JetBrains Mono',monospace;border-radius:3px;cursor:pointer;">취소</button>
+    </div>
+</div>
+
+<!-- 레이어 패널 툴팁 -->
+<div class="layer-tooltip" id="layerTooltip">
+    <div class="lt-header" id="ltHeader">L0 원경</div>
+    <div id="ltBody"></div>
+</div>
+
 <!-- ① 헤더 -->
 <div class="header">
     <div class="header-logo">
-        🏖 Sand Engine
-        <span>v0.3 · Antigravity 1974</span>
+        Sand Engine
+        <span>v0.4 · Editor</span>
     </div>
-    <div class="header-scene" id="sceneLabel">📋 abacus_game.scene.json</div>
+    <div class="header-scene" id="sceneLabel">abacus_game.scene.json</div>
     <div class="header-actions">
+        <button class="hbtn" id="btnSaveScene">↓ 씬 저장</button>
         <button class="hbtn" id="btnPause">⏸ 정지</button>
         <button class="hbtn" id="btnReset">↺ 리셋</button>
         <button class="hbtn primary" id="btnPlay">▶ 실행</button>
     </div>
 </div>
 
-<!-- ② 메인 -->
-<div class="main">
+<!-- ② 전체 작업 영역 -->
+<div class="workspace">
 
-    <!-- 왼쪽 — 미리보기 -->
-    <div class="preview-panel">
-        <div class="preview-label">미리보기</div>
+    <!-- 상단 3분할 패널 -->
+    <div class="panels-row">
 
-        <!-- 해상도 탭 -->
-        <div class="res-tabs" id="resTabs">
-            <button class="res-tab active" data-w="390" data-h="844" data-name="iPhone 14">iPhone 14<br>390×844</button>
-            <button class="res-tab" data-w="375" data-h="667" data-name="SE">SE<br>375×667</button>
-            <button class="res-tab" data-w="412" data-h="915" data-name="Android">Android<br>412×915</button>
-            <button class="res-tab" data-w="360" data-h="800" data-name="Galaxy">Galaxy<br>360×800</button>
-            <button class="res-tab" data-w="768" data-h="1024" data-name="iPad">iPad<br>768×1024</button>
-        </div>
+        <!-- 왼쪽 — 미리보기 -->
+        <div class="preview-panel" id="previewPanel">
 
-        <!-- 폰 프레임 -->
-        <div class="phone-wrap">
-            <div class="phone-outer" id="phoneOuter">
-                <div class="phone-notch">
-                    <div class="notch-cam"></div>
-                    <div class="notch-speaker"></div>
+            <div class="preview-top">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <span class="preview-label">씬뷰</span>
+                    <span class="res-info" id="resInfo" style="margin:0;font-size:8px;"></span>
                 </div>
-                <div class="phone-statusbar">
-                    <span>9:41</span>
-                    <span>▮▮▮ WiFi ■■■</span>
+
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <div class="res-tabs" id="resTabs" style="flex:1;">
+                        <button class="res-tab active" data-ratio="9:16">세로 9:16</button>
+                        <button class="res-tab" data-ratio="16:9">가로 16:9</button>
+                        <button class="res-tab" data-ratio="1:1">정방 1:1</button>
+                    </div>
+                    <button id="btnScenePlay" onclick="scenePlay()" style="
+                        background:#1A4A1A;border:1px solid #3A8A3A;color:#7FE07F;
+                        font-size:10px;font-family:'JetBrains Mono',monospace;
+                        padding:3px 10px;border-radius:3px;cursor:pointer;
+                        white-space:nowrap;flex-shrink:0;">▶ 플레이</button>
                 </div>
-                <div class="phone-canvas-wrap" id="phoneCanvasWrap">
-                    <canvas id="sand-canvas" width="320" height="240"></canvas>
-                    <canvas id="game-overlay" width="320" height="240"></canvas>
-                </div>
-                <div class="phone-homebar">
-                    <div class="homebar-line"></div>
+
+                <div class="zoom-bar">
+                    <button class="zoom-btn" id="btnZoomOut">−</button>
+                    <span class="zoom-label" id="zoomLabel">100%</span>
+                    <button class="zoom-btn" id="btnZoomIn">+</button>
+                    <button class="zoom-fit" id="btnZoomFit">맞춤</button>
                 </div>
             </div>
-            <div class="res-info" id="resInfo">iPhone 14 · 390×844 · @3x</div>
+
+            <div class="preview-viewport" id="previewViewport">
+                <div class="preview-stage" id="previewStage">
+                    <div class="phone-wrap">
+                        <div class="phone-outer" id="phoneOuter">
+                            <div class="phone-notch">
+                                <div class="notch-cam"></div>
+                                <div class="notch-speaker"></div>
+                            </div>
+                            <div class="phone-statusbar">
+                                <span>9:41</span>
+                                <span>▮▮▮ WiFi ■■■</span>
+                            </div>
+                            <div class="phone-canvas-wrap" id="phoneCanvasWrap">
+                                <canvas id="sand-canvas" width="270" height="480"></canvas>
+                                <canvas id="game-overlay" width="270" height="480"></canvas>
+                                <canvas id="text-canvas" width="270" height="480"></canvas>
+                            </div>
+                            <div class="phone-homebar">
+                                <div class="homebar-line"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="engine-state">
+                <div class="state-row"><span class="sk">FPS</span><span class="sv" id="stFps">—</span></div>
+                <div class="state-row"><span class="sk">엔티티</span><span class="sv" id="stEntities">—</span></div>
+                <div class="state-row"><span class="sk">팔레트</span><span class="sv" id="stPalette">—</span></div>
+                <div class="state-row"><span class="sk">카메라X</span><span class="sv" id="stCamera">0</span></div>
+            </div>
         </div>
 
-        <!-- 엔진 상태 -->
-        <div class="engine-state">
-            <div class="engine-state-title">엔진 상태</div>
-            <div class="state-row"><span class="sk">FPS</span><span class="sv" id="stFps">—</span></div>
-            <div class="state-row"><span class="sk">엔티티</span><span class="sv" id="stEntities">—</span></div>
-            <div class="state-row"><span class="sk">팔레트</span><span class="sv" id="stPalette">—</span></div>
-            <div class="state-row"><span class="sk">카메라X</span><span class="sv" id="stCamera">0</span></div>
+        <!-- 수직 리사이저 (미리보기|캔버스) -->
+        <div class="v-resizer" id="resizerLeft"></div>
+
+        <!-- 중앙 — 작업 캔버스 -->
+        <div class="canvas-panel" id="canvasPanel">
+
+            <div class="canvas-toolbar">
+                <span class="ct-label">씬 에디터</span>
+                <div class="ct-sep"></div>
+
+                <!-- 레이어 토글 -->
+                <button class="ct-btn active" id="l0btn" onclick="toggleLayer(0)">L0</button>
+                <button class="ct-btn active" id="l1btn" onclick="toggleLayer(1)">L1</button>
+                <button class="ct-btn active" id="l2btn" onclick="toggleLayer(2)">L2</button>
+                <button class="ct-btn active" id="l3btn" onclick="toggleLayer(3)">L3</button>
+
+                <div class="ct-sep"></div>
+
+                <!-- 캔버스 사이즈 -->
+                <div class="ct-sep"></div>
+                <button class="ct-btn" id="btnWorkFit" onclick="fitWorkCanvas()">맞춤</button>
+                <div class="ct-sep"></div>
+                <button class="ct-btn" id="btnAddText" onclick="showTextDialog()">T+</button>
+                <div class="ct-sep"></div>
+                <button class="ct-btn" id="btnUndo" title="실행 취소 (Ctrl+Z)" style="opacity:0.35;">↩</button>
+                <button class="ct-btn" id="btnRedo" title="다시 실행 (Ctrl+Y)" style="opacity:0.35;">↪</button>
+                <span style="font-size:9px;font-family:'JetBrains Mono',monospace;color:#555;min-width:32px;text-align:center;" id="historyBadge">0/0</span>
+
+                <span class="ct-breadcrumb" id="canvasBreadcrumb">
+                    <span class="ct-bc-cur">멀티프레임</span>
+                </span>
+            </div>
+
+            <!-- 드릴다운 팔레트 툴바 (드릴다운 진입 시 표시) -->
+            <div class="drill-palette-row" id="drillPaletteRow">
+                <span class="drill-pal-label">팔레트</span>
+                <div id="drillSwatches" style="display:flex;gap:3px;"></div>
+                <div class="drill-sep"></div>
+                <span class="drill-pal-label">프레임</span>
+                <div id="drillFrameBtns" style="display:flex;gap:2px;"></div>
+                <div class="drill-sep"></div>
+                <button class="drill-tool-btn active" id="drillToolDraw" onclick="setDrillTool('draw')">✏ 그리기</button>
+                <button class="drill-tool-btn" id="drillToolErase" onclick="setDrillTool('erase')">✕ 지우기</button>
+                <div style="flex:1;"></div>
+                <button class="drill-tool-btn" onclick="exitDrilldown()" style="background:#3A1A1A;border-color:#6A3030;color:#FF8A80;">✖ 나가기</button>
+            </div>
+
+            <!-- 작업 캔버스 뷰포트 -->
+            <div class="work-viewport" id="workViewport">
+                <div class="work-stage" id="workStage">
+                    <canvas id="work-canvas" width="512" height="512"></canvas>
+                </div>
+                <div class="scene-editor-frozen" id="editorFrozen" style="display:none;"></div>
+
+                <div class="flow-conn-panel" id="flowConnPanel">
+                    <div class="flow-panel-title">연결 설정</div>
+                    <div class="flow-panel-row">
+                        <span class="flow-panel-label">트리거</span>
+                        <select class="flow-panel-sel" id="flowTrigger">
+                            <option value="click">On Click</option>
+                            <option value="delay">After Delay</option>
+                            <option value="key">Key Press</option>
+                        </select>
+                    </div>
+                    <div class="flow-panel-row">
+                        <span class="flow-panel-label">액션</span>
+                        <select class="flow-panel-sel" id="flowAction">
+                            <option value="navigate">Navigate to</option>
+                            <option value="overlay">Open Overlay</option>
+                            <option value="back">Back</option>
+                        </select>
+                    </div>
+                    <div class="flow-panel-row">
+                        <span class="flow-panel-label">전환</span>
+                        <select class="flow-panel-sel" id="flowTransition">
+                            <option value="instant">Instant</option>
+                            <option value="dissolve">Dissolve</option>
+                            <option value="push">Push</option>
+                            <option value="slide">Slide</option>
+                        </select>
+                    </div>
+                    <button class="flow-panel-del" id="flowConnDel">✕ 연결 삭제</button>
+                </div>
+            </div>
+
+            <!-- 인스펙터 -->
+            <div class="work-control" id="workControl">
+                <span class="wc-empty" id="wcEmpty">캔버스에서 엔티티를 클릭하세요</span>
+                <div class="inspector" id="inspector" style="display:none;">
+                    <span class="insp-name" id="inspName"></span>
+                    <span class="insp-badge" id="inspBadge"></span>
+                    <div class="insp-sep"></div>
+                    <div class="insp-field">
+                        <span class="insp-label">x</span>
+                        <input class="insp-input" id="inspX" type="number" step="1">
+                    </div>
+                    <div class="insp-field">
+                        <span class="insp-label">y</span>
+                        <input class="insp-input" id="inspY" type="number" step="1">
+                    </div>
+                    <div class="insp-sep"></div>
+                    <div class="insp-field">
+                        <span class="insp-label">w</span>
+                        <input class="insp-input" id="inspW" type="number" step="1" min="1">
+                    </div>
+                    <div class="insp-field">
+                        <span class="insp-label">h</span>
+                        <input class="insp-input" id="inspH" type="number" step="1" min="1">
+                    </div>
+                    <span class="insp-layer-badge" id="inspLayer"></span>
+                    <button class="insp-export" id="btnExportSprite" title="PixelJSON 내보내기">↓ JSON</button>
+                    <button class="insp-export" id="btnAgGuide" title="Antigravity 제약 가이드 내보내기" style="margin-left:4px;">AG↓</button>
+                </div>
+            </div>
+
+            <!-- 레거시 컨트롤 패널 (숨김) -->
+            <div class="control-panel" id="controlPanel"></div>
         </div>
+
+        <!-- 수직 리사이저 (캔버스|레이어) -->
+        <div class="v-resizer" id="resizerRight"></div>
+
+        <!-- 오른쪽 — 레이어 패널 -->
+        <div class="layer-panel" id="layerPanel">
+
+            <div class="layer-panel-header">
+                <div class="lp-title">레이어</div>
+                <div class="lp-pal-row">
+                    <button class="pal-btn" onclick="switchPalette('palette_1bit')">1-bit</button>
+                    <button class="pal-btn" onclick="switchPalette('palette_neon')">네온</button>
+                    <button class="pal-btn" onclick="switchPalette('palette_night')">밤</button>
+                </div>
+            </div>
+
+            <div class="layer-list" id="layerList">
+                <!-- L0 ~ L3 아이템은 JS가 생성 -->
+            </div>
+
+            <div style="font-size:9px;color:#AAA;padding:6px 10px;border-top:.5px solid #D0CEC7;font-family:'JetBrains Mono',monospace;" id="selectedInfo">
+                선택된 에셋 없음
+            </div>
+        </div>
+
     </div>
 
-    <!-- 오른쪽 — 엔진 패널 -->
-    <div class="engine-panel">
+    <!-- 수평 리사이저 (패널|하단) -->
+    <div class="h-resizer" id="resizerBottom"></div>
 
-        <!-- 레이어 토글 바 -->
-        <div class="layer-bar">
-            <span class="layer-bar-label">레이어:</span>
-            <button class="layer-btn on" id="l0btn" onclick="toggleLayer(0)">L0 원경</button>
-            <button class="layer-btn on" id="l1btn" onclick="toggleLayer(1)">L1 근경</button>
-            <button class="layer-btn on" id="l2btn" onclick="toggleLayer(2)">L2 게임</button>
-            <button class="layer-btn on" id="l3btn" onclick="toggleLayer(3)">L3 UI</button>
-            <div class="layer-sep"></div>
-            <button class="pal-btn" onclick="switchPalette('palette_1bit')">1-bit</button>
-            <button class="pal-btn" onclick="switchPalette('palette_neon')">네온</button>
-            <button class="pal-btn" onclick="switchPalette('palette_night')">밤</button>
-            <div class="layer-info" id="selectedInfo">선택된 에셋 없음</div>
+    <!-- 씬 탭 스트립 -->
+    <div class="scene-tabbar" id="sceneTabBar">
+        <div class="scene-tabs" id="sceneTabs">
+            <button class="scene-tab active" id="sceneTab_abacus_game" onclick="switchEditorScene('abacus_game')">abacus_game</button>
+            <button class="scene-tab" id="sceneTab_lobby"       onclick="switchEditorScene('lobby')">lobby</button>
+            <button class="scene-tab" id="sceneTab_intro"        onclick="switchEditorScene('intro')">intro</button>
+        </div>
+        <button class="scene-tab-add" title="씬 추가">＋</button>
+    </div>
+
+    <!-- 하단 바 -->
+    <div class="bottom-bar" id="bottomBar">
+
+        <!-- 에셋 브라우저 -->
+        <div class="asset-panel">
+            <div class="asset-header">
+                <span class="asset-title">에셋 브라우저</span>
+                <button class="asset-tab active" id="tabPixel" onclick="switchAssetTab('pixel')">PixelJSON</button>
+                <button class="asset-tab" id="tabSample" onclick="switchAssetTab('sample')">샘플 사진</button>
+                <span class="asset-status" id="assetStatus">연결 중...</span>
+                <button class="asset-refresh" id="btnAssetRefresh" onclick="loadAssets()">↺</button>
+            </div>
+            <div class="asset-grid" id="assetGrid">
+                <div class="asset-loading" id="assetLoading">9192 포트 연결 중...</div>
+            </div>
         </div>
 
-        <!-- 컨트롤 패널 -->
-        <div class="control-panel" id="controlPanel">
-            <div class="cp-empty">캔버스에서 에셋을 클릭하면 컨트롤이 표시됩니다</div>
-        </div>
+        <!-- 수직 리사이저 (에셋|터미널) -->
+        <div class="v-resizer" id="resizerAsset"></div>
 
         <!-- 터미널 -->
-        <div class="terminal-panel">
+        <div class="terminal-panel" id="terminalPanel">
             <div class="terminal-log" id="termLog"></div>
             <div class="terminal-input">
                 <span class="terminal-prompt">Sand&gt;</span>
                 <input class="terminal-field" id="termInput"
-                    placeholder="명령어 입력 또는 노션 URL 붙여넣기..."
+                    placeholder="명령어 입력..."
                     autocomplete="off" spellcheck="false">
                 <button class="terminal-send" id="termSend">↑</button>
             </div>
         </div>
     </div>
-</div>
+
+</div><!-- /workspace -->
 
 <script type="module">
 import SandEngine    from './engine/SandEngine.js';
 import ControlSystem from './engine/control/ControlSystem.js';
 import AbacusScene   from './game/abacus/AbacusScene.js';
+import IntroScene    from './game/IntroScene.js';
+import LobbyScene    from './game/LobbyScene.js';
 
 // ── 로그 ────────────────────────────────────────────────────
 const termLog = document.getElementById('termLog');
 function log(msg, type = 'system') {
     const div = document.createElement('div');
     div.className = 'log-line log-' + type;
-    const prefix = type === 'ok'  ? '[✓] '   :
-                   type === 'err' ? '[✗] '   :
-                   type === 'ai'  ? 'Claude: ':
-                   type === 'user'? '> '     : '';
+    const prefix = type === 'ok'  ? '[✓] '    :
+                   type === 'err' ? '[✗] '    :
+                   type === 'ai'  ? 'Claude: ' :
+                   type === 'user'? '> '      : '';
     div.textContent = prefix + msg;
     termLog.appendChild(div);
     termLog.scrollTop = termLog.scrollHeight;
 }
 
-// ── 해상도 탭 ────────────────────────────────────────────────
-const PHONE_W = 220;
-const resTabs = document.querySelectorAll('.res-tab');
-const phoneOuter = document.getElementById('phoneOuter');
+// ══════════════════════════════════════════════════════════════
+// 미리보기: 비율 / 줌 / 팬
+// ══════════════════════════════════════════════════════════════
+const phoneOuter      = document.getElementById('phoneOuter');
 const phoneCanvasWrap = document.getElementById('phoneCanvasWrap');
-const resInfo = document.getElementById('resInfo');
-const canvas = document.getElementById('sand-canvas');
-const overlay = document.getElementById('game-overlay');
+const resInfo         = document.getElementById('resInfo');
+const canvas          = document.getElementById('sand-canvas');
+const overlay         = document.getElementById('game-overlay');
+const viewport        = document.getElementById('previewViewport');
+const stage           = document.getElementById('previewStage');
+const zoomLabel       = document.getElementById('zoomLabel');
 
-function applyRes(tab) {
-    resTabs.forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    const w = parseInt(tab.dataset.w);
-    const h = parseInt(tab.dataset.h);
-    const name = tab.dataset.name;
-    const ratio = h / w;
-    const ppi = w >= 768 ? '@2x' : w <= 375 ? '@2x' : '@3x';
+let ratioW = 9, ratioH = 16;
+let _scale = 1, _tx = 0, _ty = 0;
+const MIN_SCALE = 0.1, MAX_SCALE = 8;
 
-    let displayW, displayH;
-    if (w >= 768) {
-        phoneOuter.style.width = '240px';
-        phoneOuter.style.borderRadius = '14px';
-        displayW = 240;
-        displayH = Math.round(240 * ratio);
-    } else {
-        phoneOuter.style.width = PHONE_W + 'px';
-        phoneOuter.style.borderRadius = '28px';
-        displayW = PHONE_W;
-        displayH = Math.round(PHONE_W * (240 / 320));
-    }
-    canvas.style.width  = displayW + 'px';
-    canvas.style.height = displayH + 'px';
-    overlay.style.width  = displayW + 'px';
-    overlay.style.height = displayH + 'px';
-    phoneCanvasWrap.style.height = displayH + 'px';
-    resInfo.textContent = `${name} · ${w}×${h} · ${ppi}`;
+const BASE_W = 270, BASE_H = 480;
+let pixelScale = 1;
+
+function applyTransform() {
+    stage.style.transform = `translate(${_tx}px,${_ty}px) scale(${_scale})`;
+    zoomLabel.textContent = Math.round(_scale * 100) + '%';
 }
 
-resTabs.forEach(tab => tab.addEventListener('click', () => applyRes(tab)));
-applyRes(resTabs[0]);
+function setResolution(scale) {
+    pixelScale = scale;
+    const pw = BASE_W * scale, ph = BASE_H * scale;
+    canvas.width  = pw; canvas.height  = ph;
+    overlay.width = pw; overlay.height = ph;
+    if (window._engine) {
+        window._engine.gameWidth  = pw;
+        window._engine.gameHeight = ph;
+    }
+    resInfo.textContent = `${pw}×${ph}`;
+    fitCanvas();
+    requestAnimationFrame(fitToView);
+}
 
-// ── 레이어 토글 ──────────────────────────────────────────────
+function fitCanvas() {
+    const w = phoneOuter.offsetWidth;
+    if (!w) return;
+    const h = Math.round(w * ratioH / ratioW);
+    phoneCanvasWrap.style.height = h + 'px';
+    const pw = BASE_W * pixelScale, ph = BASE_H * pixelScale;
+    resInfo.textContent = `${pw}×${ph}`;
+}
+
+function fitToView() {
+    fitCanvas();
+    const vw = viewport.clientWidth, vh = viewport.clientHeight;
+    const phoneW = stage.offsetWidth;
+    const phoneH = phoneCanvasWrap.offsetHeight +
+                   (phoneOuter.offsetHeight - phoneCanvasWrap.offsetHeight);
+    const sc = Math.min(vw / phoneW, vh / Math.max(phoneH, 1));
+    _scale = Math.min(sc, 1);
+    _tx = (vw - phoneW * _scale) / 2;
+    _ty = (vh - phoneH * _scale) / 2;
+    applyTransform();
+}
+
+function zoomAt(factor, mx, my) {
+    const ns = Math.min(Math.max(_scale * factor, MIN_SCALE), MAX_SCALE);
+    _tx = mx - (mx - _tx) * (ns / _scale);
+    _ty = my - (my - _ty) * (ns / _scale);
+    _scale = ns;
+    applyTransform();
+}
+
+// 비율 탭
+document.querySelectorAll('#resTabs .res-tab').forEach(tab =>
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('#resTabs .res-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        [ratioW, ratioH] = tab.dataset.ratio.split(':').map(Number);
+        phoneOuter.style.borderRadius = ratioW > ratioH ? '12px' : '24px';
+        fitCanvas();
+        requestAnimationFrame(fitToView);
+    })
+);
+
+// 해상도 배율 탭
+document.querySelectorAll('#resScaleTabs .res-tab').forEach(tab =>
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('#resScaleTabs .res-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        setResolution(Number(tab.dataset.scale));
+    })
+);
+
+// 줌 버튼
+document.getElementById('btnZoomIn') .addEventListener('click', () =>
+    zoomAt(1.25, viewport.clientWidth/2, viewport.clientHeight/2));
+document.getElementById('btnZoomOut').addEventListener('click', () =>
+    zoomAt(1/1.25, viewport.clientWidth/2, viewport.clientHeight/2));
+document.getElementById('btnZoomFit').addEventListener('click', fitToView);
+
+// 휠 줌
+viewport.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = viewport.getBoundingClientRect();
+    zoomAt(e.deltaY < 0 ? 1.12 : 1/1.12, e.clientX - rect.left, e.clientY - rect.top);
+}, { passive: false });
+
+// 드래그 팬
+let _pan = false, _panX = 0, _panY = 0;
+viewport.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    _pan = true;
+    _panX = e.clientX - _tx; _panY = e.clientY - _ty;
+    viewport.classList.add('grabbing'); e.preventDefault();
+});
+document.addEventListener('mousemove', e => {
+    if (!_pan) return;
+    _tx = e.clientX - _panX; _ty = e.clientY - _panY;
+    applyTransform();
+});
+document.addEventListener('mouseup', () => {
+    if (!_pan) return;
+    _pan = false; viewport.classList.remove('grabbing');
+});
+
+// 초기화
+requestAnimationFrame(() => requestAnimationFrame(() => {
+    setResolution(1);
+    fitToView();
+}));
+
+new ResizeObserver(() => fitCanvas()).observe(phoneOuter);
+
+// ══════════════════════════════════════════════════════════════
+// 패널 리사이저
+// ══════════════════════════════════════════════════════════════
+function makeVResizer(resizerId, targetEl, opts = {}) {
+    const resizer  = document.getElementById(resizerId);
+    const minW = opts.min ?? 140;
+    const maxWFn = opts.maxFn ?? (() => window.innerWidth * 0.6);
+    let _rs = false, _sx = 0, _sw = 0;
+    resizer.addEventListener('mousedown', e => {
+        _rs = true; _sx = e.clientX; _sw = targetEl.offsetWidth;
+        resizer.classList.add('active');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+        if (!_rs) return;
+        const delta = opts.reverse ? _sx - e.clientX : e.clientX - _sx;
+        const nw = Math.min(Math.max(_sw + delta, minW), maxWFn());
+        targetEl.style.width = nw + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+        if (!_rs) return;
+        _rs = false; resizer.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    });
+}
+
+function makeHResizer(resizerId, topEl, bottomEl, opts = {}) {
+    const resizer = document.getElementById(resizerId);
+    const minH = opts.min ?? 80;
+    const maxH = opts.max ?? 400;
+    let _rs = false, _sy = 0, _sh = 0;
+    resizer.addEventListener('mousedown', e => {
+        _rs = true; _sy = e.clientY; _sh = bottomEl.offsetHeight;
+        resizer.classList.add('active');
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+        if (!_rs) return;
+        // 아래 패널 높이 = 드래그 반대 방향
+        const nh = Math.min(Math.max(_sh - (e.clientY - _sy), minH), maxH);
+        bottomEl.style.height = nh + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+        if (!_rs) return;
+        _rs = false; resizer.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    });
+}
+
+makeVResizer('resizerLeft',   document.getElementById('previewPanel'), { min: 180 });
+makeVResizer('resizerRight',  document.getElementById('layerPanel'),   { min: 140, reverse: true });
+makeVResizer('resizerAsset',  document.getElementById('terminalPanel'),{ min: 200, reverse: true });
+makeHResizer('resizerBottom', document.querySelector('.panels-row'), document.getElementById('bottomBar'), { min: 80, max: 400 });
+
+// ══════════════════════════════════════════════════════════════
+// 레이어 토글
+// ══════════════════════════════════════════════════════════════
 const layerState = { 0: true, 1: true, 2: true, 3: true };
+const LAYER_NAMES = ['L0 원경', 'L1 근경', 'L2 게임', 'L3 UI'];
+const LAYER_SCALE = ['50%', '100%', '100%', '100%'];
+
 window.toggleLayer = (n) => {
     layerState[n] = !layerState[n];
-    document.getElementById('l' + n + 'btn').classList.toggle('on', layerState[n]);
-    if (window._engine) {
-        window._engine.layers.setVisible(n, layerState[n]);
-    }
+    // 툴바 버튼
+    const tbtn = document.getElementById('l' + n + 'btn');
+    tbtn.classList.toggle('active', layerState[n]);
+    // 레이어 패널 토글
+    const ltog = document.getElementById('ltog' + n);
+    if (ltog) ltog.classList.toggle('off', !layerState[n]);
+
+    if (window._engine) window._engine.layers.setVisible(n, layerState[n]);
     log(`레이어 ${n} ${layerState[n] ? '켜짐' : '꺼짐'}`);
 };
 
-// ── 팔레트 교체 ──────────────────────────────────────────────
+// 솔로 레이어 상태
+let _soloLayer = null;
+
+window.setSoloLayer = function(idx) {
+    _soloLayer = (_soloLayer === idx) ? null : idx;
+    for (let i = 0; i < 4; i++) {
+        const item = document.getElementById('litem' + i);
+        const btn  = document.getElementById('lsolo' + i);
+        if (item) item.classList.toggle('solo', _soloLayer === i);
+        if (btn)  btn.classList.toggle('active', _soloLayer === i);
+    }
+};
+
+// 레이어 아이템 생성
+function buildLayerList() {
+    const list = document.getElementById('layerList');
+    list.innerHTML = '';
+
+    for (let i = 3; i >= 0; i--) {
+        const engine = window._engine;
+        const gw = engine?.gameWidth  ?? 270;
+        const gh = engine?.gameHeight ?? 480;
+        const lw = (i <= 1) ? gw * 4 : gw;
+        const resLabel = `${lw}×${gh}`;
+
+        // ── 래퍼 (layer-item + children) ───────────────────────
+        const wrap = document.createElement('div');
+        wrap.className = 'layer-wrap';
+        wrap.id = 'lwrap' + i;
+
+        // ── 레이어 행 ───────────────────────────────────────────
+        const item = document.createElement('div');
+        item.className = 'layer-item';
+        item.id = 'litem' + i;
+        item.innerHTML = `
+            <div class="layer-thumb-wrap">
+                <canvas id="thumb${i}" width="44" height="44"></canvas>
+            </div>
+            <div class="layer-meta">
+                <div class="layer-name">${LAYER_NAMES[i]}</div>
+                <div class="layer-scale" id="lscale${i}">${LAYER_SCALE[i]}</div>
+                <div class="layer-res"  id="lres${i}">${resLabel}</div>
+            </div>
+            <button class="layer-toggle-solo" id="lsolo${i}" onclick="setSoloLayer(${i})" title="솔로 뷰">S</button>
+            <div class="layer-toggle" id="ltog${i}" onclick="toggleLayer(${i})"></div>`;
+
+        // 더블클릭 → 현재 씬 프레임으로 줌인
+        item.addEventListener('dblclick', () => zoomToActiveFrame());
+
+        // ── 자식 목록 영역 ──────────────────────────────────────
+        const children = document.createElement('div');
+        children.className = 'layer-children';
+        children.id = 'lchildren' + i;
+
+        const addTextBtn = document.createElement('button');
+        addTextBtn.className = 'layer-add-text';
+        addTextBtn.innerHTML = `<span class="layer-add-text-icon">T</span>+ 텍스트 박스`;
+        addTextBtn.onclick = () => addTextToLayer(i);
+        children.appendChild(addTextBtn);
+
+        const entityList = document.createElement('div');
+        entityList.id = 'lentities' + i;
+        children.appendChild(entityList);
+
+        wrap.appendChild(item);
+        wrap.appendChild(children);
+        list.appendChild(wrap);
+    }
+}
+buildLayerList();
+
+// 그룹 정의: prefab prefix → 그룹 레이블
+const LAYER_GROUPS = [
+    { key: 'ABACUS', label: 'ABACUS_FRAME', match: e => (e.type ?? '').startsWith('ABACUS_') || e.type === 'ABACUS_FRAME' },
+];
+
+// 그룹 접힘 상태 (key → bool, true = 접힘)
+const _groupCollapsed = {};
+
+// 레이어별 엔티티 자식 목록 갱신 (엔티티 추가/삭제/선택/에셋교체 시 호출)
+function refreshLayerChildren() {
+    const engine = window._engine;
+    for (let i = 0; i < 4; i++) {
+        const el = document.getElementById('lentities' + i);
+        if (!el) continue;
+        el.innerHTML = '';
+
+        const all = engine
+            ? [...engine.entities._entities.values()].filter(e => e.layer === i && !e._detached)
+            : [];
+
+        // 그룹에 속하는 엔티티와 나머지 분리
+        const grouped   = {};   // groupKey → Entity[]
+        const ungrouped = [];
+
+        for (const e of all) {
+            const grp = LAYER_GROUPS.find(g => g.match(e));
+            if (grp) {
+                (grouped[grp.key] = grouped[grp.key] ?? []).push(e);
+            } else {
+                ungrouped.push(e);
+            }
+        }
+
+        // ── 그룹 렌더 ──────────────────────────────────────────
+        for (const grp of LAYER_GROUPS) {
+            const members = grouped[grp.key];
+            if (!members?.length) continue;
+
+            const collapsed = !!_groupCollapsed[grp.key];
+            const arrow = collapsed ? '▸' : '▾';
+
+            // 그룹 헤더
+            const header = document.createElement('div');
+            header.className = 'lci-group-header';
+            header.innerHTML = `
+                <span class="lci-group-arrow">${arrow}</span>
+                <span class="lci-group-name">${grp.label}</span>
+                <span class="lci-group-count">${members.length}개</span>`;
+            header.addEventListener('click', () => {
+                _groupCollapsed[grp.key] = !_groupCollapsed[grp.key];
+                refreshLayerChildren();
+            });
+            el.appendChild(header);
+
+            if (!collapsed) {
+                for (const e of members) {
+                    el.appendChild(_makeEntityRow(e, true));
+                }
+            }
+        }
+
+        // ── 그룹 외 엔티티 ────────────────────────────────────
+        for (const e of ungrouped) {
+            el.appendChild(_makeEntityRow(e, false));
+        }
+
+        // 레이어 해상도 갱신
+        if (engine) {
+            const gw = engine.gameWidth, gh = engine.gameHeight;
+            const lw = (i <= 1) ? gw * 4 : gw;
+            const resEl = document.getElementById('lres' + i);
+            if (resEl) resEl.textContent = `${lw}×${gh}`;
+        }
+    }
+}
+
+function _makeEntityRow(e, grouped) {
+    const isText = !!e._isText;
+    const name   = e.type ?? e.id ?? '?';
+    const size   = (e.pw && e.ph) ? `${e.pw}×${e.ph}` : '';
+    const row    = document.createElement('div');
+    row.className = 'layer-child-item'
+        + (grouped ? ' lci-grouped' : '')
+        + (e === _selectedEntity ? ' lci-selected' : '');
+    row.innerHTML = `
+        <span class="layer-child-icon ${isText ? 'lci-text' : 'lci-sprite'}">${isText ? 'T' : '▣'}</span>
+        <span class="layer-child-name">${name}</span>
+        <span class="layer-child-size">${size}</span>`;
+    row.addEventListener('click', () => selectEntity(e));
+    return row;
+}
+
+// 특정 레이어로 텍스트 박스 추가 (레이어 미리 선택된 채 다이얼로그 열기)
+function addTextToLayer(layerIdx) {
+    const dlLayer = document.getElementById('tdLayer');
+    if (dlLayer) dlLayer.value = String(layerIdx);
+    showTextDialog();
+}
+
+// 더블클릭 시 활성 씬 프레임으로 줌인
+function zoomToActiveFrame() {
+    const engine = window._engine;
+    if (!engine) return;
+    const sceneName = window._curEditorScene;
+    if (!sceneName || !FRAME_POS[sceneName]) return;
+    const fp = FRAME_POS[sceneName];
+    const gw = engine.gameWidth, gh = engine.gameHeight;
+    const vw = workViewport.clientWidth;
+    const vh = workViewport.clientHeight;
+    const cw = window._workW || workCanvas.width;
+    const ch = window._workH || workCanvas.height;
+
+    const sx = (vw * 0.85) / gw;
+    const sy = (vh * 0.85) / gh;
+    _wScale = Math.min(sx, sy, 4);
+
+    _wTx = _wScale * (cw / 2 - fp.x - gw / 2);
+    _wTy = _wScale * (ch / 2 - fp.y - gh / 2);
+    applyWorkTransform();
+    log(`레이어 줌인: ${LAYER_NAMES[0].split(' ')[0]} 씬 "${sceneName}"`, 'ok');
+}
+
+// ══════════════════════════════════════════════════════════════
+// 팔레트
+// ══════════════════════════════════════════════════════════════
 window.switchPalette = (name) => {
     if (window._engine) {
         window._engine.palette_mgr.load(`assets/palettes/${name}.json`)
-            .then(() => log(`팔레트 변경: ${name}`, 'ok'))
+            .then(() => log(`팔레트: ${name}`, 'ok'))
             .catch(() => log(`팔레트 없음: ${name}`, 'err'));
     }
     document.getElementById('stPalette').textContent = name;
 };
 
-// ── 엔진 상태 업데이트 ───────────────────────────────────────
-let _lastFrameTime = performance.now();
-let _frameCount = 0;
+// ══════════════════════════════════════════════════════════════
+// 작업 캔버스
+// ══════════════════════════════════════════════════════════════
+const workCanvas   = document.getElementById('work-canvas');
+const workCtx      = workCanvas.getContext('2d');
+const workViewport = document.getElementById('workViewport');
+const workStage    = document.getElementById('workStage');
+const tooltip      = document.getElementById('entityTooltip');
+
+let workSize = 512;       // 현재 씬 크기
+let _wScale  = 1;         // 작업 캔버스 줌
+let _wTx = 0, _wTy = 0;  // 작업 캔버스 팬 오프셋 (stage transform 기준은 center)
+
+let _selectedEntity   = null;
+let _sceneIsPlaying   = false;
+let _dragAssetData    = null;   // 드래그 중인 에셋 카드 데이터
+let _pendingAssetData = null;   // 레이어 피커 대기 중인 에셋
+let _pendingDropGx    = 0;      // 드롭 위치 (게임 좌표)
+let _pendingDropGy    = 0;
+let _dropHoverEntity  = null;   // dragover 중 히트된 엔티티
+
+// ── 분리(detach) 관련 상태 ────────────────────────────────────
+let _dragDetached    = false;   // 현재 분리 엔티티 드래그 중
+let _dragStartCx     = 0;       // 분리 드래그 시작 캔버스 좌표
+let _dragStartCy     = 0;
+let _willDetach      = false;   // 드래그 중 프레임 밖으로 나감 (예비 분리)
+let _pendingReattach = null;    // 레이어 피커로 재연결 대기 중인 엔티티
+
+// 씬 크기 변경
+window.setWorkSize = (sz) => {
+    workSize = sz;
+    workCanvas.width  = sz;
+    workCanvas.height = sz;
+    document.querySelectorAll('[data-wsize]').forEach(b =>
+        b.classList.toggle('active', Number(b.dataset.wsize) === sz));
+    renderWorkCanvas();
+    fitWorkCanvas();
+};
+
+// 작업 캔버스 맞춤
+window.fitWorkCanvas = () => {
+    const vw = workViewport.clientWidth  || workViewport.offsetWidth;
+    const vh = workViewport.clientHeight || workViewport.offsetHeight;
+    if (!vw || !vh) return;
+    const cw = window._workW || workCanvas.width  || workSize;
+    const ch = window._workH || workCanvas.height || workSize;
+    _wScale = Math.min(vw / cw, vh / ch) * 0.9;
+    _wTx = 0; _wTy = 0;
+    applyWorkTransform();
+};
+
+function applyWorkTransform() {
+    const vw = workViewport.offsetWidth, vh = workViewport.offsetHeight;
+    const cw = window._workW || workCanvas.width  || workSize;
+    const ch = window._workH || workCanvas.height || workSize;
+    const ox = vw / 2 + _wTx - (cw * _wScale) / 2;
+    const oy = vh / 2 + _wTy - (ch * _wScale) / 2;
+    workStage.style.transform = `translate(${ox}px,${oy}px) scale(${_wScale})`;
+    workStage.style.top  = '0';
+    workStage.style.left = '0';
+}
+
+// 작업 캔버스 휠 줌
+workViewport.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.15 : 1/1.15;
+    _wScale = Math.min(Math.max(_wScale * factor, 0.05), 20);
+    applyWorkTransform();
+}, { passive: false });
+
+// 스페이스 팬 모드
+let _spaceDown = false;
+document.addEventListener('keydown', e => {
+    if (e.code === 'Space' && e.target === document.body) {
+        e.preventDefault();
+        if (!_spaceDown) { _spaceDown = true; workViewport.style.cursor = 'grab'; }
+    }
+});
+document.addEventListener('keyup', e => {
+    if (e.code === 'Space') {
+        _spaceDown = false;
+        if (!_wpan) workViewport.style.cursor = '';
+    }
+});
+
+// 작업 캔버스 팬
+let _wpan = false, _wpanX = 0, _wpanY = 0, _wpanTx = 0, _wpanTy = 0;
+workViewport.addEventListener('mousedown', e => {
+    if (e.button === 1 || (e.button === 0 && e.altKey) || (e.button === 0 && _spaceDown)) {
+        _wpan = true;
+        _wpanX = e.clientX; _wpanY = e.clientY;
+        _wpanTx = _wTx; _wpanTy = _wTy;
+        workViewport.style.cursor = 'grabbing';
+        e.preventDefault();
+    }
+});
+document.addEventListener('mousemove', e => {
+    if (!_wpan) return;
+    _wTx = _wpanTx + (e.clientX - _wpanX);
+    _wTy = _wpanTy + (e.clientY - _wpanY);
+    applyWorkTransform();
+});
+document.addEventListener('mouseup', () => {
+    if (_wpan) { _wpan = false; workViewport.style.cursor = ''; }
+});
+
+// 작업 캔버스 렌더링
+function renderWorkCanvas() {
+    const engine = window._engine;
+    if (!engine) return;
+
+    // 엔진 렌더 (활성 씬 픽셀 갱신)
+    if (!engine._running) {
+        engine.entities.render(engine.cameraX ?? 0);
+        engine.layers.composite(canvas, engine.cameraX ?? 0);
+    }
+
+    // 멀티프레임 뷰 렌더
+    renderMultiFrame();
+
+    // 드릴다운 오버레이 — 활성 프레임 위에
+    if (_drillEntity) {
+        const gw = engine.gameWidth, gh = engine.gameHeight;
+        const fp = FRAME_POS[window._curEditorScene ?? ''];
+        if (fp) renderDrilldownOverlay(workCtx, fp.x, fp.y, gw, gh, gw, gh);
+    }
+}
+
+// ── 드릴다운 픽셀 에디터 ─────────────────────────────────────
+let _drillEntity   = null;   // 편집 중인 엔티티
+let _drillFrame    = 0;      // 현재 프레임 인덱스
+let _drillColor    = 1;      // 선택된 팔레트 인덱스 (0=투명)
+let _drillTool     = 'draw'; // 'draw' | 'erase'
+let _drillPainting = false;  // mousedown 중 페인팅 여부
+let _drillPixelSize = 1;     // work canvas에서 1픽셀 = Npx
+
+// 드릴다운 진입
+function enterDrilldown(entity) {
+    if (!entity) return;
+    const frames = entity._frames ?? (entity._pixels ? [{ pixels: entity._pixels }] : null);
+    if (!frames) { log('드릴다운: 픽셀 데이터 없음', 'err'); return; }
+    _drillEntity = entity;
+    _drillFrame  = 0;
+    _drillColor  = 1;
+    _drillTool   = 'draw';
+
+    // 팔레트 행 표시
+    document.getElementById('drillPaletteRow').classList.add('visible');
+    const breadcrumb = document.getElementById('canvasBreadcrumb');
+    if (breadcrumb) {
+        const name = entity.type ?? entity.id;
+        breadcrumb.innerHTML = `씬 뷰 &gt; <span class="ct-bc-cur">${name}</span> &gt; <span class="ct-bc-cur" style="color:#C8922A">픽셀 편집</span>`;
+    }
+
+    _buildDrillSwatches(entity);
+    _buildDrillFrameBtns(entity);
+    log(`드릴다운: ${entity.type ?? entity.id}  ${entity.pw}×${entity.ph}  ${frames.length}프레임`, 'ok');
+}
+
+// 드릴다운 나가기
+function exitDrilldown() {
+    historyPush();
+    _drillEntity   = null;
+    _drillPainting = false;
+    document.getElementById('drillPaletteRow').classList.remove('visible');
+    const breadcrumb = document.getElementById('canvasBreadcrumb');
+    if (breadcrumb) breadcrumb.innerHTML = `씬 뷰 &gt; <span class="ct-bc-cur">abacus_game</span>`;
+    log('드릴다운 종료', 'info');
+}
+
+// 팔레트 스와치 빌드
+function _buildDrillSwatches(entity) {
+    const palette = entity._palette ?? (entity._frames?.[0]?.palette) ?? [];
+    const container = document.getElementById('drillSwatches');
+    container.innerHTML = '';
+    palette.forEach((col, idx) => {
+        const btn = document.createElement('div');
+        btn.className = 'drill-color-swatch' + (idx === 0 ? ' transparent-swatch' : '') + (idx === _drillColor ? ' active' : '');
+        btn.title = `${idx}: ${col}`;
+        btn.style.background = (idx === 0 || col === 'transparent') ? '' : col;
+        btn.addEventListener('click', () => {
+            _drillColor = idx;
+            _drillTool  = idx === 0 ? 'erase' : 'draw';
+            setDrillTool(_drillTool);
+            container.querySelectorAll('.drill-color-swatch').forEach((b, i) => b.classList.toggle('active', i === idx));
+        });
+        container.appendChild(btn);
+    });
+}
+
+// 프레임 버튼 빌드
+function _buildDrillFrameBtns(entity) {
+    const frames = entity._frames ?? [{ pixels: entity._pixels ?? [] }];
+    const container = document.getElementById('drillFrameBtns');
+    container.innerHTML = '';
+    frames.forEach((_, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'drill-frame-btn' + (idx === _drillFrame ? ' active' : '');
+        btn.textContent = idx + 1;
+        btn.addEventListener('click', () => {
+            _drillFrame = idx;
+            container.querySelectorAll('.drill-frame-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+        });
+        container.appendChild(btn);
+    });
+}
+
+// 드릴다운 도구 선택
+function setDrillTool(tool) {
+    _drillTool = tool;
+    document.getElementById('drillToolDraw')?.classList.toggle('active', tool === 'draw');
+    document.getElementById('drillToolErase')?.classList.toggle('active', tool === 'erase');
+}
+
+// 드릴다운 픽셀 칠하기 (workCanvas 클릭 좌표 → 스프라이트 로컬 좌표)
+function drillSetPixelAt(gx, gy) {
+    if (!_drillEntity) return;
+    const en   = _drillEntity;
+    const cameraX = window._engine?.cameraX ?? 0;
+    const ex   = (en.layer === 2 ? en.x - cameraX : en.x);
+    const ey   = en.y;
+
+    // gx/gy는 이미 게임 좌표 — 스프라이트 로컬 좌표로
+    const pw = en.pw ?? 1, ph = en.ph ?? 1;
+    const curFrame = (en._frames ?? [])[_drillFrame] ?? (en._frames ?? [])[0];
+    const sw = curFrame?.width  ?? pw;
+    const sh = curFrame?.height ?? ph;
+    const lx = Math.floor((gx - ex) / pw * sw);
+    const ly = Math.floor((gy - ey) / ph * sh);
+    if (lx < 0 || lx >= sw || ly < 0 || ly >= sh) return;
+
+    // 픽셀 배열 수정
+    const frames = en._frames ?? [{ pixels: en._pixels ?? [], width: sw, height: sh }];
+    if (!en._frames) en._frames = frames;
+    const frame = frames[_drillFrame] ?? frames[0];
+    if (!frame.pixels) frame.pixels = [];
+
+    if (_drillTool === 'erase' || _drillColor === 0) {
+        frame.pixels = frame.pixels.filter(p => !(p[0] === lx && p[1] === ly));
+    } else {
+        const existing = frame.pixels.find(p => p[0] === lx && p[1] === ly);
+        if (existing) existing[2] = _drillColor;
+        else frame.pixels.push([lx, ly, _drillColor]);
+    }
+}
+
+// 드릴다운 캔버스 렌더링 (renderWorkCanvas 내부에서 호출)
+function renderDrilldownOverlay(ctx, drawX, drawY, drawW, drawH, vw, vh) {
+    if (!_drillEntity) return;
+    const en = _drillEntity;
+    const engine = window._engine;
+    if (!engine) return;
+
+    const cameraX = engine.cameraX ?? 0;
+    const ex = (en.layer === 2 ? en.x - cameraX : en.x);
+    const ey = en.y;
+    const pw = en.pw ?? 1, ph = en.ph ?? 1;
+    const scaleX = drawW / vw, scaleY = drawH / vh;
+
+    const frames = en._frames ?? [{ pixels: en._pixels ?? [], width: pw, height: ph }];
+    const frame  = frames[_drillFrame] ?? frames[0];
+    const sw = frame.width  ?? en._frames?.[0]?.width  ?? pw;
+    const sh = frame.height ?? en._frames?.[0]?.height ?? ph;
+    const palette = en._palette ?? frame.palette ?? [];
+
+    // 스프라이트 픽셀 하나의 크기 (work canvas pixels)
+    const cellW = (pw * scaleX) / sw;
+    const cellH = (ph * scaleY) / sh;
+    const bx = ex * scaleX + drawX;
+    const by = ey * scaleY + drawY;
+
+    // 격자 배경 (회색 바둑판)
+    for (let r = 0; r < sh; r++) {
+        for (let c = 0; c < sw; c++) {
+            ctx.fillStyle = ((c + r) % 2 === 0) ? '#3A3A36' : '#2E2E2A';
+            ctx.fillRect(bx + c * cellW, by + r * cellH, cellW, cellH);
+        }
+    }
+
+    // 픽셀 그리기
+    const pixels = frame.pixels ?? [];
+    for (const p of pixels) {
+        const [px, py, ci] = p;
+        if (ci === 0 || ci >= palette.length) continue;
+        const col = palette[ci];
+        if (!col || col === 'transparent') continue;
+        ctx.fillStyle = col;
+        ctx.fillRect(bx + px * cellW, by + py * cellH, cellW, cellH);
+    }
+
+    // 격자선
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.lineWidth   = 0.5;
+    for (let c = 0; c <= sw; c++) {
+        ctx.beginPath(); ctx.moveTo(bx + c * cellW, by); ctx.lineTo(bx + c * cellW, by + ph * scaleY); ctx.stroke();
+    }
+    for (let r = 0; r <= sh; r++) {
+        ctx.beginPath(); ctx.moveTo(bx, by + r * cellH); ctx.lineTo(bx + pw * scaleX, by + r * cellH); ctx.stroke();
+    }
+
+    // 선택 테두리
+    ctx.strokeStyle = '#C8922A';
+    ctx.lineWidth   = 2;
+    ctx.setLineDash([]);
+    ctx.strokeRect(bx, by, pw * scaleX, ph * scaleY);
+}
+
+// ── 작업 캔버스 드래그/리사이즈 시스템 ─────────────────────
+const HANDLE_R   = 6;   // 핸들 클릭 반경 (게임 좌표)
+// dragMode: null | 'move' | 'nw' | 'ne' | 'sw' | 'se'
+let _dragMode    = null;
+let _dragStartGx = 0, _dragStartGy = 0;
+let _dragOrigX   = 0, _dragOrigY   = 0;
+let _dragOrigW   = 0, _dragOrigH   = 0;
+
+// 마우스 → 캔버스 픽셀 좌표 (CSS 스케일 역변환)
+function workRawToCanvas(e) {
+    const rect = workCanvas.getBoundingClientRect();
+    return {
+        cx: (e.clientX - rect.left) * (workCanvas.width  / rect.width),
+        cy: (e.clientY - rect.top)  * (workCanvas.height / rect.height),
+    };
+}
+
+// 마우스 → 활성 프레임 내 게임 좌표 (엔티티 편집용)
+function workCanvasCoords(e) {
+    const { cx, cy } = workRawToCanvas(e);
+    const fp = FRAME_POS[window._curEditorScene ?? ''];
+    if (!fp) return { gx: 0, gy: 0 };
+    return { gx: cx - fp.x, gy: cy - fp.y };
+}
+
+function getHandleAt(gx, gy, entity) {
+    const ex = entity.x, ey = entity.y;
+    const ew = entity.pw ?? 0, eh = entity.ph ?? 0;
+    const handles = {
+        nw: [ex,      ey],
+        ne: [ex + ew, ey],
+        sw: [ex,      ey + eh],
+        se: [ex + ew, ey + eh],
+    };
+    for (const [key, [hx, hy]] of Object.entries(handles)) {
+        if (Math.abs(gx - hx) <= HANDLE_R && Math.abs(gy - hy) <= HANDLE_R) return key;
+    }
+    return null;
+}
+
+function getCursorForHandle(h) {
+    return { nw:'nw-resize', ne:'ne-resize', sw:'sw-resize', se:'se-resize' }[h] ?? 'default';
+}
+
+// 더블클릭 → 드릴다운 진입 / 드릴다운 중 더블클릭 → 나가기
+workCanvas.addEventListener('dblclick', e => {
+    if (_drillEntity) { exitDrilldown(); return; }
+    if (_selectedEntity) { enterDrilldown(_selectedEntity); }
+});
+
+workCanvas.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    if (_spaceDown) return;
+    const engine = window._engine;
+    if (!engine) return;
+
+    const { cx, cy } = workRawToCanvas(e);
+
+    // ── 이름표 드래그 → 프레임 이동 ──────────────────────────
+    const labelHit = hitTestFrameLabel(cx, cy);
+    if (labelHit) {
+        const p = FRAME_POS[labelHit];
+        // clientX/Y 델타 기반 — CSS transform 좌표 변환 오차 없음
+        _frameDrag = { name: labelHit, startClientX: e.clientX, startClientY: e.clientY, startFx: p.x, startFy: p.y };
+        workCanvas.style.cursor = 'grabbing';
+        e.preventDefault(); e.stopPropagation(); return;
+    }
+
+    // ── 연결점 드래그 (프레임 오른쪽 점) ─────────────────────
+    const dot = _flowHitDot(cx, cy);
+    if (dot) { _flowNewConn = { from: dot, mx: cx, my: cy }; return; }
+
+    // ── 연결선 클릭 ──────────────────────────────────────────
+    const ci = _flowHitConn(cx, cy);
+    if (ci >= 0) { _flowSelConn = ci; _flowUpdatePanel(); return; }
+
+    // ── 분리된 엔티티 우선 클릭 ──────────────────────────────
+    const detachedHit = hitTestDetached(cx, cy);
+    if (detachedHit) {
+        selectEntity(detachedHit);
+        _dragMode     = 'move';
+        _dragDetached = true;
+        _dragStartCx  = cx; _dragStartCy = cy;
+        _dragOrigX    = detachedHit.x; _dragOrigY = detachedHit.y;
+        workViewport.style.cursor = 'grabbing';
+        e.preventDefault(); return;
+    }
+
+    // ── 프레임 클릭 → 해당 씬 활성화 ────────────────────────
+    const frameHit = hitTestFrame(cx, cy);
+    if (!frameHit) {
+        // 빈 공간 좌클릭 드래그 → 팬 (피그마 스타일)
+        _flowSelConn = null;
+        document.getElementById('flowConnPanel').style.display = 'none';
+        _wpan = true;
+        _wpanX = e.clientX; _wpanY = e.clientY;
+        _wpanTx = _wTx; _wpanTy = _wTy;
+        workViewport.style.cursor = 'grabbing';
+        e.preventDefault();
+        return;
+    }
+    // 다른 프레임 클릭 시 씬 전환
+    if (frameHit.name !== window._curEditorScene) {
+        switchEditorScene(frameHit.name);
+        return;
+    }
+
+    // ── 활성 프레임 내부 엔티티 편집 ─────────────────────────
+    const { gx, gy } = workCanvasCoords(e);
+
+    // 드릴다운 모드: 픽셀 페인팅
+    if (_drillEntity) {
+        _drillPainting = true;
+        drillSetPixelAt(gx, gy);
+        e.preventDefault(); return;
+    }
+
+    // 핸들 클릭 우선
+    if (_selectedEntity) {
+        const h = getHandleAt(gx, gy, _selectedEntity);
+        if (h) {
+            _dragMode    = h;
+            _dragStartGx = gx; _dragStartGy = gy;
+            _dragOrigX   = _selectedEntity.x;
+            _dragOrigY   = _selectedEntity.y;
+            _dragOrigW   = _selectedEntity.pw ?? 0;
+            _dragOrigH   = _selectedEntity.ph ?? 0;
+            workViewport.style.cursor = getCursorForHandle(h);
+            e.preventDefault(); return;
+        }
+        // 선택된 엔티티 위를 클릭 → 이동
+        const en = _selectedEntity;
+        const ex = en.layer === 2 ? en.x - (engine.cameraX ?? 0) : en.x;
+        if (gx >= ex && gx < ex + (en.pw??0) && gy >= en.y && gy < en.y + (en.ph??0)) {
+            _dragMode    = 'move';
+            _dragStartGx = gx; _dragStartGy = gy;
+            _dragOrigX   = en.x; _dragOrigY = en.y;
+            workViewport.style.cursor = 'grabbing';
+            e.preventDefault(); return;
+        }
+    }
+
+    // 새 엔티티 선택 후 즉시 이동 시작 (허용 오차 적용)
+    const _hitTol = Math.max(0, Math.round(6 / (_wScale || 1)));
+    const hit = hitTest(gx, gy, engine, _hitTol);
+    selectEntity(hit);
+    if (hit) {
+        _dragMode    = 'move';
+        _dragDetached = false;
+        _willDetach  = false;
+        _dragStartGx = gx; _dragStartGy = gy;
+        _dragOrigX   = hit.x; _dragOrigY = hit.y;
+        workViewport.style.cursor = 'grabbing';
+        e.preventDefault();
+    }
+});
+
+document.addEventListener('mousemove', e => {
+    const engine = window._engine;
+
+    // 연결선 드래그 미리보기
+    if (_flowNewConn) {
+        const { cx, cy } = workRawToCanvas(e);
+        _flowNewConn.mx = cx; _flowNewConn.my = cy;
+        return;
+    }
+
+    // 드릴다운 페인팅
+    if (_drillPainting && _drillEntity) {
+        const { gx, gy } = workCanvasCoords(e);
+        drillSetPixelAt(gx, gy);
+        return;
+    }
+
+    // 드래그/리사이즈 처리
+    if (_dragMode && _selectedEntity && engine) {
+        const en = _selectedEntity;
+
+        if (_dragDetached) {
+            // ── 분리 엔티티 드래그 (캔버스 절대 좌표) ────────────
+            const { cx: dcx, cy: dcy } = workRawToCanvas(e);
+            en.x = _dragOrigX + (dcx - _dragStartCx);
+            en.y = _dragOrigY + (dcy - _dragStartCy);
+            const overFrame = hitTestFrame(dcx, dcy);
+            workViewport.style.cursor = overFrame ? 'copy' : 'grabbing';
+        } else {
+            const { gx, gy } = workCanvasCoords(e);
+            const dx = gx - _dragStartGx, dy = gy - _dragStartGy;
+
+            if (_dragMode === 'move') {
+                en.x = _dragOrigX + dx;
+                en.y = _dragOrigY + dy;
+                // 프레임 밖으로 나갔는지 감지
+                const fp = FRAME_POS[window._curEditorScene];
+                if (fp) {
+                    const gw = engine.gameWidth, gh = engine.gameHeight;
+                    _willDetach = (en.x + (en.pw ?? 0) < 0 || en.x > gw ||
+                                   en.y + (en.ph ?? 0) < 0 || en.y > gh);
+                    workViewport.style.cursor = _willDetach ? 'no-drop' : 'grabbing';
+                }
+            } else {
+                // 리사이즈 — 핸들별 x/y/pw/ph 갱신
+                _willDetach = false;
+                if (_dragMode === 'nw') {
+                    en.x  = _dragOrigX + dx;
+                    en.y  = _dragOrigY + dy;
+                    en.pw = Math.max(4, _dragOrigW - dx);
+                    en.ph = Math.max(4, _dragOrigH - dy);
+                } else if (_dragMode === 'ne') {
+                    en.y  = _dragOrigY + dy;
+                    en.pw = Math.max(4, _dragOrigW + dx);
+                    en.ph = Math.max(4, _dragOrigH - dy);
+                } else if (_dragMode === 'sw') {
+                    en.x  = _dragOrigX + dx;
+                    en.pw = Math.max(4, _dragOrigW - dx);
+                    en.ph = Math.max(4, _dragOrigH + dy);
+                } else if (_dragMode === 'se') {
+                    en.pw = Math.max(4, _dragOrigW + dx);
+                    en.ph = Math.max(4, _dragOrigH + dy);
+                }
+            }
+        }
+
+        // 좌표 업데이트 표시
+        const wcCoords = document.getElementById('wcCoords');
+        if (wcCoords) wcCoords.textContent =
+            `x:${Math.round(en.x)} y:${Math.round(en.y)} ${Math.round(en.pw??0)}×${Math.round(en.ph??0)}  L${en.layer}`;
+        return;
+    }
+
+    // ── 프레임 이동 드래그 ────────────────────────────────────
+    if (_frameDrag) {
+        // clientX/Y 델타를 _wScale로 나눠 캔버스 좌표 이동량 산출
+        const dx = (e.clientX - _frameDrag.startClientX) / _wScale;
+        const dy = (e.clientY - _frameDrag.startClientY) / _wScale;
+        FRAME_POS[_frameDrag.name].x = _frameDrag.startFx + dx;
+        FRAME_POS[_frameDrag.name].y = _frameDrag.startFy + dy;
+        return;
+    }
+
+    // 호버 → 툴팁 + 커서
+    if (!engine) return;
+    const rect = workCanvas.getBoundingClientRect();
+    if (e.clientX < rect.left || e.clientX > rect.right ||
+        e.clientY < rect.top  || e.clientY > rect.bottom) return;
+    const { cx: hcx, cy: hcy } = workRawToCanvas(e);
+    // 이름표 위 → grab 커서
+    if (hitTestFrameLabel(hcx, hcy)) {
+        workCanvas.style.cursor = 'grab';
+        tooltip.style.display = 'none';
+        return;
+    }
+    const { gx, gy } = workCanvasCoords(e);
+
+    // 드릴다운 모드: 크로스헤어 커서
+    if (_drillEntity) {
+        workCanvas.style.cursor = 'crosshair';
+        tooltip.style.display = 'none';
+        return;
+    }
+
+    // 선택된 엔티티의 핸들 위인지 먼저 확인
+    if (_selectedEntity) {
+        const h = getHandleAt(gx, gy, _selectedEntity);
+        if (h) {
+            tooltip.style.display = 'none';
+            workCanvas.style.cursor = getCursorForHandle(h);
+            return;
+        }
+    }
+
+    const hit = hitTest(gx, gy, engine);
+    if (hit) {
+        const name = hit.type ?? hit.id;
+        tooltip.style.display = 'block';
+        tooltip.style.left = (e.clientX + 12) + 'px';
+        tooltip.style.top  = (e.clientY + 4)  + 'px';
+        tooltip.textContent = `${name}  (${hit.pw??0}×${hit.ph??0})`;
+        workCanvas.style.cursor = 'pointer';
+    } else {
+        tooltip.style.display = 'none';
+        workCanvas.style.cursor = 'default';
+    }
+});
+
+document.addEventListener('mouseup', e => {
+    // 연결선 드래그 완료
+    if (_flowNewConn) {
+        const { cx, cy } = workRawToCanvas(e);
+        const hit = hitTestFrame(cx, cy);
+        if (hit && hit.name !== _flowNewConn.from) {
+            _flowConns = _flowConns.filter(c => !(c.from === _flowNewConn.from && c.to === hit.name));
+            _flowConns.push({ from: _flowNewConn.from, to: hit.name,
+                              trigger: 'click', action: 'navigate', transition: 'dissolve' });
+            log(`씬 연결: ${_flowNewConn.from} → ${hit.name}`, 'ok');
+        }
+        _flowNewConn = null;
+        return;
+    }
+    if (_drillPainting) { _drillPainting = false; return; }
+    if (_frameDrag) {
+        FRAME_POS[_frameDrag.name].x = Math.round(FRAME_POS[_frameDrag.name].x);
+        FRAME_POS[_frameDrag.name].y = Math.round(FRAME_POS[_frameDrag.name].y);
+        workCanvas.style.cursor = 'grab';
+        _frameDrag = null;
+        historyPush();
+        return;
+    }
+    if (!_dragMode) return;
+    if (_selectedEntity) {
+        _selectedEntity.x  = Math.round(_selectedEntity.x);
+        _selectedEntity.y  = Math.round(_selectedEntity.y);
+        _selectedEntity.pw = Math.round(_selectedEntity.pw ?? 0);
+        _selectedEntity.ph = Math.round(_selectedEntity.ph ?? 0);
+
+        if (_dragDetached) {
+            // ── 분리 엔티티 드롭 ────────────────────────────────
+            const { cx: uCx, cy: uCy } = workRawToCanvas(e);
+            const overFrame = hitTestFrame(uCx, uCy);
+            if (overFrame) {
+                // 프레임 안에 드롭 → 레이어 피커로 재연결
+                const fp = FRAME_POS[overFrame.name];
+                _pendingReattach = _selectedEntity;
+                _pendingReattach._reattachScene = overFrame.name;
+                _pendingReattach._reattachGx = Math.round(uCx - fp.x);
+                _pendingReattach._reattachGy = Math.round(uCy - fp.y);
+                showLayerPicker(e.clientX, e.clientY);
+            } else {
+                // 프레임 밖 → 분리 유지
+                log(`분리 유지: ${_selectedEntity.type ?? _selectedEntity.id}`, 'info');
+                refreshLayerChildren();
+            }
+            _dragDetached = false;
+        } else if (_willDetach && _dragMode === 'move') {
+            // ── 프레임 밖으로 나간 엔티티 → 분리 ────────────────
+            const fp = FRAME_POS[window._curEditorScene];
+            if (fp) {
+                const en = _selectedEntity;
+                en.x = Math.round(fp.x + en.x);
+                en.y = Math.round(fp.y + en.y);
+                en._detached = true;
+                en._detachedFrom = window._curEditorScene;
+                log(`분리됨: ${en.type ?? en.id} — 프레임 밖 배치`, 'info');
+                refreshLayerChildren();
+            }
+            _willDetach = false;
+        } else {
+            if (_dragMode === 'move') {
+                log(`이동: ${_selectedEntity.type??_selectedEntity.id} → (${_selectedEntity.x},${_selectedEntity.y})`, 'ok');
+            } else {
+                log(`크기: ${_selectedEntity.type??_selectedEntity.id} → ${_selectedEntity.pw}×${_selectedEntity.ph}`, 'ok');
+            }
+            syncInspectorInputs(_selectedEntity);
+            historyPush();
+        }
+    }
+    _dragMode = null;
+    _willDetach = false;
+    workViewport.style.cursor = '';
+});
+
+workCanvas.addEventListener('mouseleave', () => {
+    if (_flowNewConn) _flowNewConn = null;
+    if (!_dragMode) tooltip.style.display = 'none';
+});
+
+// ══════════════════════════════════════════════════════════════
+// 에셋 드래그 → 씬 에디터 드롭
+// ══════════════════════════════════════════════════════════════
+workViewport.addEventListener('dragover', e => {
+    if (!_dragAssetData) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    const engine = window._engine;
+    if (!engine) return;
+    const { gx, gy } = workCanvasCoords(e);
+    _dropHoverEntity = hitTest(gx, gy, engine) ?? null;
+    workCanvas.classList.toggle('drop-replace', !!_dropHoverEntity);
+});
+
+workViewport.addEventListener('dragleave', e => {
+    if (!workViewport.contains(e.relatedTarget)) {
+        _dropHoverEntity = null;
+        workCanvas.classList.remove('drop-replace');
+    }
+});
+
+workViewport.addEventListener('drop', e => {
+    e.preventDefault();
+    workCanvas.classList.remove('drop-replace');
+    if (!_dragAssetData) return;
+    const engine = window._engine;
+    if (!engine) return;
+    const { gx, gy } = workCanvasCoords(e);
+    const hit = hitTest(gx, gy, engine);
+
+    if (hit) {
+        // 기존 엔티티 위 드롭 → 스프라이트 교체
+        selectEntity(hit);
+        applyAssetToEntity(_dragAssetData);
+    } else {
+        // 빈 영역 드롭 → 레이어 선택 후 생성
+        _pendingAssetData = _dragAssetData;
+        _pendingDropGx    = gx;
+        _pendingDropGy    = gy;
+        showLayerPicker(e.clientX, e.clientY);
+    }
+    _dragAssetData   = null;
+    _dropHoverEntity = null;
+});
+
+// ── 씬 인메모리 자동저장 ─────────────────────────────────────
+const _sceneStates = new Map(); // sceneName → entity config 배열
+
+function _saveSceneState(sceneName) {
+    const engine = window._engine;
+    if (!engine) return;
+    const snapshot = [];
+    for (const [id, e] of engine.entities._entities) {
+        snapshot.push({
+            id,
+            type:       e.type      ?? null,
+            layer:      e.layer,
+            x:          e.x,        y:          e.y,
+            pw:         e.pw,       ph:         e.ph,
+            visible:    e.visible   ?? true,
+            flipX:      e.flipX     ?? false,
+            flipY:      e.flipY     ?? false,
+            scale:      e.scale     ?? 1,
+            rotate:     e.rotate    ?? 0,
+            pixels:     e._pixels   ?? null,
+            frames:     e._frames   ?? null,
+            _palette:   e._palette  ?? null,
+            // 텍스트 엔티티 전용
+            _isText:    e._isText   ?? false,
+            text:       e.text      ?? null,
+            fontSize:   e.fontSize  ?? null,
+            color:      e.color     ?? null,
+            fontFamily: e.fontFamily ?? null,
+            align:      e.align     ?? null,
+        });
+    }
+    _sceneStates.set(sceneName, snapshot);
+}
+
+function _restoreSceneState(sceneName) {
+    const engine = window._engine;
+    const snapshot = _sceneStates.get(sceneName);
+    if (!snapshot || snapshot.length === 0) return false;
+    // 팔레트는 첫 번째 팔레트 보유 엔티티 기준으로 복원
+    const palSrc = snapshot.find(s => s._palette?.length);
+    if (palSrc) engine.palette_mgr.load(palSrc._palette);
+    for (const cfg of snapshot) {
+        const e = engine.entities.add(cfg.id, cfg);
+        if (cfg.type)       e.type       = cfg.type;
+        if (cfg._isText)    { e._isText   = true;  e.text      = cfg.text;
+                               e.fontSize  = cfg.fontSize; e.color = cfg.color;
+                               e.fontFamily = cfg.fontFamily; e.align = cfg.align; }
+    }
+    log(`씬 복원: ${sceneName} (${snapshot.length}개)`, 'ok');
+    refreshLayerChildren();
+    return true;
+}
+
+// ── 레이어 피커 ───────────────────────────────────────────────
+const layerPicker = document.getElementById('layerPicker');
+
+function showLayerPicker(cx, cy) {
+    layerPicker.style.left    = Math.min(cx, window.innerWidth  - 240) + 'px';
+    layerPicker.style.top     = Math.min(cy, window.innerHeight - 210) + 'px';
+    layerPicker.style.display = 'block';
+}
+function hideLayerPicker() {
+    layerPicker.style.display = 'none';
+    _pendingAssetData = null;
+    _pendingReattach  = null;
+}
+
+layerPicker.querySelectorAll('.layer-picker-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const layer = parseInt(btn.dataset.layer, 10);
+
+        if (_pendingReattach) {
+            // ── 분리 엔티티 재연결 ──────────────────────────────
+            const en = _pendingReattach;
+            const targetScene = en._reattachScene;
+            en._detached     = false;
+            en._detachedFrom = null;
+            en.layer         = layer;
+            en.x             = en._reattachGx ?? 10;
+            en.y             = en._reattachGy ?? 10;
+            delete en._reattachScene;
+            delete en._reattachGx;
+            delete en._reattachGy;
+
+            // 다른 씬으로 재연결 시 현재 씬 엔티티 목록에서 이동
+            const curScene = window._curEditorScene;
+            if (targetScene && targetScene !== curScene) {
+                const engine = window._engine;
+                if (engine) {
+                    // 현재 씬 스냅샷에서 제거, 대상 씬 스냅샷에 추가
+                    const cur = _sceneStates.get(curScene) ?? [];
+                    _sceneStates.set(curScene, cur.filter(s => s.id !== (en.id ?? en.type)));
+                    const target = _sceneStates.get(targetScene) ?? [];
+                    target.push({ id: en.id, type: en.type, layer, x: en.x, y: en.y, pw: en.pw, ph: en.ph, visible: true });
+                    _sceneStates.set(targetScene, target);
+                }
+            }
+            selectEntity(en);
+            log(`재연결: ${en.type ?? en.id} → L${layer} (${targetScene ?? curScene})`, 'ok');
+            hideLayerPicker();
+            return;
+        }
+
+        _createEntityFromAsset(_pendingAssetData, _pendingDropGx, _pendingDropGy, layer);
+        hideLayerPicker();
+    });
+});
+document.getElementById('layerPickerCancel').addEventListener('click', hideLayerPicker);
+document.addEventListener('click', e => {
+    if (layerPicker.style.display === 'block' && !layerPicker.contains(e.target)) hideLayerPicker();
+});
+
+function _createEntityFromAsset(data, gx, gy, layer) {
+    const engine = window._engine;
+    if (!data || !engine) return;
+    const frames = (data.frames ?? []).map(f => {
+        const raw = f.pixels ?? [];
+        const pixels = (raw.length > 0 && Array.isArray(raw[0])) ? raw : flatToTriples(raw);
+        return { pixels };
+    });
+    // 에셋 자체 팔레트를 palette_mgr에 로드 — 없으면 rgbaCache miss로 픽셀 전체 invisible
+    if (data.palette?.length) engine.palette_mgr.load(data.palette);
+
+    const id = `entity_${Date.now()}`;
+    const entity = engine.entities.add(id, {
+        x:       Math.round(gx),
+        y:       Math.round(gy),
+        pw:      data.width  ?? 16,
+        ph:      data.height ?? 16,
+        layer,
+        visible: true,
+        scale:   1,
+        frames,
+        _palette: data.palette ?? null,
+        flipX: false, flipY: false, rotate: 0,
+    });
+    entity.type = data.name ?? id;
+    selectEntity(entity);
+    log(`생성: ${entity.type}  L${layer}  (${Math.round(gx)}, ${Math.round(gy)})`, 'ok');
+}
+
+// ── 컨텍스트 메뉴 ─────────────────────────────────────────────
+const ctxMenu = document.getElementById('ctxMenu');
+
+function showCtxMenu(cx, cy) {
+    // 현재 레이어 항목 체크 표시
+    [0,1,2,3].forEach(i => {
+        const el = document.getElementById(`ctxMoveL${i}`);
+        if (el) el.style.color = (_selectedEntity?.layer === i) ? '#FFD080' : '';
+    });
+    ctxMenu.style.left    = Math.min(cx, window.innerWidth  - 185) + 'px';
+    ctxMenu.style.top     = Math.min(cy, window.innerHeight - 230) + 'px';
+    ctxMenu.style.display = 'block';
+}
+function hideCtxMenu() { ctxMenu.style.display = 'none'; }
+
+workCanvas.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const { gx, gy } = workCanvasCoords(e);
+    const hit = hitTest(gx, gy, window._engine);
+    if (hit) {
+        selectEntity(hit);
+        showCtxMenu(e.clientX, e.clientY);
+    }
+});
+document.addEventListener('click', e => {
+    if (ctxMenu.style.display === 'block' && !ctxMenu.contains(e.target)) hideCtxMenu();
+});
+
+function _duplicateEntity(en) {
+    const engine = window._engine;
+    if (!en || !engine) return;
+    const id = `entity_${Date.now()}`;
+    const frames = en._frames ? en._frames.map(f => ({ pixels: [...(f.pixels ?? [])] })) : null;
+    const copy = engine.entities.add(id, {
+        x:       en.x + 12,
+        y:       en.y + 12,
+        pw:      en.pw,
+        ph:      en.ph,
+        layer:   en.layer,
+        visible: en.visible,
+        scale:   en.scale   ?? 1,
+        flipX:   en.flipX   ?? false,
+        flipY:   en.flipY   ?? false,
+        rotate:  en.rotate  ?? 0,
+        frames,
+        _palette: en._palette ?? null,
+    });
+    copy.type = en.type ?? id;
+    selectEntity(copy);
+    log(`복제: ${copy.type}`, 'ok');
+}
+
+document.getElementById('ctxReplace').addEventListener('click', () => {
+    hideCtxMenu();
+    // 에셋 브라우저를 "교체 대기" 상태로 표시
+    const grid = document.getElementById('assetGrid');
+    grid.style.outline = '2px solid #FFD080';
+    grid.title = '교체할 스프라이트를 클릭하세요';
+    log('에셋 브라우저에서 교체할 스프라이트를 클릭하세요', 'info');
+    const off = () => { grid.style.outline = ''; grid.title = ''; grid.removeEventListener('click', off); };
+    grid.addEventListener('click', off);
+});
+document.getElementById('ctxDuplicate').addEventListener('click', () => {
+    hideCtxMenu(); historyPush(); _duplicateEntity(_selectedEntity);
+});
+[0,1,2,3].forEach(i => {
+    document.getElementById(`ctxMoveL${i}`).addEventListener('click', () => {
+        hideCtxMenu();
+        if (_selectedEntity) {
+            _selectedEntity.layer = i;
+            log(`레이어 이동: ${_selectedEntity.type ?? _selectedEntity.id} → L${i}`, 'ok');
+            refreshLayerChildren();
+        }
+    });
+});
+document.getElementById('ctxDelete').addEventListener('click', () => {
+    hideCtxMenu();
+    const engine = window._engine;
+    if (_selectedEntity && engine) {
+        historyPush();
+        const id = _selectedEntity.id ?? _selectedEntity.type;
+        engine.entities._entities.delete(_selectedEntity.id);
+        log(`삭제: ${id}`, 'ok');
+        selectEntity(null);
+    }
+});
+
+function selectEntity(entity) {
+    _selectedEntity = entity;
+    const wcEmpty   = document.getElementById('wcEmpty');
+    const inspector = document.getElementById('inspector');
+    const selInfo   = document.getElementById('selectedInfo');
+
+    if (!entity) {
+        wcEmpty.style.display   = '';
+        inspector.style.display = 'none';
+        selInfo.textContent     = '선택된 에셋 없음';
+        refreshLayerChildren();
+        return;
+    }
+
+    const name = entity.type ?? entity.id;
+    const isInteract = entity.type === 'ABACUS_BEAD';
+    const isUI       = entity.layer === 3;
+
+    wcEmpty.style.display   = 'none';
+    inspector.style.display = '';
+
+    document.getElementById('inspName').textContent  = name;
+    const badge = document.getElementById('inspBadge');
+    badge.textContent = isInteract ? '인터랙티브' : isUI ? 'UI' : '비주얼';
+    badge.className   = 'insp-badge' + (isInteract ? '' : isUI ? ' ui' : ' visual');
+    document.getElementById('inspLayer').textContent = `L${entity.layer}`;
+
+    syncInspectorInputs(entity);
+    selInfo.textContent = `${name} @ (${Math.round(entity.x)},${Math.round(entity.y)})`;
+    log(`선택: ${name}  (${entity.pw}×${entity.ph})`, 'ok');
+    refreshLayerChildren();
+}
+
+function syncInspectorInputs(entity) {
+    if (!entity) return;
+    document.getElementById('inspX').value = Math.round(entity.x);
+    document.getElementById('inspY').value = Math.round(entity.y);
+    document.getElementById('inspW').value = Math.round(entity.pw ?? 0);
+    document.getElementById('inspH').value = Math.round(entity.ph ?? 0);
+}
+
+// 인스펙터 입력 → 엔티티 실시간 반영
+['inspX','inspY','inspW','inspH'].forEach(id => {
+    const input = document.getElementById(id);
+    input.addEventListener('input', () => {
+        if (!_selectedEntity) return;
+        const v = parseInt(input.value, 10);
+        if (isNaN(v)) return;
+        if (id === 'inspX') _selectedEntity.x  = v;
+        if (id === 'inspY') _selectedEntity.y  = v;
+        if (id === 'inspW') _selectedEntity.pw = Math.max(1, v);
+        if (id === 'inspH') _selectedEntity.ph = Math.max(1, v);
+        const selInfo = document.getElementById('selectedInfo');
+        if (selInfo) selInfo.textContent =
+            `${_selectedEntity.type??_selectedEntity.id} @ (${Math.round(_selectedEntity.x)},${Math.round(_selectedEntity.y)})`;
+    });
+    // 드래그 이후 인스펙터 동기화 (mouseup 이후 RAF)
+    input.addEventListener('focus', () => input.select());
+});
+
+// ══════════════════════════════════════════════════════════════
+// 레이어 썸네일 렌더링 (엔진 레이어 캔버스 직접 사용)
+// ══════════════════════════════════════════════════════════════
+function updateLayerThumbs() {
+    const engine = window._engine;
+    if (!engine) return;
+    const vw = engine.layers.viewWidth, vh = engine.layers.viewHeight;
+    for (let i = 0; i < 4; i++) {
+        const tc = document.getElementById('thumb' + i);
+        if (!tc) continue;
+        const tctx = tc.getContext('2d');
+        tctx.clearRect(0, 0, 44, 44);
+        tctx.fillStyle = '#1A1A18';
+        tctx.fillRect(0, 0, 44, 44);
+        const layerCanvas = engine.layers.getCanvas(i);
+        if (!layerCanvas) continue;
+        // 레이어 0/1은 패럴랙스 넓이 (W×4) → 첫 뷰포트 너비만 자름
+        tctx.drawImage(layerCanvas, 0, 0, vw, vh, 0, 0, 44, 44);
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 에셋 브라우저 (9192)
+// ══════════════════════════════════════════════════════════════
+let _assetTab      = 'pixel';
+let _assetData     = null;
+let _selectedCard  = null;   // 현재 선택된 에셋 카드 데이터
+let _retryTimer    = null;
+
+window.switchAssetTab = (tab) => {
+    _assetTab = tab;
+    document.getElementById('tabPixel') .classList.toggle('active', tab === 'pixel');
+    document.getElementById('tabSample').classList.toggle('active', tab === 'sample');
+    renderAssetGrid();
+};
+
+// PixelJSON flat[x,y,ci,...] → [[x,y,ci], ...] 변환
+function flatToTriples(flat) {
+    const t = [];
+    for (let i = 0; i + 2 < flat.length; i += 3) t.push([flat[i], flat[i+1], flat[i+2]]);
+    return t;
+}
+
+// 선택된 엔티티에 PixelJSON 에셋 적용
+function applyAssetToEntity(data) {
+    if (!_selectedEntity) {
+        log('먼저 캔버스에서 엔티티를 선택하세요', 'err');
+        return;
+    }
+    if (!data || data._isSample) {
+        log('PixelJSON 에셋만 적용 가능합니다', 'err');
+        return;
+    }
+    historyPush();
+    // frames → 엔진 내부 포맷([[x,y,ci],...])으로 변환 (두 형식 자동 감지)
+    const frames = (data.frames ?? []).map(f => {
+        const raw = f.pixels ?? [];
+        const pixels = (raw.length > 0 && Array.isArray(raw[0]))
+            ? raw                  // 이미 트리플 형식
+            : flatToTriples(raw);  // flat → 트리플 변환
+        return { pixels };
+    });
+    _selectedEntity._frames   = frames;
+    _selectedEntity._pixels   = null;
+    _selectedEntity._frameIdx = 0;
+    _selectedEntity.pw        = data.width  ?? _selectedEntity.pw;
+    _selectedEntity.ph        = data.height ?? _selectedEntity.ph;
+
+    syncInspectorInputs(_selectedEntity);
+    refreshLayerChildren();
+    log(`적용: ${data.name} → ${_selectedEntity.type ?? _selectedEntity.id}  (${data.width}×${data.height})`, 'ok');
+}
+
+// 로컬 assets/pixels/ 파일 목록 (9192 폴백)
+const LOCAL_PIXEL_FILES = [
+    // 주판왕 손님 캐릭터
+    'char_customer_normal','char_customer_rush','char_customer_picky',
+    'char_customer_credit','char_customer_regular',
+    // 배경
+    'bg_shop_wall','bg_1980_style',
+    // 주판 요소
+    'abacus_bead','abacus_frame','abacus_rod',
+    // UI
+    'ui_timer','ui_score','ui_problem','particle_star',
+    // 레거시
+    'char_ryu_master','char_pacman_master','char_mario_master',
+    'char_ryu_hadouken','char_ryu_hadouken_anim',
+];
+
+async function loadLocalPixels() {
+    const results = await Promise.allSettled(
+        LOCAL_PIXEL_FILES.map(fname =>
+            fetch(`assets/pixels/${fname}.json`, { cache: 'no-store' })
+                .then(r => r.json())
+                .then(data => ({ ...data, name: data.name ?? fname }))
+        )
+    );
+    return results
+        .filter(r => r.status === 'fulfilled')
+        .map(r => r.value);
+}
+
+window.loadAssets = async function() {
+    clearTimeout(_retryTimer);
+    document.getElementById('assetStatus').textContent = '연결 중...';
+    try {
+        const res  = await fetch('http://localhost:9192/api/data', { cache: 'no-store' });
+        _assetData = await res.json();
+        const cnt  = (_assetData.learningData ?? []).length;
+        document.getElementById('assetStatus').textContent = `9192 · ${cnt}개`;
+        renderAssetGrid();
+    } catch {
+        // 9192 실패 → 로컬 assets/pixels/ 폴백
+        try {
+            const localAssets = await loadLocalPixels();
+            _assetData = { learningData: localAssets, sampleFiles: {} };
+            document.getElementById('assetStatus').textContent = `로컬 · ${localAssets.length}개`;
+            renderAssetGrid();
+        } catch {
+            document.getElementById('assetStatus').textContent = '로드 실패';
+            document.getElementById('assetGrid').innerHTML =
+                '<div class="asset-loading">에셋을 불러올 수 없습니다</div>';
+        }
+        // 9192 백그라운드 재시도
+        _retryTimer = setTimeout(window.loadAssets, 8000);
+    }
+};
+
+function renderAssetGrid() {
+    const grid = document.getElementById('assetGrid');
+    if (!_assetData) return;
+    grid.innerHTML = '';
+
+    const items = _assetTab === 'pixel'
+        ? (_assetData.learningData ?? [])
+        : Object.entries(_assetData.sampleFiles ?? {}).flatMap(([, files]) =>
+              files.map(f => ({ _isSample: true, _file: f })));
+
+    if (!items.length) {
+        grid.innerHTML = '<div class="asset-loading">에셋이 없습니다</div>';
+        return;
+    }
+
+    items.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'asset-card';
+
+        if (item._isSample) {
+            const img = document.createElement('img');
+            img.className = 'asset-card-thumb';
+            img.style.objectFit = 'contain';
+            img.src = `http://localhost:9192/${item._file}`;
+            const name = document.createElement('div');
+            name.className   = 'asset-card-name';
+            name.textContent = item._file.split('/').pop();
+            card.appendChild(img);
+            card.appendChild(name);
+        } else {
+            // 썸네일
+            const tc = document.createElement('canvas');
+            tc.className = 'asset-card-thumb';
+            tc.width = 72; tc.height = 54;
+            renderPixelJSON(tc, item);
+            card.appendChild(tc);
+
+            // 파일명
+            const name = document.createElement('div');
+            name.className   = 'asset-card-name';
+            name.textContent = item.name ?? '?';
+            card.appendChild(name);
+
+            // 메타 태그 (크기 · fps · 프레임수)
+            const meta = document.createElement('div');
+            meta.className = 'asset-card-meta';
+            const w = item.width ?? '?', h = item.height ?? '?';
+            const fps = item.fps ?? '?';
+            const fc  = (item.frames ?? []).length;
+            meta.innerHTML =
+                `<span class="asset-meta-tag tag-size">${w}×${h}</span>` +
+                `<span class="asset-meta-tag tag-fps">${fps}fps</span>` +
+                `<span class="asset-meta-tag tag-frames">${fc}f</span>`;
+            card.appendChild(meta);
+
+            // AG 가이드 호버
+            const agGuide = document.getElementById('agGuide');
+            card.addEventListener('mouseenter', e => {
+                const palCount = (item.palette ?? []).filter(c => c !== 'transparent').length;
+                document.getElementById('agLockLine').textContent =
+                    `${w}×${h} · ${fps}fps · ${fc}프레임 — 변경 불가`;
+                document.getElementById('agPalLine').textContent =
+                    `팔레트 ${palCount}색 — 이 색 안에서만`;
+                document.getElementById('agMeta').textContent =
+                    (item.palette ?? []).filter(c => c !== 'transparent').join('  ');
+                agGuide.style.display = 'block';
+                agGuide.style.left = (e.clientX + 14) + 'px';
+                agGuide.style.top  = (e.clientY - 10) + 'px';
+            });
+            card.addEventListener('mousemove', e => {
+                agGuide.style.left = (e.clientX + 14) + 'px';
+                agGuide.style.top  = (e.clientY - 10) + 'px';
+            });
+            card.addEventListener('mouseleave', () => {
+                agGuide.style.display = 'none';
+            });
+        }
+
+        card.title = item.name ?? item._file ?? '';
+
+        // 드래그 (PixelJSON만)
+        if (!item._isSample) {
+            card.draggable = true;
+            card.addEventListener('dragstart', e => {
+                _dragAssetData = item;
+                e.dataTransfer.effectAllowed = 'copy';
+                e.dataTransfer.setData('text/plain', item.name ?? '');
+                card.classList.add('dragging');
+            });
+            card.addEventListener('dragend', () => {
+                card.classList.remove('dragging');
+                // dragAssetData는 drop 핸들러가 처리 후 클리어
+            });
+        }
+
+        // 클릭 → 선택 + 엔티티 적용
+        card.addEventListener('click', () => {
+            document.querySelectorAll('.asset-card.selected')
+                .forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            _selectedCard = item;
+            if (!item._isSample) {
+                applyAssetToEntity(item);
+            } else {
+                log(`샘플: ${item._file.split('/').pop()}`, 'ok');
+            }
+        });
+
+        grid.appendChild(card);
+    });
+}
+
+// PixelJSON sparse 렌더링 (작은 썸네일용)
+// 픽셀 형식 자동 감지: [[x,y,ci],...] or [x,y,ci,x,y,ci,...]
+function renderPixelJSON(canvas, data) {
+    if (!data || !data.frames || !data.frames.length) return;
+    const ctx    = canvas.getContext('2d');
+    const frame  = data.frames[0];
+    const pixels = frame.pixels ?? [];
+    const pal    = data.palette ?? [];
+    const w      = data.width  || 16;
+    const h      = data.height || 16;
+    const scaleX = canvas.width  / w;
+    const scaleY = canvas.height / h;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#1A1A18';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const isTriples = pixels.length > 0 && Array.isArray(pixels[0]);
+
+    if (isTriples) {
+        for (const [px, py, ci] of pixels) {
+            const color = pal[ci];
+            if (!color || color === 'transparent') continue;
+            ctx.fillStyle = color;
+            ctx.fillRect(Math.floor(px * scaleX), Math.floor(py * scaleY),
+                         Math.ceil(scaleX), Math.ceil(scaleY));
+        }
+    } else {
+        for (let i = 0; i + 2 < pixels.length; i += 3) {
+            const color = pal[pixels[i+2]];
+            if (!color || color === 'transparent') continue;
+            ctx.fillStyle = color;
+            ctx.fillRect(Math.floor(pixels[i] * scaleX), Math.floor(pixels[i+1] * scaleY),
+                         Math.ceil(scaleX), Math.ceil(scaleY));
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 엔진 상태 업데이트
+// ══════════════════════════════════════════════════════════════
+let _lastFT = performance.now(), _fc = 0;
+
 function updateState() {
     const eng = window._engine;
-    if (!eng) return;
-    _frameCount++;
-    const now = performance.now();
-    if (now - _lastFrameTime >= 500) {
-        document.getElementById('stFps').textContent = Math.round(_frameCount * 1000 / (now - _lastFrameTime));
-        document.getElementById('stEntities').textContent = eng.entities._entities.size;
-        document.getElementById('stCamera').textContent = Math.round(eng.cameraX ?? 0);
-        _frameCount = 0;
-        _lastFrameTime = now;
+    if (eng) {
+        _fc++;
+        const now = performance.now();
+        if (now - _lastFT >= 500) {
+            document.getElementById('stFps').textContent =
+                Math.round(_fc * 1000 / (now - _lastFT));
+            document.getElementById('stEntities').textContent =
+                eng.entities._entities.size;
+            document.getElementById('stCamera').textContent =
+                Math.round(eng.cameraX ?? 0);
+            _fc = 0; _lastFT = now;
+        }
     }
+    renderWorkCanvas();
+    renderTextLayer();
+    updateLayerThumbs();
     requestAnimationFrame(updateState);
 }
 
-// ── 메인 ────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// 메인
+// ══════════════════════════════════════════════════════════════
 async function main() {
     const controlPanel = document.getElementById('controlPanel');
-    const selectedInfo = document.getElementById('selectedInfo');
 
-    const engine = new SandEngine({
-        canvas,
-        gameWidth:  320,
-        gameHeight: 240,
-    });
-
-    const canvasWrap = document.getElementById('phoneCanvasWrap');
-    engine.scale.calculate(canvas.offsetWidth || 220, canvas.offsetHeight || 165);
-    engine.canvas.width  = engine.gameWidth;
-    engine.canvas.height = engine.gameHeight;
-    engine.scale.applyToCanvas(canvas);
+    const engine = new SandEngine({ canvas, gameWidth: 270, gameHeight: 480 });
     engine.input.attach();
 
     window.addEventListener('resize', () => {
-        engine.scale.update(canvas.offsetWidth, canvas.offsetHeight, canvas);
+        fitCanvas();
         engine.layers.resize(engine.gameWidth, engine.gameHeight);
         engine.entities.resize(engine.gameWidth, engine.gameHeight);
+        fitWorkCanvas();
     });
 
     const ctrl = new ControlSystem(engine, controlPanel);
 
-    // 씬 로드
+    // 씬 등록
+    const introScene  = new IntroScene();
+    const lobbyScene  = new LobbyScene();
     const abacusScene = new AbacusScene();
+    engine.scenes.register('intro',       introScene);
+    engine.scenes.register('lobby',       lobbyScene);
     engine.scenes.register('abacus_game', abacusScene);
+
     await abacusScene.onInit(engine);
-    await abacusScene.onEnter(engine);
+
+    // 씬뷰 초기 표시: abacus_game 엔티티만 배치, 게임 로직은 ▶ 플레이 버튼까지 대기
+    const _initSceneJSON = await engine.assets.load('assets/scenes/abacus_game.scene.json');
+    await engine.applyScene(_initSceneJSON);
     engine.scenes._stack.push(abacusScene);
     engine.scenes._inited.add('abacus_game');
 
-    engine.start();
-
-    // 팔레트명 표시
+    engine.start(); // 렌더 루프 시작 (엔티티 표시용) — 게임 로직은 _loaded=false로 차단
     document.getElementById('stPalette').textContent = 'palette_1bit';
 
-    // 캔버스 클릭 → 주판알 토글 or 엔티티 선택
+    // 미리보기 캔버스 클릭 (주판알 외 에셋)
     canvas.addEventListener('click', (e) => {
         const rect = canvas.getBoundingClientRect();
-        const gx = Math.floor((e.clientX - rect.left) * engine.gameWidth  / rect.width);
-        const gy = Math.floor((e.clientY - rect.top)  * engine.gameHeight / rect.height);
+        const gx = Math.floor((e.clientX - rect.left) * BASE_W / rect.width);
+        const gy = Math.floor((e.clientY - rect.top)  * BASE_H / rect.height);
         const hit = hitTest(gx, gy, engine);
-
-        if (hit?.type === 'ABACUS_BEAD') {
-            // 게임 모드: 주판알 토글
-            const { col, position, row } = hit.props;
-            const colIdx = col === '100' ? 0 : col === '10' ? 1 : 2;
-            if (position === 'upper') {
-                abacusScene.abacus.toggleUpper(colIdx, row - 1);
-            } else {
-                abacusScene.abacus.toggleLower(colIdx, row - 1);
-            }
-            // 엔티티 상태 동기화
-            const idMap = {};
-            for (const [id] of engine.entities._entities) idMap[id] = id;
-            abacusScene.abacus.syncEntities(engine.entities, idMap);
-
-            const val = abacusScene.abacus.getValue();
-            log(`주판: ${val}  (클릭: ${hit.id})`, 'ok');
-
-            // 정답 자동 체크
-            if (abacusScene._problem && val === abacusScene._problem.answer) {
-                abacusScene._checkAnswer();
-            }
-        } else if (hit) {
+        if (hit && hit.type !== 'ABACUS_BEAD') {
             ctrl.select(hit);
-            selectedInfo.textContent = `${hit.type ?? hit.id} @ (${gx},${gy})`;
-            log(`선택: ${hit.type ?? hit.id} #${hit.id}  (${gx},${gy})`, 'ok');
-        } else {
+            selectEntity(hit);
+        } else if (!hit) {
             ctrl.deselect();
-            selectedInfo.textContent = '선택된 에셋 없음';
+            selectEntity(null);
         }
     });
 
+    // 오버레이 클릭 → 주판알 토글 or 제출
+    overlay.addEventListener('click', (e) => {
+        const scene = window._abacusScene;
+        if (!scene) return;
+        const rect = overlay.getBoundingClientRect();
+        const gx = Math.floor((e.clientX - rect.left) * BASE_W / rect.width);
+        const gy = Math.floor((e.clientY - rect.top)  * BASE_H / rect.height);
+
+        if (gx >= 30 && gx <= 240 && gy >= 376 && gy <= 400) {
+            scene.submitAnswer();
+            log(`제출: ${scene.abacus.getValue()}`, 'ok');
+            return;
+        }
+
+        const BEAD_Y_UPPER = [[116, 166]];
+        const BEAD_Y_LOWER = [[176,218],[218,260],[260,302],[302,350]];
+
+        for (let c = 0; c < 9; c++) {
+            const bx = AB.colX0 + c * AB.colStep;
+            if (gx < bx || gx >= bx + AB.beadW) continue;
+
+            const [uy0, uy1] = BEAD_Y_UPPER[0];
+            if (gy >= uy0 && gy <= uy1) {
+                scene.toggleBead(c, 'upper', 0);
+                log(`${scene.abacus.getColName(c)} 윗알 → ${scene.abacus.getValue()}`, 'ok');
+                return;
+            }
+            for (let r = 0; r < 4; r++) {
+                const [y0, y1] = BEAD_Y_LOWER[r];
+                if (gy >= y0 && gy <= y1) {
+                    scene.toggleBead(c, 'lower', r);
+                    log(`${scene.abacus.getColName(c)} 아랫알${r+1} → ${scene.abacus.getValue()}`, 'ok');
+                    return;
+                }
+            }
+        }
+    });
+
+    // 씬뷰 플레이/정지 토글
+    window.scenePlay = async function() {
+        const btn    = document.getElementById('btnScenePlay');
+        const panel  = document.getElementById('previewPanel');
+        const frozen = document.getElementById('editorFrozen');
+
+        if (_sceneIsPlaying) {
+            // 정지
+            engine.stop();
+            _sceneIsPlaying = false;
+            btn.textContent       = '▶ 플레이';
+            btn.style.background  = '#1A4A1A';
+            btn.style.borderColor = '#3A8A3A';
+            btn.style.color       = '#7FE07F';
+            panel.classList.remove('playing');
+            if (frozen) frozen.style.display = 'none';
+            // 씬뷰 정적 상태 복원
+            await switchEditorScene(window._curEditorScene ?? 'abacus_game');
+            log('씬 정지', 'info');
+        } else {
+            // 플레이 — intro부터 시작
+            engine.scenes._activate('intro');
+            if (!engine._running) engine.start();
+            _sceneIsPlaying = true;
+            btn.textContent       = '⏹ 정지';
+            btn.style.background  = '#4A1A1A';
+            btn.style.borderColor = '#8A3A3A';
+            btn.style.color       = '#FF8A80';
+            panel.classList.add('playing');
+            if (frozen) frozen.style.display = 'block';
+            log('씬 플레이 (intro →)', 'ok');
+        }
+    };
+
+    // 에디터 씬 전환 (플레이 없이 정적 뷰만)
+    window._curEditorScene = 'abacus_game';
+    window.switchEditorScene = async function(sceneName) {
+        if (_sceneIsPlaying) return; // 플레이 중엔 무시
+
+        // ── 현재 씬 자동저장 ──────────────────────────────────
+        const prev = window._curEditorScene;
+        if (prev) _saveSceneState(prev);
+
+        window._curEditorScene = sceneName;
+
+        // 씬 탭 활성화 업데이트
+        document.querySelectorAll('.scene-tab').forEach(b => b.classList.remove('active'));
+        const activeBtn = document.getElementById('sceneTab_' + sceneName);
+        if (activeBtn) activeBtn.classList.add('active');
+
+        // 브레드크럼 업데이트
+        const bc = document.getElementById('canvasBreadcrumb');
+        if (bc) bc.innerHTML = `씬 뷰 &gt; <span class="ct-bc-cur">${sceneName}</span>`;
+
+        // 씬 스택 / 엔티티 / 레이어 클리어
+        engine.scenes._stack.length = 0;
+        engine.entities._entities.clear();
+        engine.layers.clearAll();
+        overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+        selectEntity(null);
+
+        if (!engine._running) engine.start();
+
+        if (sceneName === 'abacus_game') {
+            // 인메모리 저장 있으면 복원, 없으면 JSON에서 최초 로드
+            if (!_restoreSceneState('abacus_game')) {
+                const sceneJSON = await engine.assets.load('assets/scenes/abacus_game.scene.json');
+                await engine.applyScene(sceneJSON);
+            }
+        } else {
+            // intro / lobby: 저장된 씬 복원 or 빈 씬 안내
+            if (!_restoreSceneState(sceneName)) {
+                const ctx = engine.layers.getCtx(3);
+                const W = engine.gameWidth, H = engine.gameHeight;
+                ctx.clearRect(0, 0, W, H);
+                ctx.fillStyle = 'rgba(100,100,100,0.6)';
+                ctx.font = '9px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`[ ${sceneName} ]`, W / 2, H / 2);
+            }
+        }
+        log(`씬 전환: ${sceneName}`, 'info');
+    };
+
     // 헤더 버튼
+    document.getElementById('btnSaveScene').addEventListener('click', saveScene);
     document.getElementById('btnPlay').addEventListener('click', () => {
-        engine.start();
-        log('실행', 'ok');
+        engine.start(); log('실행', 'ok');
     });
     document.getElementById('btnPause').addEventListener('click', () => {
-        engine.stop?.();
-        log('정지');
+        engine.stop?.(); log('정지');
     });
     document.getElementById('btnReset').addEventListener('click', () => {
-        engine.entities._entities.forEach(e => e.setState?.(Object.keys(e.asm?.states ?? {})[0] ?? 'idle'));
+        engine.entities._entities.forEach(e =>
+            e.setState?.(Object.keys(e.asm?.states ?? {})[0] ?? 'idle'));
         log('전체 리셋', 'ok');
     });
+
+    // 인스펙터 내보내기
+    document.getElementById('btnExportSprite').addEventListener('click', exportCurrentSprite);
+    document.getElementById('btnAgGuide').addEventListener('click', exportAgGuide);
 
     // 터미널 입력
     const termInput = document.getElementById('termInput');
@@ -729,116 +3084,1034 @@ async function main() {
         handleCommand(text, engine, ctrl);
     };
     termInput.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            if (_drillEntity) { exitDrilldown(); return; }
+            hideCtxMenu(); hideLayerPicker(); return;
+        }
+        if (e.target.tagName === 'INPUT') return; // 입력 중엔 이하 단축키 무시
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
+            e.preventDefault(); historyUndo(); return;
+        }
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+            e.preventDefault(); historyRedo(); return;
+        }
+        if ((e.key === 'Delete' || e.key === 'Backspace') && _selectedEntity && !_drillEntity) {
+            historyPush();
+            const id = _selectedEntity.id ?? _selectedEntity.type;
+            engine.entities._entities.delete(_selectedEntity.id);
+            log(`삭제: ${id}`, 'ok');
+            selectEntity(null);
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'd' && _selectedEntity) {
+            e.preventDefault();
+            historyPush(); _duplicateEntity(_selectedEntity);
+        }
+    });
     document.getElementById('termSend').addEventListener('click', send);
 
-    window._engine       = engine;
-    window._ctrl         = ctrl;
-    window._abacusScene  = abacusScene;
+    window._engine      = engine;
+    window._ctrl        = ctrl;
+    window._abacusScene = abacusScene;
 
-    log('[Sand Engine v0.3] 초기화 완료');
-    log('scene: abacus_game.scene.json 로드', 'ok');
-    log(`엔티티 ${engine.entities._entities.size}개 배치 완료`, 'ok');
-    log('렌더 루프 시작 (60fps)', 'ok');
-    log('─────────────────────────────');
-    log('주판알 클릭으로 조작하세요');
+    log('[Sand Engine v0.4] 초기화 완료');
+    log('scene: abacus_game 로드', 'ok');
+    log(`엔티티 ${engine.entities._entities.size}개`, 'ok');
+    log('작업 캔버스: 파란=인터랙티브 회색=비주얼 노란=UI');
 
-    updateState();
-    renderGameUI();
+    // undo/redo 버튼 연결
+    document.getElementById('btnUndo').addEventListener('click', () => historyUndo());
+    document.getElementById('btnRedo').addEventListener('click', () => historyRedo());
+
+    // 초기 진입: 플로우 모드
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        // 프레임 위치 초기화 → 멀티프레임 캔버스 크기 확정
+        _initFramePositions(engine.gameWidth, engine.gameHeight);
+        fitWorkCanvas();
+        updateState();
+        // 초기 상태 스냅샷 (undo 기준점)
+        historyPush();
+    }));
+
+    // 에셋 브라우저 로드
+    window.loadAssets();
 }
 
 // ── 게임 UI 오버레이 ─────────────────────────────────────────
 const overlayCtx = overlay.getContext('2d');
 
+const AB = {
+    frameX: 2,   frameY: 116, frameW: 266, frameH: 234,
+    colX0:  11,  colStep: 28, beadW: 22,   beadH: 20,
+    divY:   166, divH: 10,
+    upperY: [122],
+    lowerY: [196, 238, 280, 322],
+    numCols: 9,
+    colNames: ['億','千万','百万','十万','万','千','百','十','一'],
+};
+
+function drawBead(ctx, cx, cy, rw, rh, active) {
+    ctx.beginPath();
+    ctx.moveTo(cx,      cy - rh);
+    ctx.lineTo(cx + rw, cy);
+    ctx.lineTo(cx,      cy + rh);
+    ctx.lineTo(cx - rw, cy);
+    ctx.closePath();
+    if (active) {
+        ctx.fillStyle = '#EDD68A'; ctx.fill();
+        ctx.strokeStyle = '#B8941A'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - rh + 2);
+        ctx.lineTo(cx + rw * 0.6, cy - rh * 0.3);
+        ctx.lineTo(cx, cy - rh * 0.1);
+        ctx.lineTo(cx - rw * 0.6, cy - rh * 0.3);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255,255,220,0.45)'; ctx.fill();
+    } else {
+        ctx.fillStyle = '#7A5218'; ctx.fill();
+        ctx.strokeStyle = '#3A2206'; ctx.lineWidth = 1; ctx.stroke();
+    }
+}
+
+function drawAbacus(ctx, abacus) {
+    const { frameX: fx, frameY: fy, frameW: fw, frameH: fh,
+            colX0, colStep, beadW, beadH, divY, divH } = AB;
+    const rw = beadW / 2, rh = beadH / 2;
+
+    ctx.fillStyle = '#2A1602'; ctx.fillRect(fx, fy, fw, fh);
+    ctx.fillStyle = '#6B3F10'; ctx.fillRect(fx+4, fy+4, fw-8, fh-8);
+
+    for (let c = 0; c < AB.numCols; c++) {
+        const bx = colX0 + c * colStep + rw;
+        ctx.fillStyle = '#1A0E02';
+        ctx.fillRect(bx - 1, fy + 4, 3, fh - 8);
+    }
+
+    ctx.fillStyle = '#2A1602'; ctx.fillRect(fx, divY, fw, divH);
+    ctx.fillStyle = '#9B6B2A'; ctx.fillRect(fx+4, divY+1, fw-8, divH-3);
+    ctx.fillStyle = 'rgba(255,200,100,0.2)'; ctx.fillRect(fx+4, divY+1, fw-8, 2);
+
+    ctx.font = 'bold 7px monospace';
+    ctx.fillStyle = 'rgba(255,210,120,0.65)';
+    ctx.textAlign = 'center';
+    for (let c = 0; c < AB.numCols; c++) {
+        const bx = colX0 + c * colStep + rw;
+        ctx.fillText(AB.colNames[c], bx, fy + 12);
+    }
+
+    for (let c = 0; c < AB.numCols; c++) {
+        const bx = colX0 + c * colStep + rw;
+        const colState = abacus.state[c];
+        const uActive = colState.upper[0] === 1;
+        const ucy = uActive ? divY - rh - 2 : AB.upperY[0] + rh;
+        drawBead(ctx, bx, ucy, rw, rh, uActive);
+
+        for (let r = 0; r < 4; r++) {
+            const lActive = colState.lower[r] === 1;
+            const lcy = lActive
+                ? divY + divH + rh + 2 + r * (beadH + 2)
+                : AB.lowerY[r] + rh;
+            drawBead(ctx, bx, lcy, rw, rh, lActive);
+        }
+    }
+}
+
 function renderGameUI() {
     requestAnimationFrame(renderGameUI);
     const scene = window._abacusScene;
     if (!scene) return;
+    // 에디터에서 abacus_game 탭이 아니면 오버레이 비우고 스킵
+    if (!_sceneIsPlaying && (window._curEditorScene ?? 'abacus_game') !== 'abacus_game') {
+        overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+        return;
+    }
 
-    const W = overlay.width;
-    const H = overlay.height;
-    overlayCtx.clearRect(0, 0, W, H);
+    const W = BASE_W, H = BASE_H, cx = W / 2;
+    overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+    overlayCtx.save();
+    if (pixelScale !== 1) overlayCtx.scale(pixelScale, pixelScale);
 
-    // 문제 표시
-    const prob = scene._problem;
-    if (prob) {
+    const ui    = scene.ui;
+    const prob  = ui.problem;
+    const cust  = ui.customer;
+    const abacus = scene.abacus;
+
+    // HUD
+    overlayCtx.fillStyle = 'rgba(0,0,0,0.6)';
+    overlayCtx.fillRect(0, 0, W, 32);
+    overlayCtx.font = 'bold 11px monospace';
+    overlayCtx.fillStyle = '#FFD700';
+    overlayCtx.textAlign = 'left';
+    overlayCtx.fillText(`${ui.score}pt`, 8, 20);
+    overlayCtx.textAlign = 'right';
+    overlayCtx.fillStyle = ui.combo >= 2 ? '#FF6B35' : 'rgba(255,255,255,0.3)';
+    overlayCtx.fillText(`×${ui.combo}`, W - 8, 20);
+
+    const timerMax   = ui.timerMax || 30;
+    const timerRatio = Math.max(0, ui.timer / timerMax);
+    const timerColor = timerRatio > 0.5 ? '#ffffff' : timerRatio > 0.25 ? '#FF9800' : '#F44336';
+    overlayCtx.font = 'bold 10px monospace';
+    overlayCtx.fillStyle = '#C8922A';
+    overlayCtx.textAlign = 'center';
+    overlayCtx.fillText(`LV.${ui.level}`, cx, 13);
+    overlayCtx.font = 'bold 14px monospace';
+    overlayCtx.fillStyle = timerColor;
+    overlayCtx.fillText(`${Math.ceil(ui.timer)}s`, cx, 28);
+
+    // 타이머 바
+    overlayCtx.fillStyle = 'rgba(255,255,255,0.12)';
+    overlayCtx.fillRect(0, 32, W, 6);
+    const barColor = timerRatio > 0.5 ? '#5A9A20' : timerRatio > 0.25 ? '#EF9F27' : '#C8410A';
+    overlayCtx.fillStyle = barColor;
+    overlayCtx.fillRect(0, 32, Math.round(W * timerRatio), 6);
+
+    // 손님 + 문제
+    if (cust) {
+        const badgeColors     = { normal:'#EAE4D8', rush:'#FCEBEB', picky:'#DCEEFF', credit:'#FAEEDA', regular:'#EAF3DE' };
+        const badgeTextColors = { normal:'#5A4A2A', rush:'#791F1F', picky:'#0A3B7A', credit:'#7A3A10', regular:'#3B6D11' };
+        overlayCtx.fillStyle = 'rgba(0,0,0,0.5)';
+        overlayCtx.fillRect(0, 38, W, 62);
+        overlayCtx.fillStyle = badgeColors[cust.id] || '#EAE4D8';
+        overlayCtx.fillRect(6, 41, 70, 13);
+        overlayCtx.font = 'bold 8px monospace';
+        overlayCtx.fillStyle = badgeTextColors[cust.id] || '#333';
+        overlayCtx.textAlign = 'left';
+        overlayCtx.fillText(`${cust.badge} ${cust.label}`, 9, 51);
+        overlayCtx.font = '18px monospace';
+        overlayCtx.fillText('👴', 6, 80);
+        overlayCtx.fillStyle = 'rgba(255,255,255,0.92)';
+        overlayCtx.fillRect(32, 57, W - 38, 22);
+        overlayCtx.font = 'bold 9px monospace';
+        overlayCtx.fillStyle = '#1A1A18';
+        overlayCtx.textAlign = 'left';
+        overlayCtx.fillText(prob?.displayText ?? '', 36, 72);
+        if (prob?.items?.length) {
+            overlayCtx.font = '8px monospace';
+            overlayCtx.fillStyle = 'rgba(255,220,100,0.9)';
+            const summary = prob.items.map(i => `${i.name}${i.qty}개×${i.unitPrice}`).join('  ');
+            overlayCtx.fillText(summary, 6, 94);
+        }
+    }
+
+    // 주판
+    drawAbacus(overlayCtx, abacus);
+
+    // 현재값
+    const val = abacus.getValue();
+    overlayCtx.fillStyle = 'rgba(0,0,0,0.55)';
+    overlayCtx.fillRect(0, 356, W, 18);
+    overlayCtx.font = 'bold 11px monospace';
+    overlayCtx.fillStyle = val > 0 ? '#FFD700' : 'rgba(255,255,255,0.25)';
+    overlayCtx.textAlign = 'center';
+    overlayCtx.fillText(`${val.toLocaleString()}원`, cx, 370);
+
+    // 제출 버튼
+    const isPlaying = ui.state === 'playing';
+    overlayCtx.fillStyle = isPlaying ? '#ffffff' : 'rgba(255,255,255,0.12)';
+    overlayCtx.fillRect(30, 376, W - 60, 24);
+    overlayCtx.font = 'bold 10px monospace';
+    overlayCtx.fillStyle = isPlaying ? '#1A1A18' : 'rgba(255,255,255,0.25)';
+    overlayCtx.textAlign = 'center';
+    overlayCtx.fillText('정답 제출 ↵', cx, 392);
+
+    // 상태 오버레이
+    if (ui.state === 'correct') {
+        overlayCtx.fillStyle = 'rgba(90,154,32,0.85)';
+        overlayCtx.fillRect(0, H/2-28, W, 46);
+        overlayCtx.font = 'bold 18px monospace';
+        overlayCtx.fillStyle = '#ffffff';
+        overlayCtx.textAlign = 'center';
+        overlayCtx.fillText('✓ 정답!', cx, H/2+4);
+    } else if (ui.state === 'wrong') {
+        overlayCtx.fillStyle = 'rgba(180,40,40,0.85)';
+        overlayCtx.fillRect(0, H/2-28, W, 46);
         overlayCtx.font = 'bold 14px monospace';
         overlayCtx.fillStyle = '#ffffff';
         overlayCtx.textAlign = 'center';
-        overlayCtx.fillText(`${prob.a} + ${prob.b} = ?`, W / 2, 36);
+        overlayCtx.fillText(`✗ 오답  정답: ${prob?.answer ?? '?'}원`, cx, H/2+4);
+    } else if (ui.state === 'levelup') {
+        overlayCtx.fillStyle = 'rgba(200,146,42,0.9)';
+        overlayCtx.fillRect(0, H/2-32, W, 54);
+        overlayCtx.font = 'bold 20px monospace';
+        overlayCtx.fillStyle = '#ffffff';
+        overlayCtx.textAlign = 'center';
+        overlayCtx.fillText(`LEVEL ${ui.level}!`, cx, H/2+6);
+    } else if (ui.state === 'gameover') {
+        overlayCtx.fillStyle = 'rgba(0,0,0,0.75)';
+        overlayCtx.fillRect(0, 0, W, H);
+        overlayCtx.font = 'bold 22px monospace';
+        overlayCtx.fillStyle = '#ffffff';
+        overlayCtx.textAlign = 'center';
+        overlayCtx.fillText('시간 종료', cx, H/2-16);
+        overlayCtx.font = 'bold 16px monospace';
+        overlayCtx.fillStyle = '#FFD700';
+        overlayCtx.fillText(`${ui.score}pt`, cx, H/2+14);
+        overlayCtx.font = '10px monospace';
+        overlayCtx.fillStyle = 'rgba(255,255,255,0.5)';
+        overlayCtx.fillText('리셋 버튼으로 다시 시작', cx, H/2+36);
     }
 
-    // 현재 주판 값
-    const val = scene.abacus.getValue();
-    overlayCtx.font = '10px monospace';
-    overlayCtx.fillStyle = 'rgba(255,255,255,0.5)';
-    overlayCtx.textAlign = 'center';
-    overlayCtx.fillText(`현재: ${val}`, W / 2, 50);
-
-    // 타이머 바
-    const timerRatio = Math.max(0, scene.timer / (30));
-    const barW = Math.round((W - 20) * timerRatio);
-    const barColor = timerRatio > 0.4 ? '#4CAF50' : timerRatio > 0.2 ? '#FF9800' : '#F44336';
-    overlayCtx.fillStyle = 'rgba(0,0,0,0.4)';
-    overlayCtx.fillRect(10, 6, W - 20, 6);
-    overlayCtx.fillStyle = barColor;
-    overlayCtx.fillRect(10, 6, barW, 6);
-
-    // 점수 + 콤보
-    const st = scene.score?.state ?? {};
-    overlayCtx.font = 'bold 10px monospace';
-    overlayCtx.fillStyle = '#FFD700';
-    overlayCtx.textAlign = 'left';
-    overlayCtx.fillText(`${st.score ?? 0}pt`, 10, H - 8);
-    if ((st.combo ?? 0) >= 2) {
-        overlayCtx.fillStyle = '#FF6B35';
-        overlayCtx.textAlign = 'right';
-        overlayCtx.fillText(`×${st.combo} COMBO`, W - 10, H - 8);
-    }
-
-    // 열 이름 (百 十 一)
-    const colLabels = [['百', 134], ['十', 159], ['一', 184]];
-    overlayCtx.font = '8px monospace';
-    overlayCtx.fillStyle = 'rgba(255,255,255,0.35)';
-    overlayCtx.textAlign = 'center';
-    for (const [label, x] of colLabels) {
-        overlayCtx.fillText(label, x + 1, 77);
-    }
+    overlayCtx.restore();
 }
+renderGameUI();
 
 // ── 히트 테스트 ──────────────────────────────────────────────
-function hitTest(gx, gy, engine) {
+// tol: 클릭 허용 오차 (캔버스 픽셀). 줌 아웃 시 작은 엔티티도 클릭 가능하게.
+function hitTest(gx, gy, engine, tol = 0) {
     const cameraX = engine.cameraX ?? 0;
     let topHit = null, topLayer = -1;
     for (const entity of engine.entities._entities.values()) {
-        if (!entity.visible) continue;
+        if (!entity.visible || entity._detached) continue;
         if (!entity.pw || !entity.ph) continue;
         const ex = entity.layer === 2 ? entity.x - cameraX : entity.x;
-        const ey = entity.y;
-        if (gx >= ex && gx < ex + entity.pw && gy >= ey && gy < ey + entity.ph) {
+        if (gx >= ex - tol && gx < ex + entity.pw + tol &&
+            gy >= entity.y - tol && gy < entity.y + entity.ph + tol) {
             if (entity.layer >= topLayer) { topLayer = entity.layer; topHit = entity; }
         }
     }
     return topHit;
 }
 
+// 분리된 엔티티 히트 테스트 (캔버스 절대 좌표 기준)
+function hitTestDetached(cx, cy) {
+    const engine = window._engine;
+    if (!engine) return null;
+    const tol = Math.max(4, Math.round(8 / (_wScale || 1)));
+    for (const entity of engine.entities._entities.values()) {
+        if (!entity._detached || !entity.pw || !entity.ph) continue;
+        if (cx >= entity.x - tol && cx < entity.x + entity.pw + tol &&
+            cy >= entity.y - tol && cy < entity.y + entity.ph + tol) {
+            return entity;
+        }
+    }
+    return null;
+}
+
+// ══════════════════════════════════════════════════════════════
+// 저장 / 내보내기
+// ══════════════════════════════════════════════════════════════
+function downloadJSON(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 히스토리 시스템 (Ctrl+Z / Ctrl+Y, 최대 100개)
+// ══════════════════════════════════════════════════════════════
+const HISTORY_MAX  = 100;
+let _history       = [];   // 스냅샷 배열
+let _historyIdx    = -1;   // 현재 위치 (-1 = 비어있음)
+let _historyLock   = false; // undo/redo 중 재귀 push 방지
+
+function _historySnapshot() {
+    // 현재 활성 씬 엔티티를 먼저 스냅샷에 반영
+    const cur = window._curEditorScene;
+    if (cur) _saveSceneState(cur);
+    return {
+        curScene:    cur,
+        framePos:    JSON.parse(JSON.stringify(FRAME_POS)),
+        sceneStates: new Map(
+            [..._sceneStates].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])
+        ),
+    };
+}
+
+function historyPush() {
+    if (_historyLock) return;
+    try {
+        const snap = _historySnapshot();
+        _history.splice(_historyIdx + 1);
+        _history.push(snap);
+        if (_history.length > HISTORY_MAX) _history.shift();
+        else _historyIdx++;
+    } catch(err) {
+        console.warn('[history] push 실패:', err);
+    }
+    _historyUpdateUI();
+}
+
+function _historyApply(snap) {
+    _historyLock = true;
+    try {
+        // FRAME_POS 복원
+        for (const [name, pos] of Object.entries(snap.framePos)) {
+            if (FRAME_POS[name]) { FRAME_POS[name].x = pos.x; FRAME_POS[name].y = pos.y; }
+            else FRAME_POS[name] = { x: pos.x, y: pos.y };
+        }
+        // sceneStates 복원
+        _sceneStates.clear();
+        for (const [k, v] of snap.sceneStates)
+            _sceneStates.set(k, JSON.parse(JSON.stringify(v)));
+        // 현재 씬 엔티티 강제 리로드
+        const engine = window._engine;
+        if (engine) {
+            engine.entities._entities.clear();
+            engine.layers.clearAll();
+            selectEntity(null);
+            _restoreSceneState(snap.curScene);
+        }
+        window._curEditorScene = snap.curScene;
+        document.querySelectorAll('.scene-tab').forEach(b => b.classList.remove('active'));
+        const tab = document.getElementById('sceneTab_' + snap.curScene);
+        if (tab) tab.classList.add('active');
+        const bc = document.getElementById('canvasBreadcrumb');
+        if (bc) bc.innerHTML = `씬 뷰 &gt; <span class="ct-bc-cur">${snap.curScene}</span>`;
+        log(`히스토리 복원 [${_historyIdx + 1}/${_history.length}]`, 'ok');
+    } finally {
+        _historyLock = false;
+        _historyUpdateUI();
+    }
+}
+
+function historyUndo() {
+    if (_historyIdx <= 0) { log('더 이상 되돌릴 수 없습니다', 'info'); return; }
+    _historyIdx--;
+    _historyApply(_history[_historyIdx]);
+}
+
+function historyRedo() {
+    if (_historyIdx >= _history.length - 1) { log('다시 실행할 항목 없음', 'info'); return; }
+    _historyIdx++;
+    _historyApply(_history[_historyIdx]);
+}
+
+function _historyUpdateUI() {
+    const badge = document.getElementById('historyBadge');
+    if (badge) badge.textContent = `${_historyIdx + 1}/${_history.length}`;
+    const btnU = document.getElementById('btnUndo');
+    const btnR = document.getElementById('btnRedo');
+    if (btnU) btnU.style.opacity = _historyIdx > 0 ? '1' : '0.35';
+    if (btnR) btnR.style.opacity = _historyIdx < _history.length - 1 ? '1' : '0.35';
+}
+
+// ══════════════════════════════════════════════════════════════
+// 씬 플로우 뷰 (피그마 스타일)
+// ══════════════════════════════════════════════════════════════
+// FLOW_W/H = 실제 게임 해상도 (270×480). 엔진 init 전 상수로 선언.
+const FLOW_W = 270, FLOW_H = 480, FLOW_DOT_R = 8;
+const FLOW_COLORS = { intro: '#1E3A5F', lobby: '#1E4A2E', abacus_game: '#4A2A1A' };
+const FLOW_GAP = 60, FLOW_PAD_X = 40, FLOW_PAD_Y = 70;
+
+// ── 멀티프레임 레이아웃 (Figma 스타일) ─────────────────────────
+// 프레임 = 씬 하나. 항상 모든 프레임이 캔버스에 펼쳐짐.
+// 클릭 = 해당 씬 활성화 → 에셋/엔티티 편집은 활성 프레임 안에서.
+const SCENE_NAMES  = ['intro', 'lobby', 'abacus_game'];
+const FRAME_GAP    = 80;   // 프레임 간 간격
+const FRAME_PAD_X  = 60;   // 좌우 여백
+const FRAME_PAD_Y  = 60;   // 상하 여백
+const FRAME_LABEL  = 24;   // 씬 이름 레이블 높이 (프레임 위)
+const CANVAS_LIMIT = 1800; // 캔버스 최대 너비 한계
+
+let _flowConns  = [];   // { from, to, trigger, action, transition }
+let _flowSelConn = null;
+let _flowNewConn = null; // { from, mx, my } — 연결선 드래그 중
+
+// 각 프레임의 캔버스 좌표 (엔진 init 후 _initFramePositions() 로 설정)
+let FRAME_POS = {}; // { sceneName: { x, y } }
+
+function _initFramePositions(gw, gh) {
+    SCENE_NAMES.forEach((name, i) => {
+        FRAME_POS[name] = {
+            x: FRAME_PAD_X + i * (gw + FRAME_GAP),
+            y: FRAME_PAD_Y + FRAME_LABEL,
+        };
+    });
+    // 프레임이 자유롭게 이동할 수 있도록 충분한 버퍼 확보
+    const frameAreaW = FRAME_PAD_X * 2 + SCENE_NAMES.length * gw + (SCENE_NAMES.length - 1) * FRAME_GAP;
+    const totalW = Math.min(CANVAS_LIMIT, Math.max(frameAreaW + gw * 4, frameAreaW + 1200));
+    const totalH = FRAME_PAD_Y + FRAME_LABEL + gh + gh * 4 + FRAME_PAD_Y; // 상하 4프레임 높이 여유
+    workCanvas.width  = totalW;
+    workCanvas.height = totalH;
+    // workSize를 실제 캔버스 크기와 동기화 (fitWorkCanvas/applyWorkTransform 에서 사용)
+    window._workW = totalW;
+    window._workH = totalH;
+}
+
+// 프레임 드래그 상태
+let _frameDrag = null; // { name, startCx, startCy, startFx, startFy }
+
+// 이름표 + 프레임 상단 스트립 히트 테스트 (드래그 핸들 영역)
+function hitTestFrameLabel(cx, cy) {
+    const engine = window._engine;
+    if (!engine) return null;
+    const gw = engine.gameWidth;
+    for (const name of SCENE_NAMES) {
+        const p = FRAME_POS[name];
+        if (!p) continue;
+        // 이름표 위(FRAME_LABEL) + 프레임 상단 30px 까지 드래그 허용
+        if (cx >= p.x && cx < p.x + gw &&
+            cy >= p.y - FRAME_LABEL && cy < p.y + 30)
+            return name;
+    }
+    return null;
+}
+
+// 캔버스 픽셀 좌표 → 어느 프레임인지 + 그 프레임 내 게임 좌표
+function hitTestFrame(cx, cy) {
+    const engine = window._engine;
+    if (!engine) return null;
+    const gw = engine.gameWidth, gh = engine.gameHeight;
+    for (const name of SCENE_NAMES) {
+        const p = FRAME_POS[name];
+        if (!p) continue;
+        if (cx >= p.x && cx < p.x + gw && cy >= p.y && cy < p.y + gh)
+            return { name, gx: cx - p.x, gy: cy - p.y };
+    }
+    return null;
+}
+
+// 연결 점 hit test (프레임 오른쪽 점)
+function _flowHitDot(cx, cy) {
+    const engine = window._engine;
+    if (!engine) return null;
+    const gw = engine.gameWidth, gh = engine.gameHeight;
+    for (const name of SCENE_NAMES) {
+        const p = FRAME_POS[name];
+        if (!p) continue;
+        if (Math.hypot(cx - (p.x + gw), cy - (p.y + gh / 2)) <= FLOW_DOT_R + 5)
+            return name;
+    }
+    return null;
+}
+
+// 플로우 모드 — 작업 캔버스에 직접 렌더 (renderWorkCanvas()에서 호출)
+// 멀티프레임 캔버스 렌더 — renderWorkCanvas() 에서 항상 호출
+function renderMultiFrame() {
+    const engine = window._engine;
+    if (!engine) return;
+
+    const ctx = workCtx;
+    const W = workCanvas.width, H = workCanvas.height;
+    const gw = engine.gameWidth, gh = engine.gameHeight;
+
+    // 배경 + 점 그리드
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#D8D6D0';
+    for (let x = 0; x < W; x += 24)
+        for (let y = 0; y < H; y += 24)
+            ctx.fillRect(x, y, 1, 1);
+
+    // 씬 간 연결선 (프레임 뒤에 그려야 시각적으로 깔끔)
+    _flowConns.forEach((c, i) => {
+        const f = FRAME_POS[c.from], t = FRAME_POS[c.to];
+        if (!f || !t) return;
+        _flowDrawBezier(ctx, f.x + gw, f.y + gh / 2,
+                             t.x,      t.y + gh / 2,
+                             i === _flowSelConn, c.trigger ?? 'click');
+    });
+    if (_flowNewConn) {
+        const f = FRAME_POS[_flowNewConn.from];
+        if (f) {
+            ctx.save();
+            ctx.strokeStyle = '#C8922A'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+            const sx = f.x + gw, sy = f.y + gh / 2;
+            const cp = Math.abs(_flowNewConn.mx - sx) * 0.5;
+            ctx.beginPath(); ctx.moveTo(sx, sy);
+            ctx.bezierCurveTo(sx + cp, sy, _flowNewConn.mx - cp, _flowNewConn.my,
+                              _flowNewConn.mx, _flowNewConn.my);
+            ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+        }
+    }
+
+    // 각 씬 프레임 렌더
+    for (const name of SCENE_NAMES) {
+        const pos = FRAME_POS[name];
+        if (pos) _drawSceneFrame(ctx, engine, name, pos.x, pos.y, gw, gh);
+    }
+
+    // ── 분리된 엔티티 렌더 (프레임 밖, 캔버스 절대 좌표) ──────
+    for (const en of engine.entities._entities.values()) {
+        if (!en._detached) continue;
+        const ex = en.x, ey = en.y;
+        const ew = en.pw || 32, eh = en.ph || 32;
+        const isSel = (en === _selectedEntity);
+
+        ctx.save();
+        ctx.strokeStyle = isSel ? '#C8922A' : '#888';
+        ctx.lineWidth   = isSel ? 2 : 1;
+        ctx.setLineDash([5, 3]);
+        ctx.strokeRect(ex, ey, ew, eh);
+        ctx.fillStyle = isSel ? 'rgba(200,146,42,0.12)' : 'rgba(120,120,120,0.08)';
+        ctx.fillRect(ex, ey, ew, eh);
+        ctx.setLineDash([]);
+
+        // 이름 레이블
+        ctx.fillStyle = isSel ? '#C8922A' : '#888';
+        ctx.font = `${Math.max(8, Math.round(9 / (_wScale || 1)))}px JetBrains Mono, monospace`;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+        ctx.fillText(`⬡ ${en.type ?? en.id}`, ex + 2, ey - 2);
+
+        // 원본 씬 화살표 (어느 씬에서 분리됐는지)
+        if (en._detachedFrom && FRAME_POS[en._detachedFrom]) {
+            const fp = FRAME_POS[en._detachedFrom];
+            ctx.strokeStyle = 'rgba(200,146,42,0.4)';
+            ctx.lineWidth = 0.8;
+            ctx.setLineDash([3, 4]);
+            ctx.beginPath();
+            ctx.moveTo(fp.x + gw / 2, fp.y + gh / 2);
+            ctx.lineTo(ex + ew / 2, ey + eh / 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        ctx.restore();
+    }
+}
+
+function _flowDrawBezier(ctx, sx, sy, ex, ey, sel, label) {
+    const cp = Math.abs(ex - sx) * 0.5;
+    ctx.save();
+    ctx.strokeStyle = sel ? '#C8922A' : '#3A6A9A';
+    ctx.lineWidth   = sel ? 2 : 1.5;
+    if (sel) { ctx.shadowColor = '#C8922A'; ctx.shadowBlur = 6; }
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.bezierCurveTo(sx + cp, sy, ex - cp, ey, ex, ey);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    // 화살촉
+    const ang = Math.atan2(ey - sy, ex - sx);
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - 9 * Math.cos(ang - 0.4), ey - 9 * Math.sin(ang - 0.4));
+    ctx.lineTo(ex - 9 * Math.cos(ang + 0.4), ey - 9 * Math.sin(ang + 0.4));
+    ctx.closePath();
+    ctx.fillStyle = sel ? '#C8922A' : '#3A6A9A';
+    ctx.fill();
+    // 라벨
+    ctx.fillStyle = sel ? '#C8922A' : '#555';
+    ctx.font = '7px JetBrains Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, (sx + ex) / 2, (sy + ey) / 2 - 6);
+    ctx.restore();
+}
+
+function _drawSceneFrame(ctx, engine, name, fx, fy, gw, gh) {
+    const isActive = (name === window._curEditorScene);
+    const LAYER_C  = ['rgba(80,140,255,','rgba(80,200,100,','rgba(255,200,60,','rgba(200,100,255,'];
+
+    ctx.save();
+
+    // ── 씬 이름 레이블 (프레임 위) ─────────────────────────────
+    ctx.fillStyle = isActive ? '#FFD080' : '#666';
+    ctx.font = `${isActive ? 'bold ' : ''}12px JetBrains Mono, monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(name, fx + gw / 2, fy - 8);
+
+    // ── clip to 프레임 ────────────────────────────────────────
+    ctx.save();
+    ctx.beginPath(); ctx.rect(fx, fy, gw, gh); ctx.clip();
+
+    // 배경
+    ctx.fillStyle = FLOW_COLORS[name] ?? '#202020';
+    ctx.fillRect(fx, fy, gw, gh);
+
+    if (isActive && !_sceneIsPlaying) {
+        // 활성 씬: sand-canvas + overlay + text-canvas 모두 합성 (폰 미리보기와 동일)
+        const mainCanvas = document.getElementById('sand-canvas');
+        if (mainCanvas) ctx.drawImage(mainCanvas, 0, 0, gw, gh, fx, fy, gw, gh);
+        if (overlay && overlay.width > 0)
+            ctx.drawImage(overlay, 0, 0, overlay.width, overlay.height, fx, fy, gw, gh);
+        if (_textCanvas && _textCanvas.width > 0)
+            ctx.drawImage(_textCanvas, 0, 0, _textCanvas.width, _textCanvas.height, fx, fy, gw, gh);
+
+        // 선택된 엔티티만 표시
+        if (_selectedEntity) {
+            const e = _selectedEntity;
+            if (e.visible && e.pw && e.ph) {
+                const cameraX = engine.cameraX ?? 0;
+                const ex = (e.layer === 2 ? e.x - cameraX : e.x);
+                ctx.strokeStyle = '#C8922A';
+                ctx.lineWidth   = 2;
+                ctx.setLineDash([]);
+                ctx.strokeRect(fx + ex, fy + e.y, e.pw, e.ph);
+                ctx.fillStyle = 'rgba(200,146,42,0.08)';
+                ctx.fillRect(fx + ex, fy + e.y, e.pw, e.ph);
+                const hw = 5;
+                ctx.fillStyle = '#C8922A';
+                [[fx+ex,fy+e.y],[fx+ex+e.pw,fy+e.y],
+                 [fx+ex,fy+e.y+e.ph],[fx+ex+e.pw,fy+e.y+e.ph]].forEach(([hx,hy]) => {
+                    ctx.fillRect(hx - hw/2, hy - hw/2, hw, hw);
+                });
+            }
+        }
+    } else {
+        // 비활성 씬 또는 저장된 씬: 와이어프레임 미리보기
+        const saved = _sceneStates.get(name) ?? [];
+        if (saved.length) {
+            for (const e of saved) {
+                const ex = (e.x ?? 0), ey = (e.y ?? 0);
+                const ew = (e.pw ?? 0), eh = (e.ph ?? 0);
+                if (ew < 1 || eh < 1) continue;
+                const lc = LAYER_C[e.layer ?? 2] ?? 'rgba(180,180,180,';
+                ctx.fillStyle   = lc + '0.1)';
+                ctx.strokeStyle = lc + '0.6)';
+                ctx.lineWidth = 0.5;
+                ctx.fillRect(fx + ex, fy + ey, ew, eh);
+                ctx.strokeRect(fx + ex, fy + ey, ew, eh);
+            }
+        } else {
+            ctx.fillStyle = 'rgba(255,255,255,0.05)';
+            ctx.font = '11px JetBrains Mono, monospace';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('비어 있음', fx + gw / 2, fy + gh / 2);
+        }
+    }
+    ctx.restore(); // clip 해제
+
+    // ── 프레임 테두리 ─────────────────────────────────────────
+    if (isActive) { ctx.shadowColor = '#C8922A'; ctx.shadowBlur = 14; }
+    ctx.strokeStyle = isActive ? '#C8922A' : '#3A3A36';
+    ctx.lineWidth   = isActive ? 2 : 1;
+    ctx.strokeRect(fx, fy, gw, gh);
+    ctx.shadowBlur  = 0;
+
+    // ── 엔티티 수 뱃지 (우하단) ──────────────────────────────
+    const cnt = isActive
+        ? engine.entities._entities.size
+        : (_sceneStates.get(name)?.length ?? 0);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(fx, fy + gh - 20, gw, 20);
+    ctx.fillStyle = '#666';
+    ctx.font = '9px JetBrains Mono, monospace';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(cnt ? `${cnt} entities` : 'empty', fx + 6, fy + gh - 10);
+
+    // ── 연결점 — 오른쪽(출력) / 왼쪽(입력) ──────────────────
+    const dotY = fy + gh / 2;
+    // 출력 점
+    ctx.beginPath(); ctx.arc(fx + gw, dotY, FLOW_DOT_R, 0, Math.PI*2);
+    ctx.fillStyle = '#555'; ctx.fill();
+    ctx.strokeStyle = '#AAA'; ctx.lineWidth = 1.5; ctx.stroke();
+    // 입력 점
+    ctx.beginPath(); ctx.arc(fx, dotY, FLOW_DOT_R, 0, Math.PI*2);
+    ctx.fillStyle = '#333'; ctx.fill();
+    ctx.strokeStyle = '#666'; ctx.lineWidth = 1; ctx.stroke();
+
+    ctx.restore();
+}
+
+function _flowHitConn(cx, cy) {
+    const engine = window._engine;
+    if (!engine) return -1;
+    const gw = engine.gameWidth, gh = engine.gameHeight;
+    for (let i = 0; i < _flowConns.length; i++) {
+        const c = _flowConns[i];
+        const f = FRAME_POS[c.from], t = FRAME_POS[c.to];
+        if (!f || !t) continue;
+        const sx = f.x + gw, sy = f.y + gh / 2;
+        const ex = t.x,      ey = t.y + gh / 2;
+        const cp = Math.abs(ex - sx) * 0.5;
+        for (let s = 0; s <= 1; s += 0.04) {
+            const u = 1 - s;
+            const bx = u**3*sx + 3*u**2*s*(sx+cp) + 3*u*s**2*(ex-cp) + s**3*ex;
+            const by = u**3*sy + 3*u**2*s*sy       + 3*u*s**2*ey       + s**3*ey;
+            if (Math.hypot(cx - bx, cy - by) < 8) return i;
+        }
+    }
+    return -1;
+}
+
+// 플로우 연결 패널 컨트롤 이벤트
+['flowTrigger','flowAction','flowTransition'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => {
+        if (_flowSelConn === null || _flowSelConn >= _flowConns.length) return;
+        const c = _flowConns[_flowSelConn];
+        c.trigger    = document.getElementById('flowTrigger').value;
+        c.action     = document.getElementById('flowAction').value;
+        c.transition = document.getElementById('flowTransition').value;
+    });
+});
+document.getElementById('flowConnDel').addEventListener('click', () => {
+    if (_flowSelConn === null) return;
+    _flowConns.splice(_flowSelConn, 1);
+    _flowSelConn = null;
+    document.getElementById('flowConnPanel').style.display = 'none';
+});
+window.addEventListener('resize', () => { fitWorkCanvas(); });
+
+function _flowUpdatePanel() {
+    const panel = document.getElementById('flowConnPanel');
+    if (_flowSelConn === null || _flowSelConn >= _flowConns.length) {
+        panel.style.display = 'none'; return;
+    }
+    const c = _flowConns[_flowSelConn];
+    panel.style.display = 'block';
+    document.getElementById('flowTrigger').value    = c.trigger    ?? 'click';
+    document.getElementById('flowAction').value     = c.action     ?? 'navigate';
+    document.getElementById('flowTransition').value = c.transition ?? 'dissolve';
+}
+
+// ══════════════════════════════════════════════════════════════
+// 텍스트 레이어 시스템
+// ══════════════════════════════════════════════════════════════
+const _textCanvas = document.getElementById('text-canvas');
+const _textCtx    = _textCanvas.getContext('2d');
+
+const TEXT_TYPE_STYLE = {
+    TEXT_DIALOG:   { font: '12px "DotGothic16"', color: '#FFFFFF', align: 'left',   bg: 'rgba(0,0,0,0.7)' },
+    TEXT_UI:       { font: '10px "JetBrains Mono"', color: '#FFD080', align: 'left',   bg: null },
+    TEXT_TITLE:    { font: '20px "DotGothic16"', color: '#FFFFFF', align: 'center', bg: null },
+    TEXT_TOAST:    { font: '9px "JetBrains Mono"',  color: '#7FE07F', align: 'center', bg: 'rgba(0,0,0,0.5)' },
+    TEXT_SUBTITLE: { font: '10px "DotGothic16"', color: '#CCCCCC', align: 'center', bg: null },
+};
+
+function renderTextLayer() {
+    const engine = window._engine;
+    _textCtx.clearRect(0, 0, _textCanvas.width, _textCanvas.height);
+    if (!engine) return;
+    for (const e of engine.entities._entities.values()) {
+        if (!e._isText || !e.visible) continue;
+        const style = TEXT_TYPE_STYLE[e.type] ?? TEXT_TYPE_STYLE.TEXT_UI;
+        const fs    = e.fontSize ?? parseInt(style.font) ?? 12;
+        const fam   = e.fontFamily ? `${fs}px "${e.fontFamily}"` : style.font;
+        const col   = e.color ?? style.color;
+        const align = e.align  ?? style.align;
+        const text  = e.text   ?? '';
+        const px    = e.x, py = e.y;
+        const pw    = e.pw ?? 200, ph = e.ph ?? fs + 8;
+
+        _textCtx.save();
+        if (style.bg || e.bg) {
+            _textCtx.fillStyle = e.bg ?? style.bg;
+            _textCtx.fillRect(px, py, pw, ph);
+        }
+        _textCtx.font         = fam;
+        _textCtx.fillStyle    = col;
+        _textCtx.textAlign    = align;
+        _textCtx.textBaseline = 'middle';
+        const tx = align === 'center' ? px + pw / 2 : align === 'right' ? px + pw - 4 : px + 4;
+        _textCtx.fillText(text, tx, py + ph / 2, pw - 8);
+        _textCtx.restore();
+    }
+}
+
+// work canvas에서 텍스트 엔티티 bounding box 및 미리보기 렌더 (renderWorkCanvas 내부 엔티티 루프에 호출)
+function _drawTextEntityOverlay(ctx, entity, ex, ey, ew, eh) {
+    const style = TEXT_TYPE_STYLE[entity.type] ?? TEXT_TYPE_STYLE.TEXT_UI;
+    // 보라-핑크 계열 점선 박스
+    ctx.save();
+    ctx.strokeStyle = 'rgba(220,100,255,0.85)';
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(ex + 0.5, ey + 0.5, ew - 1, eh - 1);
+    ctx.fillStyle = 'rgba(180,60,220,0.06)';
+    ctx.fillRect(ex + 0.5, ey + 0.5, ew - 1, eh - 1);
+    ctx.setLineDash([]);
+    // 타입 뱃지
+    ctx.fillStyle = 'rgba(220,100,255,0.9)';
+    ctx.font = '7px JetBrains Mono, monospace';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(entity.type ?? 'TEXT', ex + 3, ey + 3);
+    // 텍스트 미리보기
+    const fs = Math.min(entity.fontSize ?? 12, eh - 14);
+    if (fs >= 6) {
+        ctx.fillStyle = entity.color ?? style.color;
+        ctx.font = `${fs}px DotGothic16, monospace`;
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'left';
+        ctx.fillText(entity.text ?? '', ex + 4, ey + eh / 2 + 4, ew - 8);
+    }
+    ctx.restore();
+}
+
+window.showTextDialog = function() {
+    document.getElementById('textDialog').style.display = 'block';
+    document.getElementById('tdText').focus();
+    document.getElementById('tdText').select();
+};
+
+window.confirmTextDialog = function() {
+    const engine = window._engine;
+    if (!engine) return;
+    historyPush();
+    const type  = document.getElementById('tdType').value;
+    const text  = document.getElementById('tdText').value || '텍스트';
+    const size  = parseInt(document.getElementById('tdSize').value) || 14;
+    const color = document.getElementById('tdColor').value;
+    const layer = parseInt(document.getElementById('tdLayer').value);
+    const W = engine.gameWidth, H = engine.gameHeight;
+    const pw = Math.min(W - 20, Math.max(text.length * size * 0.65, 80));
+    const ph = size + 10;
+    const id  = `text_${Date.now()}`;
+    const e   = engine.entities.add(id, {
+        x: Math.round((W - pw) / 2), y: Math.round(H / 2 - ph / 2),
+        pw: Math.round(pw), ph: Math.round(ph),
+        layer, visible: true,
+        pixels: null, frames: null, _palette: null,
+    });
+    e.type      = type;
+    e._isText   = true;
+    e.text      = text;
+    e.fontSize  = size;
+    e.color     = color;
+    e.fontFamily = type === 'TEXT_UI' ? 'JetBrains Mono' : 'DotGothic16';
+    e.align     = (type === 'TEXT_TITLE' || type === 'TEXT_TOAST' || type === 'TEXT_SUBTITLE') ? 'center' : 'left';
+    selectEntity(e);
+    document.getElementById('textDialog').style.display = 'none';
+    log(`텍스트 생성: ${type} "${text}"  L${layer}`, 'ok');
+};
+
+// ══════════════════════════════════════════════════════════════
+// 씬 저장 — assets/scenes/ 에 직접 덮어쓰기 (서버 API)
+async function saveScene() {
+    const engine = window._engine;
+    if (!engine) { log('엔진 없음', 'err'); return; }
+
+    // 엔티티가 0개면 실수 저장 방지
+    if (engine.entities._entities.size === 0) {
+        if (!confirm('엔티티가 0개입니다. 빈 파일로 저장하시겠습니까?')) return;
+    }
+
+    const entities = [];
+    for (const [id, e] of engine.entities._entities) {
+        const entry = {
+            id,
+            type:    e.type,
+            layer:   e.layer,
+            x:       Math.round(e.x),
+            y:       Math.round(e.y),
+            pw:      e.pw,
+            ph:      e.ph,
+            visible: e.visible,
+        };
+        if (e.flipX)  entry.flipX  = true;
+        if (e.flipY)  entry.flipY  = true;
+        if (e.scale && e.scale !== 1) entry.scale = e.scale;
+        entities.push(entry);
+    }
+
+    const filename = (document.getElementById('sceneLabel').textContent.trim() || 'scene');
+    const content  = JSON.stringify({ entities }, null, 2);
+
+    try {
+        const res = await fetch('http://localhost:8088/api/save-scene', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ filename, content }),
+        });
+        const json = await res.json();
+        if (json.success) {
+            log(`✓ 저장 완료: assets/scenes/${json.filename}  (${entities.length}개)`, 'ok');
+        } else {
+            throw new Error(json.error ?? 'unknown');
+        }
+    } catch (err) {
+        log(`저장 실패 — 서버 연결 확인 (${err.message})`, 'err');
+        // 폴백: 브라우저 다운로드
+        downloadJSON({ entities }, filename);
+    }
+}
+
+// 선택된 엔티티 스프라이트 → PixelJSON 내보내기
+function exportCurrentSprite() {
+    const e = _selectedEntity;
+    if (!e) { log('엔티티를 먼저 선택하세요', 'err'); return; }
+
+    const frames = e._frames ?? (e._pixels ? [{ pixels: e._pixels }] : []);
+    if (!frames.length) { log('스프라이트 데이터 없음', 'err'); return; }
+
+    const data = {
+        name:    e.type ?? e.id,
+        width:   e.pw,
+        height:  e.ph,
+        fps:     8,
+        palette: ['transparent','#ffffff','#aaaaaa','#555555','#000000'],
+        frames,
+    };
+    const filename = `${e.type ?? e.id}.json`;
+    downloadJSON(data, filename);
+    log(`내보내기: ${filename}  (${frames.length}프레임)`, 'ok');
+}
+
+// Antigravity 제약 가이드 내보내기 (선택 엔티티 기준)
+function exportAgGuide() {
+    const e = _selectedEntity;
+    const assetData = e ? (e._frames ? {
+        name:    e.type ?? e.id,
+        width:   e._frames[0]?.width  ?? e.pw,
+        height:  e._frames[0]?.height ?? e.ph,
+        fps:     8,
+        palette: e._palette ?? e._frames[0]?.palette ?? [],
+        frames:  e._frames,
+    } : null) : null;
+
+    // 전체 에셋 목록에서 선택된 카드도 참조
+    const src = assetData ?? _selectedCard;
+    if (!src) { log('에셋을 먼저 선택하세요 (에셋 브라우저 클릭 or 씬 뷰 클릭)', 'err'); return; }
+
+    const palette = src.palette ?? [];
+    const palColors = palette.filter(c => c && c !== 'transparent');
+    const frameCount = (src.frames ?? []).length;
+    const w = src.width ?? '?', h = src.height ?? '?', fps = src.fps ?? '?';
+
+    const lines = [
+        `# Antigravity 작업 가이드 — ${src.name ?? '(unnamed)'}`,
+        `생성일: ${new Date().toLocaleDateString('ko-KR')}`,
+        ``,
+        `## 잠금 항목 (절대 변경 불가)`,
+        `- width  : ${w}`,
+        `- height : ${h}`,
+        `- fps    : ${fps}`,
+        `- frames : ${frameCount}프레임`,
+        ``,
+        `## 팔레트 (이 색상 안에서만 사용)`,
+        ...palette.map((c, i) => `  ${i}: ${c}`),
+        ``,
+        `## 자유 수정 가능`,
+        `- frames[n].pixels 배열 (픽셀 데이터 전부)`,
+        `- 단, 팔레트 인덱스는 0~${palette.length - 1} 범위 안에서`,
+        ``,
+        `## 파일명`,
+        `- 원본 파일명 그대로 덮어쓰기 (${src.name ?? 'filename'}.json)`,
+        ``,
+        `## 포맷 예시`,
+        `{`,
+        `  "width": ${w}, "height": ${h}, "fps": ${fps},`,
+        `  "palette": [${palette.slice(0,3).map(c=>`"${c}"`).join(', ')}, ...],`,
+        `  "frames": [{ "pixels": [[x, y, colorIndex], ...] }]`,
+        `}`,
+    ];
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `AG_guide_${src.name ?? 'asset'}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    log(`AG 가이드 내보내기: AG_guide_${src.name ?? 'asset'}.txt`, 'ok');
+}
+
 // ── 명령어 처리 ──────────────────────────────────────────────
 function handleCommand(text, engine, ctrl) {
-    const cmd = text.toLowerCase();
+    const cmd = text.toLowerCase().trim();
     if (cmd === 'reset' || cmd === '리셋') {
         const sel = ctrl.selected;
-        if (sel) { sel.setState?.(Object.keys(sel.asm?.states ?? {})[0] ?? 'idle'); log('리셋 완료', 'ok'); }
+        if (sel) { sel.setState?.(Object.keys(sel.asm?.states ?? {})[0] ?? 'idle'); log('리셋', 'ok'); }
         else log('에셋을 먼저 선택하세요');
     } else if (cmd.startsWith('state:')) {
-        const state = cmd.slice(6).trim();
-        ctrl.selected?.setState?.(state);
-        log(`상태 변경: ${state}`, 'ok');
+        ctrl.selected?.setState?.(cmd.slice(6).trim());
+        log(`상태: ${cmd.slice(6).trim()}`, 'ok');
     } else if (cmd === 'list' || cmd === '목록') {
         for (const [id, e] of engine.entities._entities)
             log(`  ${id}  ${e.type ?? '?'}  (${e.x},${e.y})`);
     } else if (cmd.startsWith('palette:')) {
         switchPalette(cmd.slice(8).trim());
+    } else if (cmd === 'fit') {
+        fitWorkCanvas();
+    } else if (cmd === 'save' || cmd === '저장') {
+        saveScene();
+    } else if (cmd === 'export' || cmd === '내보내기') {
+        exportCurrentSprite();
+    } else if (cmd === 'help' || cmd === '도움말') {
+        ['list — 엔티티 목록', 'save — 씬 저장', 'export — 스프라이트 내보내기',
+         'palette:<name> — 팔레트 변경', 'state:<name> — 상태 변경',
+         'fit — 작업 캔버스 맞춤', 'reset — 선택 엔티티 리셋'].forEach(l => log(l));
     } else {
-        log(`알 수 없는 명령: ${text}`, 'err');
+        log(`알 수 없는 명령 (help로 목록 확인)`, 'err');
     }
 }
 

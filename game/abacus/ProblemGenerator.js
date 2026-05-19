@@ -1,54 +1,44 @@
 /**
  * 주판왕 — ProblemGenerator
- * 레벨에 따라 덧셈 문제를 생성한다. 결과값 ≤ 999 (3열 주판 최대).
+ * CustomerSystem의 손님 데이터를 받아 문제를 생성한다.
  *
  * 레벨 정의:
- *   1 입문 — 1자리 + 1자리 (결과 ≤ 9)
- *   2 초급 — 1자리 + 1자리 (결과 ≤ 18)
- *   3 중급 — 2자리 + 1자리 (결과 ≤ 99)
- *   4 고급 — 2자리 + 2자리 (결과 ≤ 198)
+ *   1 입문 — 물건 1종 × 수량 (곱셈 → 합산)
+ *   2 초급 — 물건 2종 합산
+ *   3 중급 — 거스름돈 (지불 - 합계)
+ *   4 고급 — 할인 합산 (10% 단위 반올림)
  */
 export default class ProblemGenerator {
-    constructor() {
-        this._history = [];
-    }
+    /**
+     * customer: CustomerSystem.generate()의 반환값
+     * level: 1~4
+     * 반환값: { answer, displayText, items, paid, level }
+     */
+    fromCustomer(customer, level) {
+        const { items, total, paid } = customer;
 
-    // level: 1~4. 반환값: { a, b, operator, answer }
-    generate(level = 1) {
-        let problem;
-        let attempts = 0;
-        do {
-            problem = this._make(level);
-            attempts++;
-        } while (attempts < 10 && this._isDuplicate(problem));
+        let answer;
+        let displayText;
 
-        this._history.push(problem.answer);
-        if (this._history.length > 5) this._history.shift();
+        if (level === 1) {
+            // 물건 1종: qty × unitPrice
+            const { name, qty, unitPrice } = items[0];
+            answer = qty * unitPrice;
+            displayText = `${name} ${qty}개 = ?원`;
+        } else if (level === 2) {
+            // 물건 2종 합산
+            answer = total;
+            displayText = items.map(i => `${i.name} ${i.qty}개(${i.unitPrice}원)`).join(' + ') + ' = ?원';
+        } else if (level === 3) {
+            // 거스름돈: paid - total
+            answer = paid - total;
+            displayText = `받은돈 ${paid}원 - 합계 ${total}원 = ?원`;
+        } else {
+            // 레벨4: 10% 할인 후 합계
+            answer = Math.round(total * 0.9 / 10) * 10;
+            displayText = `합계 ${total}원 (10%할인) = ?원`;
+        }
 
-        return problem;
-    }
-
-    _make(level) {
-        const [aRange, bRange] = LEVEL_RANGES[Math.min(level, 4) - 1];
-        const a        = this._rand(aRange[0], aRange[1]);
-        const b        = this._rand(bRange[0], bRange[1]);
-        const answer   = a + b;
-        return { a, b, operator: '+', answer };
-    }
-
-    _isDuplicate(problem) {
-        return this._history.includes(problem.answer);
-    }
-
-    _rand(min, max) {
-        return Math.floor(Math.random() * (max - min + 1)) + min;
+        return { answer, displayText, items, paid, level, total };
     }
 }
-
-// [a범위, b범위]
-const LEVEL_RANGES = [
-    [[1, 5],   [1, 4]],    // Level 1 입문
-    [[1, 9],   [1, 9]],    // Level 2 초급
-    [[10, 50], [1, 9]],    // Level 3 중급
-    [[10, 90], [10, 90]],  // Level 4 고급
-];

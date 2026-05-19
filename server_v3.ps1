@@ -85,6 +85,27 @@ while ($listener.IsListening) {
             [System.IO.File]::WriteAllText($filePath, $data.content, [System.Text.Encoding]::UTF8)
             Send-Json $response @{ success = $true; filename = $raw }
 
+        # API: save-scene — assets/scenes/ 에 직접 덮어쓰기
+        } elseif ($path -eq "/api/save-scene" -and $method -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+            $body = $reader.ReadToEnd()
+            $reader.Close()
+            $data = ConvertFrom-Json $body
+
+            if ($null -eq $data -or $null -eq $data.filename -or $null -eq $data.content) {
+                throw "Invalid body: need filename + content"
+            }
+
+            $raw = [System.IO.Path]::GetFileName($data.filename) -replace '[\\/:*?"<>|]', '_'
+            if (-not $raw.EndsWith('.json')) { $raw += '.json' }
+            $dir = Join-Path $rootPath "assets\scenes"
+            if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }
+            $filePath = Join-Path $dir $raw
+
+            Write-Host "Scene saved: $filePath"
+            [System.IO.File]::WriteAllText($filePath, $data.content, [System.Text.Encoding]::UTF8)
+            Send-Json $response @{ success = $true; filename = $raw }
+
         # API: rename
         } elseif ($path -eq "/api/rename-pixelart" -and $method -eq "POST") {
             $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
