@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#06060A; overflow:hidden; }
+</style>
+</head><body>
+<canvas id="sand-canvas"></canvas>
+<script type="module">
+'use strict';
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   SAND ENGINE — FEATURE SHOWCASE
+   Sand Engine 버전 (engine/ 모듈 기반)
+
+   세그먼트 목록 (총 15개):
+     OPENING    — Text Form "SAND ENGINE"
+     PARTICLE   — Burst / Sand Rain / Drift / Text Form / Explosion
+                  Snow / Smoke / Pixel Rain
+     TEXT       — Typewriter / Blink
+     TRANSITION — Fade / Dither / Palette Flash / Slide Left
+     OUTRO      — "1974" + Burst Stars
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+import SandEngine from '../../engine/SandEngine.js';
+import { Scene }  from '../../engine/scene/SceneManager.js';
+
+const W = 320, H = 240;
+const _embed = window !== window.top;
+
+// palette_1bit.json 인덱스
+const P = {
+    FG:   1,   // #ffffff
+    GRAY: 4,   // #999999
+    DIM:  5,   // #777777
+    DARK: 7,   // #333333
+    BLUE: 10,  // #aaaaff
+    RED:  11,  // #ff4444
+};
+
+// 오버레이 캔버스 CSS 색상
+const COL = {
+    BG:  '#06060A',
+    FG:  '#E8E4D8',
+    AM:  '#C8922A',
+    DIM: '#3A3830',
+    HI:  '#FFFFFF',
+};
+
+// ── 미니 파티클 풀 (오버레이 전용) ───────────────────────
+class MiniPS {
+    constructor() { this._p = []; }
+    add(x, y, vx, vy, life, decay, col, sz = 1) {
+        this._p.push({ x, y, vx, vy, life, decay, col, sz });
+    }
+    tick(sec) {
+        for (let i = this._p.length - 1; i >= 0; i--) {
+            const p = this._p[i];
+            p.x += p.vx * sec * 60;
+            p.y += p.vy * sec * 60;
+            p.life -= p.decay * sec * 60;
+            if (p.life <= 0) this._p.splice(i, 1);
+        }
+    }
+    draw(ctx) {
+        for (const p of this._p) {
+            ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+            ctx.fillStyle = p.col;
+            ctx.fillRect(~~p.x, ~~p.y, p.sz, p.sz);
+        }
+        ctx.globalAlpha = 1;
+    }
+    clear() { this._p = []; }
+}
+
+const rnd   = (a, b)    => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const ease  = t => t < 0.5 ? 2 * t * t : 1 - (2 - 2 * t) ** 2 / 2;
+
+// ── 세그먼트 정의 ─────────────────────────────────────────
+//  init(engine)                      — 진입 시 1회
+//  tick(engine, dt)                  — onUpdate 매 프레임 (dt: ms)
+//  simOverlay(ctx, w, h, segT, dt)   — onPostRender 매 프레임
+const SEG = [
+
+    // ─── OPENING ─────────────────────────────────────────
+    {
+        cat: '', name: 'SAND ENGINE', desc: 'FEATURE SHOWCASE', dur: 3.5,
+        init(e) {
+            e.particles.emitTextForm({
+                text: 'SAND ENGINE', cx: W / 2, cy: H / 2 - 8,
+                fontSize: 13, speed: 0.065, layer: 1, palIdx: P.FG,
+            });
+        },
+        simOverlay(ctx, w, h, t) {
+            ctx.globalAlpha = clamp(t * 1.5, 0, 1);
+            ctx.fillStyle   = COL.AM;
+            ctx.font        = '7px "Courier New",monospace';
+            ctx.textAlign   = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText('FEATURE SHOWCASE', w / 2, h / 2 + 12);
+            ctx.globalAlpha = 1;
+            ctx.textAlign   = 'left';
+        },
+    },
+
+    // ─── PARTICLE ────────────────────────────────────────
+    {
+        cat: 'PARTICLE', name: 'Burst', desc: '충돌 · 타격 이펙트', dur: 2.5,
+        init(e) {
+            for (let i = 0; i < 3; i++) setTimeout(() => {
+                e.particles.emit('burst', {
+                    count: 28, layer: 1,
+                    cx: W / 2, cy: H / 2,
+                    minSpeed: 40, maxSpeed: 120, gravity: 150,
+                    palIdx: i % 2 ? P.BLUE : P.FG,
+                });
+            }, i * 350);
+        },
+    },
+
+    {
+        cat: 'PARTICLE', name: 'Sand Rain', desc: '배경 · 강수 연출', dur: 2.5,
+        _timer: 0,
+        init(e) { this._timer = 0; },
+        tick(e, dt) {
+            this._timer -= dt / 1000;
+            if (this._timer <= 0) {
+                e.particles.emit('sand_rain', {
+                    count: 6, layer: 1, screenW: W,
+                    groundY: H + 10,
+                    minSpeed: 110, maxSpeed: 220,
+                    gravity: 80, palIdxRange: [P.FG, P.FG],
+                });
+                this._timer = 0.016;
+            }
+        },
+    },
+
+    {
+        cat: 'PARTICLE', name: 'Drift', desc: '패럴랙스 배경 파티클 3레이어', dur: 3,
+        init(e) {
+            e.particles.emit('drift', {
+                count: 40, layer: 0, screenW: W, screenH: H,
+                palIdx: P.DARK, speedMult: 0.3, wrap: true,
+            });
+            setTimeout(() => e.particles.emit('drift', {
+                count: 40, layer: 1, screenW: W, screenH: H,
+                palIdx: P.GRAY, speedMult: 0.6, wrap: true,
+            }), 400);
+            setTimeout(() => e.particles.emit('drift', {
+                count: 30, layer: 2, screenW: W, screenH: H,
+                palIdx: P.FG, speedMult: 1.2, wrap: true,
+            }), 800);
+        },
+        simOverlay(ctx, w, h, t) {
+            if (t < 0.5) return;
+            ctx.globalAlpha  = clamp((t - 0.5) * 2, 0, 1) * 0.7;
+            ctx.fillStyle    = COL.AM;
+            ctx.font         = '5px "Courier New",monospace';
+            ctx.textBaseline = 'top';
+            ['L0  0.3×', 'L1  0.6×', 'L2  1.2×'].forEach((s, i) =>
+                ctx.fillText(s, 8, 28 + i * 16)
+            );
+            ctx.globalAlpha = 1;
+        },
+    },
+
+    {
+        cat: 'PARTICLE', name: 'Text Form', desc: '픽셀 수렴 · 로고 형성', dur: 3.5,
+        init(e) {
+            e.particles.emitTextForm({
+                text: 'HELLO', cx: W / 2, cy: H / 2,
+                fontSize: 20, speed: 0.07, layer: 1, palIdx: P.FG,
+            });
+        },
+    },
+
+    {
+        cat: 'PARTICLE', name: 'Explosion', desc: '폭발 · 파괴 이펙트', dur: 2.5,
+        _ps: null, _flash: 0,
+        init(e) {
+            this._ps    = new MiniPS();
+            this._flash = 1.0;
+            for (let i = 0; i < 70; i++) {
+                const a = rnd(0, Math.PI * 2), s = rnd(0.5, 4.5);
+                this._ps.add(W / 2, H / 2,
+                    Math.cos(a) * s, Math.sin(a) * s - 0.5,
+                    1, 0.015, i % 3 ? COL.FG : COL.AM, i < 12 ? 2 : 1);
+            }
+        },
+        tick(e, dt) {
+            const sec = dt / 1000;
+            this._ps.tick(sec);
+            this._flash = Math.max(0, this._flash - 0.05 * sec * 60);
+        },
+        simOverlay(ctx, w, h, t) {
+            this._ps.draw(ctx);
+            if (this._flash > 0.005) {
+                ctx.globalAlpha = this._flash * 0.55;
+                ctx.fillStyle   = COL.HI;
+                ctx.fillRect(0, 0, w, h);
+                ctx.globalAlpha = 1;
+            }
+        },
+    },
+
+    {
+        cat: 'PARTICLE', name: 'Snow', desc: '겨울 · 분위기 효과', dur: 2.5,
+        _ps: null,
+        init(e) { this._ps = new MiniPS(); },
+        tick(e, dt) {
+            if (rnd(0, 1) < 0.5)
+                this._ps.add(rnd(0, W), -2, rnd(-0.15, 0.15), rnd(0.4, 1.2), 1, 0.003, COL.HI);
+            this._ps.tick(dt / 1000);
+        },
+        simOverlay(ctx) {
+            for (const p of this._ps._p) {
+                ctx.globalAlpha = Math.max(0, Math.min(0.8, p.life));
+                ctx.fillStyle   = p.col;
+                ctx.fillRect(~~p.x, ~~p.y, 1, 1);
+            }
+            ctx.globalAlpha = 1;
+        },
+    },
+
+    {
+        cat: 'PARTICLE', name: 'Smoke', desc: '연기 · 불 연출', dur: 2.5,
+        _ps: null,
+        init(e) { this._ps = new MiniPS(); },
+        tick(e, dt) {
+            for (let i = 0; i < 2; i++)
+                this._ps.add(rnd(W / 2 - 8, W / 2 + 8), H / 2 + 20,
+                    rnd(-0.12, 0.12), rnd(-0.5, -0.15), 1, 0.007, COL.DIM, 2);
+            this._ps.tick(dt / 1000);
+        },
+        simOverlay(ctx) {
+            for (const p of this._ps._p) {
+                ctx.globalAlpha = Math.max(0, Math.min(0.45, p.life * 0.45));
+                ctx.fillStyle   = p.col;
+                ctx.fillRect(~~p.x, ~~p.y, 2, 2);
+            }
+            ctx.globalAlpha = 1;
+        },
+    },
+
+    {
+        cat: 'PARTICLE', name: 'Pixel Rain', desc: '데이터 · 코드 연출', dur: 2.5,
+        _ps: null,
+        init(e) { this._ps = new MiniPS(); },
+        tick(e, dt) {
+            for (let i = 0; i < 6; i++)
+                this._ps.add((rnd(0, W) | 0), -2, 0, rnd(2.5, 5),
+                    1, 0.003, rnd(0, 1) > 0.7 ? COL.AM : COL.FG);
+            this._ps.tick(dt / 1000);
+        },
+        simOverlay(ctx) {
+            for (const p of this._ps._p) {
+                ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+                ctx.fillStyle   = p.col;
+                ctx.fillRect(~~p.x, ~~p.y, 1, 2);
+            }
+            ctx.globalAlpha = 1;
+        },
+    },
+
+    // ─── TEXT FX ─────────────────────────────────────────
+    {
+        cat: 'TEXT', name: 'Typewriter', desc: '대화 · 스토리 연출', dur: 3.5,
+        _s: '', _i: 0, _tmr: 0,
+        init(e) { this._s = ''; this._i = 0; this._tmr = 0; },
+        simOverlay(ctx, w, h, t, dt) {
+            const TGT = '안녕, 나는 Sand Engine이야.';
+            this._tmr += dt / 1000;
+            if (this._i < TGT.length && this._tmr > 0.07) {
+                this._s += TGT[this._i++]; this._tmr = 0;
+            }
+            const blink = Math.floor(Date.now() / 450) % 2 === 0;
+            ctx.fillStyle = '#1A1A14';
+            ctx.fillRect(20, 78, 280, 82);
+            ctx.fillStyle = COL.AM;
+            ctx.fillRect(20, 78, 280, 1);
+            ctx.fillStyle    = COL.FG;
+            ctx.font         = '7px "Courier New",monospace';
+            ctx.textBaseline = 'top';
+            ctx.fillText(this._s + (this._i < TGT.length && blink ? '_' : ''), 28, 98);
+        },
+    },
+
+    {
+        cat: 'TEXT', name: 'Blink', desc: 'PRESS START · UI 강조', dur: 2.5,
+        simOverlay(ctx, w, h, t) {
+            const on = Math.floor(t * 2) % 2 === 0;
+            ctx.font         = '9px "Courier New",monospace';
+            ctx.textAlign    = 'center';
+            ctx.textBaseline = 'middle';
+            if (on) {
+                ctx.fillStyle = COL.FG;
+                ctx.fillText('PRESS  START', w / 2, h / 2 - 5);
+            }
+            ctx.font      = '5px "Courier New",monospace';
+            ctx.fillStyle = COL.DIM;
+            ctx.fillText('blink interval: 500ms', w / 2, h / 2 + 12);
+            ctx.textAlign = 'left';
+        },
+    },
+
+    // ─── TRANSITION ──────────────────────────────────────
+    {
+        cat: 'TRANSITION', name: 'Fade', desc: '챕터 전환 · 사망 후', dur: 3,
+        simOverlay(ctx, w, h, t) {
+            ctx.fillStyle = '#1A1A14'; ctx.fillRect(40, 60, 240, 120);
+            ctx.fillStyle = COL.DIM; ctx.font = '8px "Courier New",monospace';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('[ Scene ]', w / 2, h / 2);
+            ctx.textAlign = 'left';
+            const cyc = t % 1.5;
+            const a = cyc < 0.75 ? ease(cyc / 0.75) : ease(1 - (cyc - 0.75) / 0.75);
+            ctx.globalAlpha = a;
+            ctx.fillStyle   = '#000';
+            ctx.fillRect(0, 0, w, h);
+            ctx.globalAlpha = 1;
+        },
+    },
+
+    {
+        cat: 'TRANSITION', name: 'Dither', desc: '꿈 · 회상 장면', dur: 3,
+        simOverlay(ctx, w, h, t) {
+            ctx.fillStyle = '#1A1A14'; ctx.fillRect(40, 60, 240, 120);
+            ctx.fillStyle = COL.DIM; ctx.font = '8px "Courier New",monospace';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('[ Scene ]', w / 2, h / 2);
+            ctx.textAlign = 'left';
+            const prog = (t % 1.5) / 1.5;
+            const thr  = prog < 0.5 ? prog * 2 : 2 - prog * 2;
+            ctx.fillStyle = '#000';
+            for (let y = 0; y < h; y += 2)
+                for (let x = 0; x < w; x += 2)
+                    if (Math.random() < thr) ctx.fillRect(x, y, 1, 1);
+        },
+    },
+
+    {
+        cat: 'TRANSITION', name: 'Palette Flash', desc: '히트 이펙트 · 보스 등장', dur: 3,
+        _last: -1, _fa: 0,
+        init(e) { this._last = -1; this._fa = 0; },
+        simOverlay(ctx, w, h, t, dt) {
+            ctx.fillStyle = '#1A1A14'; ctx.fillRect(40, 60, 240, 120);
+            ctx.fillStyle = COL.AM; ctx.font = '8px "Courier New",monospace';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('[ Hit! ]', w / 2, h / 2);
+            ctx.textAlign  = 'left';
+            const step = Math.floor(t / 0.75);
+            if (step !== this._last) { this._last = step; this._fa = 1.0; }
+            this._fa = Math.max(0, this._fa - 0.08 * (dt / 1000) * 60);
+            const cols = [COL.AM, COL.FG, COL.AM, '#FF4444'];
+            ctx.globalAlpha = this._fa * 0.75;
+            ctx.fillStyle   = cols[step % cols.length];
+            ctx.fillRect(0, 0, w, h);
+            ctx.globalAlpha = 1;
+        },
+    },
+
+    {
+        cat: 'TRANSITION', name: 'Slide Left', desc: '스테이지 이동 · 메뉴 전환', dur: 3,
+        simOverlay(ctx, w, h, t) {
+            const cyc = t % 1.5;
+            const p   = cyc < 0.75 ? ease(cyc / 0.75) : 1;
+            const off = Math.floor((1 - p) * w);
+            ctx.fillStyle    = '#1A1A14'; ctx.fillRect(0, 60, w - off, 120);
+            ctx.fillStyle    = COL.DIM;
+            ctx.font         = '8px "Courier New",monospace';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Scene A', 20, h / 2);
+            ctx.fillStyle = '#141418'; ctx.fillRect(w - off, 60, w, 120);
+            ctx.fillStyle = COL.FG;
+            ctx.fillText('Scene B', w - off + 8, h / 2);
+            ctx.fillStyle = COL.AM; ctx.fillRect(w - off - 1, 0, 1, h);
+        },
+    },
+
+    // ─── OUTRO ───────────────────────────────────────────
+    {
+        cat: '', name: '1974', desc: '모든 것이 시작되었다', dur: 4,
+        init(e) {
+            e.particles.emitTextForm({
+                text: '1974', cx: W / 2, cy: H / 2,
+                fontSize: 28, speed: 0.06, layer: 1, palIdx: P.FG,
+            });
+            for (let i = 0; i < 5; i++) setTimeout(() => {
+                e.particles.emit('burst', {
+                    count: 12, layer: 1,
+                    cx: 30 + Math.random() * 260,
+                    cy: 30 + Math.random() * 180,
+                    minSpeed: 20, maxSpeed: 80, gravity: 100,
+                    palIdx: i % 2 ? P.BLUE : P.FG,
+                });
+            }, i * 320);
+        },
+        simOverlay(ctx, w, h, t) {
+            const a = clamp((t - 3) * 2, 0, 1);
+            if (a > 0.005) {
+                ctx.globalAlpha = a;
+                ctx.fillStyle   = '#000';
+                ctx.fillRect(0, 0, w, h);
+                ctx.globalAlpha = 1;
+            }
+        },
+    },
+];
+
+// ── ShowcaseScene ─────────────────────────────────────────
+class ShowcaseScene extends Scene {
+    constructor() {
+        super('showcase');
+        this._segIdx  = 0;
+        this._segT    = 0;
+        this._inited  = false;
+        this._lastDt  = 16;
+    }
+
+    _seg() { return SEG[this._segIdx]; }
+
+    onEnter(engine) {
+        engine.particles.clear();
+        engine.text.clearAll();
+        this._segIdx = 0;
+        this._segT   = 0;
+        this._inited = false;
+    }
+
+    onUpdate(now, dt, input) {
+        const engine = this.engine;
+        this._lastDt = dt;
+
+        // PixelRenderer 매 프레임 클리어 (잔상 방지)
+        for (let i = 0; i < 3; i++) {
+            const r = engine.entities.getRenderer(i);
+            if (r) r.clear();
+        }
+
+        const seg = this._seg();
+        if (!seg) return;
+
+        // 세그먼트 초기화 (1회)
+        if (!this._inited) {
+            engine.particles.clear();
+            engine.text.clearAll();
+            seg.init?.(engine);
+            this._inited = true;
+        }
+
+        // 세그먼트 틱
+        seg.tick?.(engine, dt);
+
+        // 경과 시간 누적
+        this._segT += dt / 1000;
+
+        // 다음 세그먼트 전환
+        if (this._segT >= seg.dur) {
+            this._segIdx++;
+            this._segT   = 0;
+            this._inited = false;
+            if (this._segIdx >= SEG.length) {
+                if (_embed) {
+                    window.parent.postMessage({ type: 'navigate', to: 'intro' }, '*');
+                } else {
+                    this._segIdx = 0;   // 단독 실행 시 루프
+                }
+            }
+        }
+    }
+
+    onRender(cameraX) {
+        // TextRenderer L3 누적 방지
+        const ctx = this.engine.layers.getCtx(3);
+        if (ctx) ctx.clearRect(0, 0, W, H);
+    }
+
+    onPostRender(canvas) {
+        const ctx  = canvas.getContext('2d');
+        const seg  = this._seg();
+        const t    = this._segT;
+        const dt   = this._lastDt;
+
+        ctx.save();
+
+        // 세그먼트 커스텀 오버레이 (전환 시뮬·커스텀 파티클 등)
+        seg?.simOverlay?.(ctx, W, H, t, dt);
+
+        // ── UI 레이블 ─────────────────────────────────────
+        const dur     = seg?.dur ?? 1;
+        const fadeIn  = clamp(t * 3, 0, 1);
+        const fadeOut = t > dur - 0.5 ? clamp((dur - t) * 2, 0, 1) : 1;
+        const uiA     = fadeIn * fadeOut;
+
+        if (uiA > 0.01 && seg) {
+            ctx.globalAlpha  = uiA;
+            ctx.textBaseline = 'top';
+            ctx.textAlign    = 'left';
+
+            // 카테고리 칩 (좌상단)
+            if (seg.cat) {
+                ctx.font      = '6px "Courier New",monospace';
+                ctx.fillStyle = COL.AM;
+                ctx.fillText(`▸ ${seg.cat}`, 8, 8);
+            }
+
+            // 이름 (하단 중앙)
+            ctx.font      = '10px "Courier New",monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = COL.FG;
+            ctx.fillText(seg.name, W / 2, H - 28);
+
+            // 설명 (이름 아래)
+            ctx.font      = '6px "Courier New",monospace';
+            ctx.fillStyle = COL.DIM;
+            ctx.fillText(seg.desc, W / 2, H - 16);
+
+            ctx.textAlign   = 'left';
+            ctx.globalAlpha = 1;
+        }
+
+        // ── 진행 바 (최하단) ──────────────────────────────
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle   = COL.DIM;
+        ctx.fillRect(0, H - 2, W, 2);
+        ctx.fillStyle   = COL.AM;
+        ctx.fillRect(0, H - 2, Math.floor(W * (this._segIdx / SEG.length)), 2);
+        ctx.globalAlpha = 1;
+
+        ctx.restore();
+    }
+
+    onExit() {
+        this.engine.particles.clear();
+        this.engine.text.clearAll();
+    }
+}
+
+// ── 메인 ─────────────────────────────────────────────────
+async function main() {
+    // ?scale=N 파라미터로 픽셀 배율 강제 지정 (에디터 팝업 배율 버튼용)
+    const _scaleParam = parseInt(new URLSearchParams(location.search).get('scale')) || 0;
+
+    const canvas = document.getElementById('sand-canvas');
+    const engine = new SandEngine({ canvas, gameWidth: W, gameHeight: H });
+    await engine.init();
+
+    // 배율 파라미터가 있으면 ScaleManager 강제 적용
+    if (_scaleParam >= 1) {
+        const sc = _scaleParam;
+        canvas.style.width           = W * sc + 'px';
+        canvas.style.height          = H * sc + 'px';
+        canvas.style.imageRendering  = 'pixelated';
+        canvas.style.position        = 'fixed';
+        canvas.style.left            = Math.round((innerWidth  - W * sc) / 2) + 'px';
+        canvas.style.top             = Math.round((innerHeight - H * sc) / 2) + 'px';
+        document.body.style.background = '#000';
+        document.body.style.overflow   = 'hidden';
+    }
+
+    await engine.loadPalette('/assets/palettes/palette_1bit.json');
+
+    const scene = new ShowcaseScene();
+    engine.scenes.register('showcase', scene);
+    engine.scenes.change('showcase');
+
+    if (_embed) {
+        window.parent.postMessage({ type: 'ready' }, '*');
+        window.addEventListener('message', e => {
+            if (e.data?.type === 'start')  engine.start();
+            if (e.data?.type === 'pause')  engine.stop();
+            if (e.data?.type === 'resume') engine.start();
+        });
+    } else {
+        engine.start();
+    }
+}
+
+main().catch(console.error);
+</script>
+</body></html>

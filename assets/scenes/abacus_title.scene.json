@@ -1,0 +1,27 @@
+{
+  "scene": "abacus_title",
+  "palette": "palette_1bit.json",
+  "bgm": null,
+  "transition": "dither_fade",
+  "layers": {
+    "0": { "parallax": 0.15 },
+    "1": { "parallax": 0.6  },
+    "2": { "parallax": 1.0  },
+    "3": { "parallax": 0    }
+  },
+  "entities": [
+    {
+      "id": "title_logo",
+      "prefab": "OBJECT_STATIC",
+      "layer": 2,
+      "x": 80, "y": 40
+    },
+    {
+      "id": "start_btn",
+      "prefab": "UI_HUD_BUTTON",
+      "layer": 3,
+      "x": 110, "y": 160,
+      "props": { "label": "START", "action": "start_game" }
+    }
+  ]
+}

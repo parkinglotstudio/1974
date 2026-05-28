@@ -1,0 +1,18 @@
+{
+  "name": "palette_red_tint",
+  "description": "타이머 경고 팔레트 — 붉은 색조",
+  "palette": [
+    "transparent",
+    "#ffeeee",
+    "#ffcccc",
+    "#ffaaaa",
+    "#ff8888",
+    "#ff5555",
+    "#ff2222",
+    "#dd0000",
+    "#aa0000",
+    "#880000",
+    "#550000",
+    "#ff6600"
+  ]
+}

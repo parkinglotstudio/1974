@@ -1,0 +1,33 @@
+{
+  "scene": "abacus_result",
+  "palette": "palette_1bit.json",
+  "bgm": null,
+  "transition": "dither_fade",
+  "layers": {
+    "0": { "parallax": 0.15 },
+    "1": { "parallax": 0.6  },
+    "2": { "parallax": 1.0  },
+    "3": { "parallax": 0    }
+  },
+  "entities": [
+    {
+      "id": "result_score",
+      "prefab": "UI_SCORE",
+      "layer": 3,
+      "x": 100, "y": 80
+    },
+    {
+      "id": "retry_btn",
+      "prefab": "UI_HUD_BUTTON",
+      "layer": 3,
+      "x": 80, "y": 160,
+      "props": { "label": "RETRY", "action": "restart_game" }
+    },
+    {
+      "id": "star_burst",
+      "prefab": "PARTICLE_STAR",
+      "layer": 2,
+      "x": 160, "y": 120
+    }
+  ]
+}

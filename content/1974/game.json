@@ -1,0 +1,64 @@
+{
+  "id": "1974",
+  "name": "1974",
+  "version": "0.1",
+  "resolution": {
+    "width": 180,
+    "height": 320
+  },
+  "aspectLabel": "세로 9:16",
+  "palette": "/assets/palettes/palette_1bit.json",
+  "paletteAliases": [],
+  "layers": {
+    "0": {
+      "name": "배경",
+      "parallax": 0.15
+    },
+    "1": {
+      "name": "중경",
+      "parallax": 0.6
+    },
+    "2": {
+      "name": "오브젝트",
+      "parallax": 1
+    },
+    "3": {
+      "name": "UI",
+      "parallax": 0
+    }
+  },
+  "prefabs": {},
+  "scenes": {
+    "intro": {
+      "type": "live",
+      "label": "인트로",
+      "liveEntry": "content/1974/intro.html"
+    },
+    "showcase": {
+      "type": "live",
+      "label": "쇼케이스",
+      "liveEntry": "content/1974/showcase.html"
+    },
+    "ch1": {
+      "type": "live",
+      "label": "Ch1",
+      "liveEntry": "content/1974/ch1.html",
+      "layers": {
+        "3": {
+          "visible": true
+        }
+      }
+    },
+    "ch2": {
+      "type": "live",
+      "label": "Ch2",
+      "liveEntry": "content/1974/ch2.html"
+    },
+    "ch3": {
+      "type": "live",
+      "label": "Ch3",
+      "liveEntry": "content/1974/ch3.html"
+    }
+  },
+  "defaultScene": "intro"
+}

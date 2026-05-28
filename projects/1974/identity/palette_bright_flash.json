@@ -1,0 +1,18 @@
+{
+  "name": "palette_bright_flash",
+  "description": "네모세모동그라미 — 밝은 플래시 / 부스트 (동그라미 변신, 게임 시작)",
+  "palette": [
+    "transparent",
+    "#ffffff",
+    "#e8f8ff",
+    "#a0e0ff",
+    "#0a1a2a",
+    "#20d0ff",
+    "#00a8e8",
+    "#ffe860",
+    "#ffcc00",
+    "#40e8ff",
+    "#c0f8ff",
+    "#ff4040"
+  ]
+}

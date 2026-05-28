@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>1974 · Ch.1 Analog Birth</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #06060A;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* ── standalone header ── */
+        .s-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            background: #111;
+            border-bottom: 1px solid #1e1e1e;
+            height: 44px;
+            flex-shrink: 0;
+        }
+        .s-header .logo {
+            font-size: 12px; font-weight: 700; color: #ddd;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .s-header .logo span { font-size: 10px; font-weight: 400; color: #444; }
+        .s-header .btns { display: flex; gap: 6px; }
+        .hbtn {
+            font-size: 10px; padding: 4px 10px; border-radius: 6px;
+            border: .5px solid #333; background: #1a1a1a; color: #888;
+            cursor: pointer; font-family: inherit;
+        }
+        .hbtn:hover { color: #ccc; border-color: #444; }
+        .hbtn.pri { background: #ddd; color: #111; border-color: #ddd; }
+
+        /* ── center wrapper ── */
+        .main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .canvas-wrap {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        #sand-canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        /* ═══════════════════════════════════════
+           AVATAR SELECTION OVERLAY  (180 × 320)
+           설계 단위: 게임 픽셀 (1px = 1게임픽셀)
+           transform: scale(SCALE) 로 확대
+           ═══════════════════════════════════════ */
+        #ov {
+            position: absolute;
+            top: 0; left: 0;
+            width: 180px; height: 320px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            pointer-events: auto;
+            transform-origin: top left;
+            font-family: 'JetBrains Mono', monospace;
+            color: #fff;
+        }
+
+        /* ── HUD bar (17px) ── */
+        .ov-hud {
+            height: 17px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 7px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            font-size: 6px;
+            letter-spacing: .10em;
+            color: #555;
+        }
+        .ov-hud-l { color: #777; }
+
+        /* ── Hero zone (143px) ── */
+        .ov-hero {
+            height: 143px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 8px 0 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+
+        .ov-art-box {
+            width: 80px; height: 80px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.02);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        #ov-hero-art {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            display: block;
+        }
+
+        .ov-hero-name {
+            font-size: 8px; font-weight: 700;
+            color: #e8e8e8; letter-spacing: .12em;
+        }
+        .ov-hero-sub {
+            font-size: 6px; color: #555; letter-spacing: .08em;
+            margin-top: -2px;
+        }
+        .ov-hero-stars {
+            font-size: 7px; color: #888; letter-spacing: .02em;
+        }
+        .ov-sel-btn {
+            padding: 4px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.18);
+            color: #bbb;
+            font-family: inherit; font-size: 7px; letter-spacing: .12em;
+            cursor: pointer;
+            transition: background .1s, border-color .1s, color .1s;
+        }
+        .ov-sel-btn:hover:not(:disabled) {
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.4); color: #fff;
+        }
+        .ov-sel-btn:disabled {
+            opacity: .4; cursor: default;
+        }
+
+        /* ── Grid zone (160px) ── */
+        .ov-grid-zone {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 8px 8px 6px;
+            gap: 5px;
+            min-height: 0;
+        }
+
+        .ov-grid-lbl {
+            font-size: 6px; color: #444;
+            letter-spacing: .12em; flex-shrink: 0;
+        }
+        .ov-grid-lbl span { color: #888; }
+
+        .ov-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 3px;
+            min-height: 0;
+        }
+
+        /* Avatar slot */
+        .av {
+            border: 1px solid rgba(255,255,255,0.07);
+            background: rgba(255,255,255,0.015);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            gap: 2px;
+            padding: 2px;
+            transition: border-color .1s, background .1s;
+            overflow: hidden;
+            position: relative;
+        }
+        .av:hover:not(.locked) {
+            border-color: rgba(255,255,255,0.25);
+            background: rgba(255,255,255,0.05);
+        }
+        .av.on {
+            border-color: rgba(255,255,255,0.55);
+            background: rgba(255,255,255,0.08);
+        }
+        .av.locked { opacity: .2; cursor: default; }
+        .av canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            display: block; flex-shrink: 0;
+        }
+        .av-n {
+            font-size: 5px; color: #555;
+            letter-spacing: .04em; line-height: 1;
+        }
+        .av.on .av-n { color: #999; }
+    </style>
+</head>
+<body>
+
+<div class="s-header" id="sHdr">
+    <div class="logo">
+        📺 1974 <span>Ch.1 · Analog Birth · 1974~1980</span>
+    </div>
+    <div class="btns">
+        <button class="hbtn" id="btnRestart">↺ 리스타트</button>
+        <button class="hbtn pri" id="btnPlay">▶ 실행</button>
+    </div>
+</div>
+
+<div class="main" id="mainWrap">
+    <div class="canvas-wrap" id="cWrap">
+        <canvas id="sand-canvas"></canvas>
+
+        <div id="ov">
+            <!-- HUD -->
+            <div class="ov-hud">
+                <span class="ov-hud-l">◆ CH.01 · ANALOG BIRTH</span>
+                <span>1974~1980</span>
+            </div>
+
+            <!-- Hero zone -->
+            <div class="ov-hero">
+                <div class="ov-art-box">
+                    <canvas id="ov-hero-art"></canvas>
+                </div>
+                <div class="ov-hero-name"  id="ov-name">PIXEL-01</div>
+                <div class="ov-hero-sub"   id="ov-sub">THE PIONEER</div>
+                <div class="ov-hero-stars" id="ov-stars">★☆☆☆☆</div>
+                <button class="ov-sel-btn" id="ov-sel">▶ SELECT</button>
+            </div>
+
+            <!-- Grid zone -->
+            <div class="ov-grid-zone">
+                <div class="ov-grid-lbl">
+                    MY AVATARS · <span id="ov-owned">01</span> / 15
+                </div>
+                <div class="ov-grid" id="ov-grid"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+import SandEngine from '../../engine/SandEngine.js';
+import Ch1Scene   from './scripts/Ch1Scene.js';
+
+// ── embed 감지 ─────────────────────────────────────────────────
+const _isEmbed = window !== window.top;
+if (_isEmbed) {
+    document.getElementById('sHdr').style.display  = 'none';
+    document.body.style.background  = '#000';
+    document.body.style.overflow    = 'hidden';
+    const main = document.getElementById('mainWrap');
+    if (main) { main.style.padding = '0'; main.style.background = '#000'; }
+}
+
+// ── postMessage ────────────────────────────────────────────────
+let _started = false, engine;
+window.addEventListener('message', e => {
+    if (!e.data?.type) return;
+    if (e.data.type === 'start'  && !_started) { _started = true; startAll(); }
+    if (e.data.type === 'pause' ) engine?.stop?.();
+    if (e.data.type === 'resume') engine?.start?.();
+    if (e.data.type === 'layerVisible') {
+        engine?.layers?.setVisible(e.data.layer, e.data.visible);
+    }
+    if (e.data.type === 'reloadLayerAssets') {
+        // 현재 씬의 _loadLayerAssets 재호출 → 새 배경 즉시 반영
+        engine?.scenes?.current?._loadLayerAssets?.().catch(console.warn);
+    }
+});
+window.addEventListener('load', () => {
+    if (_isEmbed) window.parent.postMessage({ type: 'ready' }, '*');
+});
+
+// ── 해상도 & 스케일 (9:16 세로, 동적 리사이즈 대응) ─────────────
+const GW = 180, GH = 320;
+
+const canvas = document.getElementById('sand-canvas');
+const ov     = document.getElementById('ov');
+const cWrap  = document.getElementById('cWrap');
+
+canvas.width  = GW;
+canvas.height = GH;
+ov.style.visibility = 'hidden';   // FOUC 방지 — buildAvatarUI 완료 후 표시
+
+function calcScale() {
+    if (_isEmbed) {
+        // embed: iframe이 phone-canvas-wrap을 꽉 채우므로
+        // Math.floor 없이 정확한 비율로 맞춤 (소수점 허용)
+        return Math.min(window.innerWidth / GW, window.innerHeight / GH);
+    }
+    return Math.max(1, Math.floor(Math.min(
+        (window.innerWidth  - 20) / GW,
+        (window.innerHeight - 60) * 0.95 / GH)));
+}
+
+function applyScale() {
+    const S = calcScale();
+    canvas.style.width       = `${GW * S}px`;
+    canvas.style.height      = `${GH * S}px`;
+    cWrap.style.width        = `${GW * S}px`;
+    cWrap.style.height       = `${GH * S}px`;
+    ov.style.transform       = `scale(${S})`;
+    ov.style.transformOrigin = 'top left';
+}
+
+applyScale();
+window.addEventListener('resize', applyScale);  // embed/standalone 모두 대응
+
+// ── 엔진 ─────────────────────────────────────────────────────
+engine = new SandEngine({ canvas, gameWidth: GW, gameHeight: GH });
+const ch1 = new Ch1Scene();
+engine.scenes.register('ch1', ch1);
+
+// ── 버튼 (standalone) ─────────────────────────────────────────
+document.getElementById('btnPlay')?.addEventListener('click', () => startAll());
+document.getElementById('btnRestart')?.addEventListener('click', () => {
+    ch1.onExit?.(); ch1.onEnter?.(engine);
+});
+
+// ── 아바타 렌더 헬퍼 ──────────────────────────────────────────
+function makeAvatarCanvas(av, ppp) {   // ppp = pixels per pixel
+    const rows = av.map.length, cols = av.map[0].length;
+    const c = document.createElement('canvas');
+    c.width = cols * ppp;  c.height = rows * ppp;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    const col = av.unlocked ? '#ffffff' : '#2a2a2a';
+    av.map.forEach((row, y) => row.forEach((px, x) => {
+        if (px) { ctx.fillStyle = col; ctx.fillRect(x*ppp, y*ppp, ppp, ppp); }
+    }));
+    return c;
+}
+
+function drawHeroArt(av) {
+    const heroC = document.getElementById('ov-hero-art');
+    const ppp   = 9;   // 8×8 sprite → 72×72
+    heroC.width  = av.map[0].length * ppp;
+    heroC.height = av.map.length    * ppp;
+    heroC.style.width  = heroC.width  + 'px';
+    heroC.style.height = heroC.height + 'px';
+    const ctx = heroC.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, heroC.width, heroC.height);
+    av.map.forEach((row, y) => row.forEach((px, x) => {
+        if (px) {
+            ctx.fillStyle = av.unlocked ? '#ffffff' : '#333';
+            ctx.fillRect(x*ppp, y*ppp, ppp, ppp);
+        }
+    }));
+}
+
+// ── 아바타 UI 빌드 ────────────────────────────────────────────
+let avatars = [], selIdx = 0;
+
+async function buildAvatarUI() {
+    try {
+        const r = await fetch('/content/1974/data/ch1_avatars.json');
+        avatars = await r.json();
+    } catch(e) { console.warn('[ch1] 아바타 데이터 로드 실패', e); ov.style.visibility = 'visible'; return; }
+
+    const owned = avatars.filter(a => a.unlocked).length;
+    document.getElementById('ov-owned').textContent = String(owned).padStart(2, '0');
+
+    const grid = document.getElementById('ov-grid');
+    grid.innerHTML = '';
+
+    avatars.forEach((av, i) => {
+        const slot = document.createElement('div');
+        slot.className = 'av' + (av.unlocked ? '' : ' locked') + (i === 0 ? ' on' : '');
+
+        // mini: 8×8 at 3px = 24×24
+        const mini = makeAvatarCanvas(av, 3);
+        mini.style.width  = '24px';
+        mini.style.height = '24px';
+        slot.appendChild(mini);
+
+        const num = document.createElement('div');
+        num.className   = 'av-n';
+        num.textContent = av.unlocked ? String(i+1).padStart(2,'0') : '🔒';
+        slot.appendChild(num);
+
+        if (av.unlocked) slot.addEventListener('click', () => select(i));
+        grid.appendChild(slot);
+    });
+
+    select(0);
+    ov.style.visibility = 'visible';  // 모든 데이터 세팅 완료 후 한 번에 표시
+}
+
+function select(idx) {
+    selIdx = idx;
+    const av = avatars[idx];
+    if (!av) return;
+
+    document.querySelectorAll('.av').forEach((s, i) =>
+        s.classList.toggle('on', i === idx));
+
+    drawHeroArt(av);
+
+    document.getElementById('ov-name').textContent  = av.name;
+    document.getElementById('ov-sub').textContent   = av.sub;
+    document.getElementById('ov-stars').textContent =
+        '★'.repeat(av.rarity) + '☆'.repeat(5 - av.rarity);
+
+    const btn = document.getElementById('ov-sel');
+    btn.textContent = av.unlocked ? '▶ SELECT' : '🔒 LOCKED';
+    btn.disabled    = !av.unlocked;
+}
+
+// ── 메인 ──────────────────────────────────────────────────────
+async function startAll() {
+    engine.input.attach();
+    engine.canvas.width  = GW;
+    engine.canvas.height = GH;
+
+    await ch1.onInit(engine);
+    await ch1.onEnter(engine);
+    engine.scenes._stack.push(ch1);
+    engine.scenes._inited.add('ch1');
+
+    engine.start();
+    await buildAvatarUI();
+}
+
+if (!_isEmbed) startAll().catch(console.error);
+</script>
+</body>
+</html>

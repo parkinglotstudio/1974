@@ -1,0 +1,23 @@
+{
+  "prefab": "UI_SCORE",
+  "type": "UI_SCORE",
+  "asset": "pixels/ui_score.json",
+  "layer": 3,
+  "animation": {
+    "idle":    { "frames": [0], "fps": 0, "loop": true },
+    "correct": { "frames": [1, 2, 1], "fps": 8, "loop": false }
+  },
+  "collider": null,
+  "props": {
+    "score": 0,
+    "maxScore": 9999
+  },
+  "controls": {
+    "default": [
+      { "label": "+점수", "action": "custom:score_up",   "icon": "+" },
+      { "label": "-점수", "action": "custom:score_down", "icon": "-" },
+      { "label": "리셋",  "action": "reset",             "icon": "↺" }
+    ],
+    "custom": []
+  }
+}

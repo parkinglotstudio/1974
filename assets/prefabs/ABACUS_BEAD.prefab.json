@@ -1,0 +1,24 @@
+{
+  "prefab": "ABACUS_BEAD",
+  "type": "ABACUS_BEAD",
+  "asset": "pixels/abacus_bead.json",
+  "layer": 2,
+  "animation": {
+    "up":   { "frames": [0], "fps": 0,  "loop": false },
+    "down": { "frames": [1], "fps": 0,  "loop": false },
+    "move": { "frames": [0, 1], "fps": 8, "loop": false }
+  },
+  "collider": { "w": 10, "h": 6 },
+  "props": {
+    "direction": "vertical",
+    "axis": "y_only"
+  },
+  "controls": {
+    "default": [
+      { "label": "위로",   "action": "state:up",   "icon": "↑" },
+      { "label": "아래로", "action": "state:down",  "icon": "↓" },
+      { "label": "리셋",   "action": "reset",       "icon": "↺" }
+    ],
+    "custom": []
+  }
+}

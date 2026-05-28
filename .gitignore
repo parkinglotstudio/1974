@@ -5,3 +5,11 @@ Thumbs.db
 .gemini/
 PLANDATA/*.pptx
 PLANDATA/*.pdf
+# 레퍼런스 샘플 이미지 (용량 큼 — 로컬 전용)
+assets/samples/
+# 임시/백업 폴더
+temp_frames/
+backup/
+# 개발 서버 캐시
+__pycache__/
+*.pyc

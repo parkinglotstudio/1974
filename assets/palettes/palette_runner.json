@@ -1,0 +1,18 @@
+{
+  "name": "palette_runner",
+  "description": "Unsanity Runner — 스케치 종이 팔레트",
+  "palette": [
+    "transparent",
+    "#faf8f5",
+    "#f0ede8",
+    "#cfc8bf",
+    "#1a1a18",
+    "#41916c",
+    "#2d6a2d",
+    "#ffd700",
+    "#e8a020",
+    "#4a9a6a",
+    "#66ffcc",
+    "#e03030"
+  ]
+}

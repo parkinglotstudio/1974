@@ -1,0 +1,17 @@
+{
+  "prefab": "ABACUS_ROD",
+  "type": "ABACUS_ROD",
+  "asset": "pixels/abacus_rod.json",
+  "layer": 2,
+  "animation": {
+    "idle": { "frames": [0], "fps": 0, "loop": true }
+  },
+  "collider": null,
+  "props": {},
+  "controls": {
+    "default": [
+      { "label": "리셋", "action": "reset", "icon": "↺" }
+    ],
+    "custom": []
+  }
+}

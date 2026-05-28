@@ -1,0 +1,18 @@
+{
+  "name": "palette_night",
+  "description": "밤 팔레트 — 어두운 청색 계열",
+  "palette": [
+    "transparent",
+    "#0a0a1a",
+    "#111128",
+    "#1a1a3a",
+    "#222255",
+    "#2a2a6a",
+    "#333388",
+    "#4444aa",
+    "#5555cc",
+    "#6666ee",
+    "#7777ff",
+    "#aaaaff"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "prefab": "UI_PROBLEM",
+  "type": "UI_PROBLEM",
+  "asset": "pixels/ui_problem.json",
+  "layer": 3,
+  "animation": {
+    "idle":    { "frames": [0], "fps": 0, "loop": true },
+    "correct": { "frames": [1], "fps": 0, "loop": false },
+    "wrong":   { "frames": [2], "fps": 0, "loop": false }
+  },
+  "collider": null,
+  "props": {
+    "operandA": 0,
+    "operandB": 0,
+    "operator": "+",
+    "answer": 0
+  },
+  "controls": {
+    "default": [
+      { "label": "정답", "action": "state:correct", "icon": "○" },
+      { "label": "오답", "action": "state:wrong",   "icon": "✕" },
+      { "label": "리셋", "action": "reset",         "icon": "↺" }
+    ],
+    "custom": []
+  }
+}

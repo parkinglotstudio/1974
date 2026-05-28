@@ -1,0 +1,21 @@
+{
+  "id": "speedrun",
+  "name": "네모세모동그라미(네세동)",
+  "version": "0.1",
+  "resolution": { "width": 480, "height": 270 },
+  "aspectLabel": "가로 480:270",
+  "palette": "/assets/palettes/palette_runner.json",
+  "paletteAliases": [],
+  "layers": {
+    "0": { "name": "원경", "parallax": 0.15 },
+    "1": { "name": "근경", "parallax": 0.6  },
+    "2": { "name": "게임", "parallax": 1.0  },
+    "3": { "name": "UI",   "parallax": 0.0  }
+  },
+  "prefabs": {},
+  "scenes": {
+    "speedrun_title":  { "type": "json", "src": "/content/speedrun/scenes/title.json", "label": "전체 씬" },
+    "speedrun_game":   { "type": "live", "liveEntry": "content/speedrun/index.html",  "label": "게임 씬" }
+  },
+  "defaultScene": "speedrun_title"
+}

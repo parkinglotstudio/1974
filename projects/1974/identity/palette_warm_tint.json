@@ -1,0 +1,18 @@
+{
+  "name": "palette_warm_tint",
+  "description": "네모세모동그라미 — 따뜻한 모래 색조 (인트로 완성, 네모 복귀)",
+  "palette": [
+    "transparent",
+    "#fdf5e4",
+    "#f0e0c0",
+    "#c8a87a",
+    "#2a1f10",
+    "#8a6a30",
+    "#5a3a18",
+    "#ffd060",
+    "#e89010",
+    "#b08040",
+    "#ffe0a0",
+    "#c03020"
+  ]
+}

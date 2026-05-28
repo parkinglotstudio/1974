@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>네모세모동그라미 · Sand Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #EDEBE4;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100vh;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+            background: #fff;
+            border-bottom: 1px solid #E0DDD6;
+            flex-shrink: 0;
+            height: 44px;
+        }
+        .header-logo {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1A1A18;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-logo span {
+            font-size: 10px;
+            font-weight: 400;
+            color: #AAA;
+        }
+        .header-actions { display: flex; gap: 6px; }
+        .hbtn {
+            font-size: 10px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: .5px solid #D0CEC7;
+            background: #F5F5F0;
+            color: #555;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .hbtn:hover { background: #ECEAE3; }
+        .hbtn.primary { background: #1A1A18; color: #fff; border-color: #1A1A18; }
+
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            min-height: 0;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-wrap {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        .phone-outer {
+            background: #fff;
+            border-radius: 20px;
+            border: 6px solid #1A1A18;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+            overflow: hidden;
+            position: relative;
+        }
+        .phone-canvas-wrap {
+            background: #faf8f5;
+            position: relative;
+            display: flex;
+        }
+        #sand-canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #game-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            pointer-events: none;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        .side-panel {
+            width: 180px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px;
+            align-self: flex-start;
+        }
+        .panel-box {
+            background: #fff;
+            border-radius: 8px;
+            border: .5px solid #D0CEC7;
+            padding: 10px 12px;
+        }
+        .panel-title {
+            font-size: 9px;
+            color: #AAA;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .state-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            padding: 2px 0;
+        }
+        .sk { color: #888; }
+        .sv { font-weight: 700; color: #1A1A18; }
+
+        .log-panel {
+            flex: 1;
+            background: #fff;
+            border-radius: 8px;
+            border: .5px solid #D0CEC7;
+            padding: 8px 10px;
+            overflow-y: auto;
+            font-size: 9px;
+            line-height: 1.7;
+            color: #888;
+            min-height: 80px;
+            max-height: 180px;
+        }
+        .log-ok  { color: #5A9A20; }
+        .log-err { color: #C8410A; }
+
+        /* ── 페이즈 선택 패널 ── */
+        .phase-panel {
+            background: #fff;
+            border-radius: 8px;
+            border: .5px solid #D0CEC7;
+            padding: 10px 12px;
+        }
+        .phase-title {
+            font-size: 9px;
+            color: #AAA;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .phase-btn-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .phase-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: .5px solid #D0CEC7;
+            background: #F5F5F0;
+            color: #333;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 9px;
+            font-weight: 700;
+            text-align: left;
+            transition: all 0.12s;
+        }
+        .phase-btn:hover {
+            transform: translateX(2px);
+            border-color: #888;
+            background: #ECEAE3;
+        }
+        .phase-btn:active { transform: scale(0.97); }
+        .phase-btn .phase-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            background: #1A1A18;
+            color: #fff;
+            font-size: 9px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .phase-btn.p1 .phase-num { background: #555; }
+        .phase-btn.p2 .phase-num { background: #41916c; }
+        .phase-btn.p3 .phase-num { background: #c8410a; }
+        .phase-btn.p4 .phase-num { background: #4040c0; }
+        .phase-btn.p5 .phase-num { background: #ff007f; }
+        .phase-btn .phase-label { flex: 1; line-height: 1.3; }
+        .phase-btn .phase-key {
+            font-size: 8px;
+            color: #AAA;
+            background: #E8E6E0;
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-logo">
+        🟥 네모세모동그라미
+        <span>Sand Engine v0.4</span>
+    </div>
+    <div class="header-actions">
+        <button class="hbtn" id="btnRestart">↺ 리스타트</button>
+        <button class="hbtn primary" id="btnPlay">▶ 실행</button>
+    </div>
+</div>
+
+<div class="main">
+    <div style="display:flex; gap:16px; align-items:flex-start; padding:16px;">
+
+        <!-- 게임 캔버스 -->
+        <div class="game-wrap">
+            <div class="phone-outer">
+                <div class="phone-canvas-wrap" id="phoneCanvasWrap">
+                    <canvas id="sand-canvas"></canvas>
+                    <canvas id="game-overlay"></canvas>
+                </div>
+            </div>
+            <div style="font-size:9px; color:#AAA; text-align:center;">
+                화면 좌/우 터치(클릭)로 네모를 조작해 보세요.
+            </div>
+        </div>
+
+        <!-- 사이드 패널 -->
+        <div class="side-panel">
+            <div class="panel-box">
+                <div class="panel-title">엔진 상태</div>
+                <div class="state-row"><span class="sk">FPS</span><span class="sv" id="stFps">—</span></div>
+                <div class="state-row"><span class="sk">엔티티</span><span class="sv" id="stEntities">—</span></div>
+                <div class="state-row"><span class="sk">페이즈</span><span class="sv" id="stPhase">idle</span></div>
+                <div class="state-row"><span class="sk">점수</span><span class="sv" id="stScore">0</span></div>
+            </div>
+
+            <div class="panel-box">
+                <div class="panel-title">조작법</div>
+                <div style="font-size:9px;line-height:1.8;color:#555;">
+                    도형 본체 클릭:<br>
+                    · <b>도형 변신</b> (네모 → 세모 → 동그라미)<br>
+                    <br>
+                    화면 터치(클릭) 홀드:<br>
+                    · 클릭한 X 좌표 방향으로 이동<br>
+                    <br>
+                    * 키보드 지원:<br>
+                    · A / 좌측 화살표: 왼쪽 이동<br>
+                    · D / 우측 화살표: 오른쪽 이동
+                </div>
+            </div>
+
+            <!-- 페이즈 선택 패널 -->
+            <div class="phase-panel">
+                <div class="phase-title">⚡ 페이즈 점프</div>
+                <div class="phase-btn-grid">
+                    <button class="phase-btn p1" id="btnPhase1">
+                        <span class="phase-num">1</span>
+                        <span class="phase-label">Phase 1: 처음부터<br><span style="font-weight:400;color:#888">별 생성 인트로</span></span>
+                        <span class="phase-key">1</span>
+                    </button>
+                    <button class="phase-btn p2" id="btnPhase2">
+                        <span class="phase-num">2</span>
+                        <span class="phase-label">Phase 2: 마리오 단계<br><span style="font-weight:400;color:#888">X=310 지점 시작</span></span>
+                        <span class="phase-key">2</span>
+                    </button>
+                    <button class="phase-btn p3" id="btnPhase3">
+                        <span class="phase-num">3</span>
+                        <span class="phase-label">Phase 3: 주르르 단계<br><span style="font-weight:400;color:#888">X=560 지점 시작</span></span>
+                        <span class="phase-key">3</span>
+                    </button>
+                    <button class="phase-btn p4" id="btnPhase4">
+                        <span class="phase-num">4</span>
+                        <span class="phase-label">Phase 4: 여우 단계<br><span style="font-weight:400;color:#888">X=810 지점 시작</span></span>
+                        <span class="phase-key">4</span>
+                    </button>
+                    <button class="phase-btn p5" id="btnPhase5" style="border-color:#ff007f;">
+                        <span class="phase-num">5</span>
+                        <span class="phase-label">Phase 5: 미니 여우 단계<br><span style="font-weight:400;color:#888">X=1010 지점 시작</span></span>
+                        <span class="phase-key">5</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="log-panel" id="logPanel"></div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+import SandEngine  from '../../engine/SandEngine.js';
+import RunnerScene from './scripts/RunnerScene.js?v=21';
+
+// ── 로그 ─────────────────────────────────────────────────────────
+const logPanel = document.getElementById('logPanel');
+function log(msg, cls = '') {
+    const d = document.createElement('div');
+    if (cls) d.className = 'log-' + cls;
+    d.textContent = msg;
+    logPanel.appendChild(d);
+    logPanel.scrollTop = logPanel.scrollHeight;
+}
+
+// ── embed 모드 감지 (엔진 iframe 내부 여부) ────────────────────
+const _isEmbed = window !== window.top;
+if (_isEmbed) {
+    const hdr  = document.querySelector('.header');
+    const side = document.querySelector('.side-panel');
+    const main = document.querySelector('.main');
+    if (hdr)  hdr.style.display  = 'none';
+    if (side) side.style.display = 'none';
+    if (main) { main.style.padding = '0'; main.style.justifyContent = 'center'; main.style.alignItems = 'center'; }
+    document.body.style.background = '#0a0a0a';
+    document.body.style.overflow   = 'hidden';
+}
+
+// ── postMessage API ───────────────────────────────────────────
+let _gameStarted = false;
+window.addEventListener('message', (e) => {
+    if (!e.data?.type) return;
+    if (e.data.type === 'start'  && !_gameStarted) {
+        _gameStarted = true;
+        main().catch(err => log('오류: ' + err.message, 'err'));
+    }
+    if (e.data.type === 'pause' ) engine?.stop?.();
+    if (e.data.type === 'resume') engine?.start?.();
+});
+
+window.addEventListener('load', () => {
+    if (_isEmbed) window.parent.postMessage({ type: 'ready' }, '*');
+});
+
+// ── 캔버스 크기 ───────────────────────────────────────────────
+const GAME_W = 480, GAME_H = 270;
+// embed 모드: 분수 스케일로 iframe 뷰포트에 맞춤 (overflow:hidden 클리핑 우회)
+// 단독 모드: 정수 스케일 (픽셀퍼팩트)
+const SCALE  = _isEmbed
+    ? Math.min(window.innerWidth / GAME_W, window.innerHeight / GAME_H)
+    : Math.max(1, Math.floor(Math.min(
+          (window.innerWidth  - 240) / GAME_W,
+          (window.innerHeight -  44) * 0.88 / GAME_H)));
+
+const canvas  = document.getElementById('sand-canvas');
+const overlay = document.getElementById('game-overlay');
+const wrap    = document.getElementById('phoneCanvasWrap');
+
+canvas.width  = GAME_W;  canvas.height  = GAME_H;
+overlay.width = GAME_W;  overlay.height = GAME_H;
+canvas.style.width   = overlay.style.width   = `${GAME_W * SCALE}px`;
+canvas.style.height  = overlay.style.height  = `${GAME_H * SCALE}px`;
+wrap.style.width  = `${GAME_W * SCALE}px`;
+wrap.style.height = `${GAME_H * SCALE}px`;
+
+// embed 모드: position:fixed로 overflow:hidden 조상 클리핑 우회
+if (_isEmbed) {
+    const offX = Math.max(0, (window.innerWidth  - GAME_W * SCALE) / 2);
+    const offY = Math.max(0, (window.innerHeight - GAME_H * SCALE) / 2);
+    [canvas, overlay].forEach(c => {
+        c.style.position = 'fixed';
+        c.style.left     = `${offX}px`;
+        c.style.top      = `${offY}px`;
+        c.style.imageRendering = 'auto'; // 축소 시 부드럽게
+    });
+}
+
+// ── 엔진 & 씬 ────────────────────────────────────────────────
+const engine = new SandEngine({ canvas, gameWidth: GAME_W, gameHeight: GAME_H });
+const runnerScene = new RunnerScene(overlay);
+engine.scenes.register('runner', runnerScene);
+
+// ── 헤더 버튼 ────────────────────────────────────────────────
+document.getElementById('btnPlay').addEventListener('click', () => {
+    engine.start();
+    log('엔진 실행', 'ok');
+});
+document.getElementById('btnRestart').addEventListener('click', () => {
+    runnerScene._startSequence();
+    log('↺ 처음부터 재시작');
+});
+
+// ── 페이즈 점프 버튼 ─────────────────────────────────────────
+const phaseLabels = ['', '🌟 Phase 1: 처음부터', '👨 Phase 2: 마리오 단계', '🏃 Phase 3: 주르르 단계', '🦊 Phase 4: 여우 단계', '🔍 Phase 5: 미니 여우 단계'];
+function jumpToPhase(n) {
+    runnerScene._jumpToPhase(n);
+    log(phaseLabels[n] + ' 로 이동', 'ok');
+    // 버튼 플래시 효과
+    const btn = document.getElementById('btnPhase' + n);
+    if (btn) {
+        btn.style.boxShadow = '0 0 0 2px #1A1A18';
+        setTimeout(() => { btn.style.boxShadow = ''; }, 300);
+    }
+}
+document.getElementById('btnPhase1').addEventListener('click', () => jumpToPhase(1));
+document.getElementById('btnPhase2').addEventListener('click', () => jumpToPhase(2));
+document.getElementById('btnPhase3').addEventListener('click', () => jumpToPhase(3));
+document.getElementById('btnPhase4').addEventListener('click', () => jumpToPhase(4));
+document.getElementById('btnPhase5').addEventListener('click', () => jumpToPhase(5));
+
+// ── 키보드 단축키 (숫자 1~5) ──────────────────────────────────
+window.addEventListener('keydown', (e) => {
+    // 입력창 포커스 중엔 무시
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === '1') jumpToPhase(1);
+    if (e.key === '2') jumpToPhase(2);
+    if (e.key === '3') jumpToPhase(3);
+    if (e.key === '4') jumpToPhase(4);
+    if (e.key === '5') jumpToPhase(5);
+});
+
+// ── 상태 패널 갱신 ───────────────────────────────────────────
+let _fc = 0, _ft = performance.now();
+function updateStats() {
+    _fc++;
+    const now = performance.now();
+    if (now - _ft >= 500) {
+        document.getElementById('stFps').textContent =
+            Math.round(_fc * 1000 / (now - _ft));
+        document.getElementById('stEntities').textContent =
+            engine.entities._entities.size;
+        document.getElementById('stPhase').textContent =
+            (runnerScene._state ?? '—');
+        document.getElementById('stScore').textContent =
+            `X: ${Math.round(runnerScene.char?.x ?? 0)}`;
+        _fc = 0; _ft = now;
+    }
+    requestAnimationFrame(updateStats);
+}
+
+// ── 메인 ─────────────────────────────────────────────────────
+async function main() {
+    log('[Sand Engine] 초기화 중...');
+
+    engine.input.attach();
+    engine.canvas.width  = GAME_W;
+    engine.canvas.height = GAME_H;
+
+    await runnerScene.onInit(engine);
+    await runnerScene.onEnter(engine);
+    engine.scenes._stack.push(runnerScene);
+    engine.scenes._inited.add('runner');
+
+    log('에셋 로드 완료', 'ok');
+    log('RunnerScene 등록 완료', 'ok');
+    log('SPACE 또는 탭으로 시작');
+
+    engine.start();
+    updateStats();
+}
+
+// embed 모드: 채널 start 신호 대기 / 단독 실행: 즉시 시작
+if (!_isEmbed) {
+    main().catch(err => {
+        console.error(err);
+        log('오류: ' + err.message, 'err');
+    });
+}
+</script>
+</body>
+</html>

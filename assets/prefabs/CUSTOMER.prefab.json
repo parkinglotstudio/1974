@@ -1,0 +1,20 @@
+{
+  "prefab": "CUSTOMER",
+  "type": "CUSTOMER",
+  "asset": "pixels/char_customer_normal.json",
+  "layer": 1,
+  "animation": {
+    "idle": { "frames": [0], "fps": 0, "loop": true }
+  },
+  "collider": { "w": 80, "h": 140 },
+  "props": {
+    "customerType": "normal",
+    "assetMap": {
+      "normal":  "pixels/char_customer_normal.json",
+      "rush":    "pixels/char_customer_rush.json",
+      "picky":   "pixels/char_customer_picky.json",
+      "credit":  "pixels/char_customer_credit.json",
+      "regular": "pixels/char_customer_regular.json"
+    }
+  }
+}

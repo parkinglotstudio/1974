@@ -1,0 +1,20 @@
+{
+  "id": "avatarrun",
+  "name": "아바타 런 (Avatar Run)",
+  "version": "0.1",
+  "resolution": { "width": 480, "height": 270 },
+  "aspectLabel": "가로 480:270",
+  "palette": "/assets/palettes/palette_runner.json",
+  "paletteAliases": [],
+  "layers": {
+    "0": { "name": "원경", "parallax": 0.15 },
+    "1": { "name": "근경", "parallax": 0.6  },
+    "2": { "name": "게임", "parallax": 1.0  },
+    "3": { "name": "UI",   "parallax": 0.0  }
+  },
+  "prefabs": {},
+  "scenes": {
+    "avatarrun_game": { "type": "live", "liveEntry": "content/avatarrun/index.html", "label": "게임 씬" }
+  },
+  "defaultScene": "avatarrun_game"
+}

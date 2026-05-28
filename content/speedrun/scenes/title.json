@@ -1,0 +1,10 @@
+{
+  "name": "speedrun_title",
+  "layers": {
+    "0": { "parallax": 0.15, "visible": true },
+    "1": { "parallax": 0.6,  "visible": true },
+    "2": { "parallax": 1.0,  "visible": true },
+    "3": { "parallax": 0.0,  "visible": true }
+  },
+  "entities": []
+}

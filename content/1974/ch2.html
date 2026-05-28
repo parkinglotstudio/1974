@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>1974 · Ch.2 Arcade Pixel</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #070a14;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100vh;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+            background: #0a0d1c;
+            border-bottom: 1px solid #1a1f33;
+            flex-shrink: 0;
+            height: 44px;
+        }
+        .header-logo {
+            font-size: 12px;
+            font-weight: 700;
+            color: #a0f080;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-logo span { font-size: 10px; font-weight: 400; color: #3a4a3a; }
+        .header-actions { display: flex; gap: 6px; }
+        .hbtn {
+            font-size: 10px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: .5px solid #2a3a2a;
+            background: #0f1a0f;
+            color: #6a8a6a;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .hbtn:hover { background: #162016; color: #a0f080; }
+        .hbtn.primary { background: #a0f080; color: #070a14; border-color: #a0f080; }
+
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            min-height: 0;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-wrap {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        .canvas-outer {
+            background: #000;
+            border-radius: 4px;
+            border: 2px solid #1a3a1a;
+            box-shadow: 0 4px 32px rgba(80,255,80,0.12), 0 0 0 1px #0a1a0a;
+            overflow: hidden;
+            position: relative;
+        }
+        .canvas-wrap {
+            background: #000;
+            position: relative;
+            display: flex;
+        }
+        #sand-canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #ch-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            pointer-events: none;
+        }
+        .ch-title-block {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+        }
+        .ch-num {
+            font-size: 9px;
+            color: #3a6a3a;
+            letter-spacing: .15em;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .ch-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #a0f080;
+            letter-spacing: .04em;
+            line-height: 1.2;
+            text-shadow: 0 0 10px rgba(160,240,128,0.5);
+        }
+        .ch-years {
+            font-size: 9px;
+            color: #3a5a3a;
+            margin-top: 4px;
+            letter-spacing: .1em;
+        }
+        .ch-concept {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 8px;
+            color: #3a5a3a;
+            text-align: right;
+            line-height: 1.8;
+            letter-spacing: .05em;
+        }
+
+        /* 사이드 패널 */
+        .side-panel {
+            width: 180px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px;
+            align-self: flex-start;
+        }
+        .panel-box {
+            background: #0a0d1c;
+            border-radius: 8px;
+            border: .5px solid #1a1f33;
+            padding: 10px 12px;
+        }
+        .panel-title {
+            font-size: 9px;
+            color: #3a4a3a;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .state-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            padding: 2px 0;
+        }
+        .sk { color: #3a4a3a; }
+        .sv { font-weight: 700; color: #a0f080; }
+
+        .ch-info {
+            font-size: 9px;
+            line-height: 1.9;
+            color: #3a5a3a;
+        }
+        .ch-info strong { color: #6a8a6a; }
+
+        /* 연결 게임 버튼 */
+        .game-links { display: flex; flex-direction: column; gap: 4px; }
+        .game-link-btn {
+            font-size: 9px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: .5px solid #1a3a1a;
+            background: #0a140a;
+            color: #6a8a6a;
+            cursor: pointer;
+            font-family: inherit;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+        }
+        .game-link-btn:hover { background: #0f1f0f; color: #a0f080; border-color: #2a4a2a; }
+        .game-link-btn .gl-label { flex: 1; }
+        .game-link-btn .gl-arrow { color: #2a4a2a; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-logo">
+        🟩 1974
+        <span>Ch.2 · Arcade Pixel · 1981~1986</span>
+    </div>
+    <div class="header-actions">
+        <button class="hbtn" id="btnRestart">↺ 리스타트</button>
+        <button class="hbtn primary" id="btnPlay">▶ 실행</button>
+    </div>
+</div>
+
+<div class="main">
+    <div style="display:flex; gap:16px; align-items:flex-start; padding:16px;">
+
+        <!-- 게임 캔버스 -->
+        <div class="game-wrap">
+            <div class="canvas-outer">
+                <div class="canvas-wrap" id="canvasWrap">
+                    <canvas id="sand-canvas"></canvas>
+                    <div id="ch-overlay">
+                        <div class="ch-title-block">
+                            <div class="ch-num">Chapter 02</div>
+                            <div class="ch-name">Arcade Pixel</div>
+                            <div class="ch-years">1981 — 1986</div>
+                        </div>
+                        <div class="ch-concept">
+                            네온 그린<br>
+                            CRT 감성<br>
+                            게임 카드 수집
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="font-size:9px; color:#3a5a3a; text-align:center; letter-spacing:.06em;">
+                NEON · CRT · ARCADE
+            </div>
+        </div>
+
+        <!-- 사이드 패널 -->
+        <div class="side-panel">
+            <div class="panel-box">
+                <div class="panel-title">엔진 상태</div>
+                <div class="state-row"><span class="sk">FPS</span><span class="sv" id="stFps">—</span></div>
+                <div class="state-row"><span class="sk">파티클</span><span class="sv" id="stParticles">—</span></div>
+                <div class="state-row"><span class="sk">팔레트</span><span class="sv" id="stPalette">Neon</span></div>
+            </div>
+
+            <div class="panel-box">
+                <div class="panel-title">챕터 정보</div>
+                <div class="ch-info">
+                    <strong>시대</strong> 1981 ~ 1986<br>
+                    <strong>테마</strong> 아케이드 픽셀<br>
+                    <strong>팔레트</strong> 네온 초록<br>
+                    <strong>재화</strong> 게임 카드
+                </div>
+            </div>
+
+            <div class="panel-box">
+                <div class="panel-title">연결 게임</div>
+                <div class="game-links">
+                    <button class="game-link-btn" id="btnRunner">
+                        <span>🟥</span>
+                        <span class="gl-label">네모세모동그라미</span>
+                        <span class="gl-arrow">▶</span>
+                    </button>
+                    <button class="game-link-btn" id="btnAbacus">
+                        <span>🀱</span>
+                        <span class="gl-label">주판왕</span>
+                        <span class="gl-arrow">▶</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+import SandEngine from '../../engine/SandEngine.js';
+import Ch2Scene  from './scripts/Ch2Scene.js';
+
+// ── embed 모드 감지 ───────────────────────────────────────────────
+const _isEmbed = window !== window.top;
+if (_isEmbed) {
+    document.querySelector('.header').style.display    = 'none';
+    document.querySelector('.side-panel').style.display = 'none';
+    document.body.style.background = '#000';
+    document.body.style.overflow   = 'hidden';
+    const main = document.querySelector('.main');
+    if (main) { main.style.padding = '0'; }
+}
+
+// ── postMessage API ──────────────────────────────────────────────
+let _started = false;
+let engine;
+window.addEventListener('message', (e) => {
+    if (!e.data?.type) return;
+    if (e.data.type === 'start'  && !_started) { _started = true; main(); }
+    if (e.data.type === 'pause' ) engine?.stop?.();
+    if (e.data.type === 'resume') engine?.start?.();
+});
+window.addEventListener('load', () => {
+    if (_isEmbed) window.parent.postMessage({ type: 'ready' }, '*');
+});
+
+// ── 해상도 ───────────────────────────────────────────────────────
+const GAME_W = 320, GAME_H = 240;
+const SCALE = _isEmbed
+    ? Math.max(1, Math.floor(Math.min(window.innerWidth / GAME_W, window.innerHeight / GAME_H)))
+    : Math.max(1, Math.floor(Math.min(
+          (window.innerWidth  - 220) / GAME_W,
+          (window.innerHeight -  60) * 0.88 / GAME_H)));
+
+const canvas  = document.getElementById('sand-canvas');
+const wrap    = document.getElementById('canvasWrap');
+const overlay = document.getElementById('ch-overlay');
+
+canvas.width  = GAME_W;  canvas.height  = GAME_H;
+canvas.style.width  = `${GAME_W * SCALE}px`;
+canvas.style.height = `${GAME_H * SCALE}px`;
+wrap.style.width    = `${GAME_W * SCALE}px`;
+wrap.style.height   = `${GAME_H * SCALE}px`;
+if (overlay) {
+    overlay.style.width  = `${GAME_W * SCALE}px`;
+    overlay.style.height = `${GAME_H * SCALE}px`;
+}
+
+// ── 엔진 & 씬 ────────────────────────────────────────────────────
+engine = new SandEngine({ canvas, gameWidth: GAME_W, gameHeight: GAME_H });
+const ch2Scene = new Ch2Scene();
+engine.scenes.register('ch2', ch2Scene);
+
+// ── 버튼 ─────────────────────────────────────────────────────────
+document.getElementById('btnPlay').addEventListener('click', () => main());
+document.getElementById('btnRestart').addEventListener('click', () => {
+    ch2Scene.onExit();
+    ch2Scene.onEnter(engine);
+});
+
+// ── 연결 게임 버튼 (convergence 전환) ────────────────────────────
+function gotoGame(url) {
+    // embed 모드: 부모에 postMessage → 부모가 씬 전환 처리
+    // 독립 모드: 직접 이동
+    const navigate = _isEmbed
+        ? () => window.parent.postMessage({ type: 'navigate', url }, '*')
+        : () => { window.location.href = url; };
+
+    engine.scenes.convergeOut(navigate, 420);
+}
+
+document.getElementById('btnRunner').addEventListener('click',
+    () => gotoGame('/content/runner/index.html'));
+document.getElementById('btnAbacus').addEventListener('click',
+    () => gotoGame('/content/abacus/index.html'));
+
+// ── FPS 표시 ─────────────────────────────────────────────────────
+let _fc = 0, _ft = performance.now();
+function updateStats() {
+    _fc++;
+    const now = performance.now();
+    if (now - _ft >= 500) {
+        document.getElementById('stFps').textContent =
+            Math.round(_fc * 1000 / (now - _ft));
+        document.getElementById('stParticles').textContent =
+            engine.particles?.liveCount ?? '—';
+        _fc = 0; _ft = now;
+    }
+    requestAnimationFrame(updateStats);
+}
+
+// ── 메인 ─────────────────────────────────────────────────────────
+async function main() {
+    engine.input.attach();
+    engine.canvas.width  = GAME_W;
+    engine.canvas.height = GAME_H;
+
+    await ch2Scene.onInit(engine);
+    await ch2Scene.onEnter(engine);
+    engine.scenes._stack.push(ch2Scene);
+    engine.scenes._inited.add('ch2');
+
+    engine.start();
+    if (!_isEmbed) updateStats();
+}
+
+if (!_isEmbed) main().catch(console.error);
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "prefab": "BG_SHOP_WALL",
+  "type": "BG_SHOP_WALL",
+  "asset": "pixels/bg_shop_wall.json",
+  "layer": 0,
+  "animation": {
+    "idle": { "frames": [0], "fps": 0, "loop": true }
+  },
+  "collider": null
+}

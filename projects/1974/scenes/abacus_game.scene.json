@@ -1,0 +1,103 @@
+{
+  "scene": "abacus_game",
+  "palette": "palette_1bit.json",
+  "bgm": null,
+  "transition": "dither_fade",
+  "layers": {
+    "0": { "parallax": 0.15 },
+    "1": { "parallax": 0.6  },
+    "2": { "parallax": 1.0  },
+    "3": { "parallax": 0    }
+  },
+  "entities": [
+    {
+      "comment": "=== UI Layer 3 — canvas 320x240 기준 ===",
+      "id": "ui_timer",
+      "prefab": "UI_TIMER",
+      "layer": 3,
+      "x": 120, "y": 4,
+      "props": { "duration": 30, "warningThreshold": 10, "dangerThreshold": 6 }
+    },
+    {
+      "id": "ui_score",
+      "prefab": "UI_SCORE",
+      "layer": 3,
+      "x": 248, "y": 4
+    },
+    {
+      "id": "ui_problem",
+      "prefab": "UI_PROBLEM",
+      "layer": 3,
+      "x": 40, "y": 18
+    },
+
+    {
+      "comment": "=== Abacus Frame — 88x80, x=116 y=80, 중앙 배치 ===",
+      "id": "abacus_frame",
+      "prefab": "ABACUS_FRAME",
+      "layer": 2,
+      "x": 116, "y": 80
+    },
+
+    {
+      "comment": "=== Rods 3x76 — col 百:x=134 十:x=159 一:x=184, y=82 ===",
+      "id": "rod_100", "prefab": "ABACUS_ROD", "layer": 2, "x": 134, "y": 82
+    },
+    { "id": "rod_10",  "prefab": "ABACUS_ROD", "layer": 2, "x": 159, "y": 82 },
+    { "id": "rod_1",   "prefab": "ABACUS_ROD", "layer": 2, "x": 184, "y": 82 },
+
+    {
+      "comment": "=== Upper beads 12x8 — bead_x=rod_x-5: 129/154/179, y=82(u1) y=94(u2) ===",
+      "id": "bead_100_u1", "prefab": "ABACUS_BEAD", "layer": 2, "x": 129, "y": 82,
+      "props": { "position": "upper", "col": "100", "row": 1, "state": "up" }
+    },
+    { "id": "bead_100_u2", "prefab": "ABACUS_BEAD", "layer": 2, "x": 129, "y": 94,
+      "props": { "position": "upper", "col": "100", "row": 2, "state": "up" } },
+
+    { "id": "bead_10_u1", "prefab": "ABACUS_BEAD", "layer": 2, "x": 154, "y": 82,
+      "props": { "position": "upper", "col": "10", "row": 1, "state": "up" } },
+    { "id": "bead_10_u2", "prefab": "ABACUS_BEAD", "layer": 2, "x": 154, "y": 94,
+      "props": { "position": "upper", "col": "10", "row": 2, "state": "up" } },
+
+    { "id": "bead_1_u1", "prefab": "ABACUS_BEAD", "layer": 2, "x": 179, "y": 82,
+      "props": { "position": "upper", "col": "1", "row": 1, "state": "up" } },
+    { "id": "bead_1_u2", "prefab": "ABACUS_BEAD", "layer": 2, "x": 179, "y": 94,
+      "props": { "position": "upper", "col": "1", "row": 2, "state": "up" } },
+
+    {
+      "comment": "=== Lower beads 12x8 — y=109/118/127/136/145 (9px 간격) ===",
+      "id": "bead_100_l1", "prefab": "ABACUS_BEAD", "layer": 2, "x": 129, "y": 109,
+      "props": { "position": "lower", "col": "100", "row": 1, "state": "down" }
+    },
+    { "id": "bead_100_l2", "prefab": "ABACUS_BEAD", "layer": 2, "x": 129, "y": 118,
+      "props": { "position": "lower", "col": "100", "row": 2, "state": "down" } },
+    { "id": "bead_100_l3", "prefab": "ABACUS_BEAD", "layer": 2, "x": 129, "y": 127,
+      "props": { "position": "lower", "col": "100", "row": 3, "state": "down" } },
+    { "id": "bead_100_l4", "prefab": "ABACUS_BEAD", "layer": 2, "x": 129, "y": 136,
+      "props": { "position": "lower", "col": "100", "row": 4, "state": "down" } },
+    { "id": "bead_100_l5", "prefab": "ABACUS_BEAD", "layer": 2, "x": 129, "y": 145,
+      "props": { "position": "lower", "col": "100", "row": 5, "state": "down" } },
+
+    { "id": "bead_10_l1", "prefab": "ABACUS_BEAD", "layer": 2, "x": 154, "y": 109,
+      "props": { "position": "lower", "col": "10", "row": 1, "state": "down" } },
+    { "id": "bead_10_l2", "prefab": "ABACUS_BEAD", "layer": 2, "x": 154, "y": 118,
+      "props": { "position": "lower", "col": "10", "row": 2, "state": "down" } },
+    { "id": "bead_10_l3", "prefab": "ABACUS_BEAD", "layer": 2, "x": 154, "y": 127,
+      "props": { "position": "lower", "col": "10", "row": 3, "state": "down" } },
+    { "id": "bead_10_l4", "prefab": "ABACUS_BEAD", "layer": 2, "x": 154, "y": 136,
+      "props": { "position": "lower", "col": "10", "row": 4, "state": "down" } },
+    { "id": "bead_10_l5", "prefab": "ABACUS_BEAD", "layer": 2, "x": 154, "y": 145,
+      "props": { "position": "lower", "col": "10", "row": 5, "state": "down" } },
+
+    { "id": "bead_1_l1", "prefab": "ABACUS_BEAD", "layer": 2, "x": 179, "y": 109,
+      "props": { "position": "lower", "col": "1", "row": 1, "state": "down" } },
+    { "id": "bead_1_l2", "prefab": "ABACUS_BEAD", "layer": 2, "x": 179, "y": 118,
+      "props": { "position": "lower", "col": "1", "row": 2, "state": "down" } },
+    { "id": "bead_1_l3", "prefab": "ABACUS_BEAD", "layer": 2, "x": 179, "y": 127,
+      "props": { "position": "lower", "col": "1", "row": 3, "state": "down" } },
+    { "id": "bead_1_l4", "prefab": "ABACUS_BEAD", "layer": 2, "x": 179, "y": 136,
+      "props": { "position": "lower", "col": "1", "row": 4, "state": "down" } },
+    { "id": "bead_1_l5", "prefab": "ABACUS_BEAD", "layer": 2, "x": 179, "y": 145,
+      "props": { "position": "lower", "col": "1", "row": 5, "state": "down" } }
+  ]
+}

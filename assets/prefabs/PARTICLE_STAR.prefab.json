@@ -1,0 +1,22 @@
+{
+  "prefab": "PARTICLE_STAR",
+  "type": "PARTICLE_STAR",
+  "asset": "pixels/particle_star.json",
+  "layer": 2,
+  "animation": {
+    "burst": { "frames": [0, 1, 2, 3, 4], "fps": 12, "loop": false }
+  },
+  "collider": null,
+  "props": {
+    "count": 12,
+    "spread": 40,
+    "lifetime": 800
+  },
+  "controls": {
+    "default": [
+      { "label": "발동", "action": "play", "icon": "▶" },
+      { "label": "정지", "action": "stop", "icon": "■" }
+    ],
+    "custom": []
+  }
+}

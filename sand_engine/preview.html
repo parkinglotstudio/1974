@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>Sand Engine — Preview</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+    width:100%; height:100%;
+    background:#ECEAE3;
+    overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+}
+
+/* ── 폰 목업 스타일 외곽 프레임 ── */
+.frame-outer {
+    background:#F5F5F0;
+    border:6px solid #1A1A18;
+    border-radius:20px;
+    box-shadow:
+        0 0 0 1px rgba(0,0,0,.08),
+        inset 0 0 0 1px rgba(255,255,255,.06),
+        0 10px 40px rgba(0,0,0,.22);
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    /* 크기는 JS가 설정 */
+}
+
+/* ── 상단 상태바 (폰 상태바 컨셉) ── */
+.frame-header {
+    background:#0A0A0A;
+    padding:6px 12px 5px;
+    display:flex; align-items:center; justify-content:space-between;
+    flex-shrink:0;
+}
+.frame-title {
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; color:#777; letter-spacing:.10em; text-transform:uppercase;
+}
+.frame-indicators {
+    display:flex; gap:4px; align-items:center;
+}
+.frame-dot {
+    width:6px; height:6px; border-radius:50%;
+    background:#2A2A28;
+}
+.frame-dot.active { background:#C8922A; }
+
+/* ── 게임 스크린 ── */
+.frame-screen {
+    background:#000;
+    position:relative;
+    overflow:hidden;
+    flex-shrink:0;
+    /* 크기는 JS가 설정 */
+}
+.frame-screen iframe {
+    display:block;
+    border:none;
+    image-rendering:pixelated;
+    /* 크기는 JS가 설정 */
+}
+
+/* ── 하단 크림 바 (폰 하단 바디 컨셉) ── */
+.frame-footer {
+    background:#F5F5F0;
+    border-top:1px solid #D0CEC7;
+    padding:5px 12px 6px;
+    display:flex; align-items:center; justify-content:space-between;
+    flex-shrink:0;
+}
+.frame-res {
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px; color:#999; letter-spacing:.05em;
+}
+.frame-scale-badge {
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px; color:#C8922A; letter-spacing:.05em; font-weight:700;
+}
+</style>
+</head>
+<body>
+
+<div class="frame-outer" id="frameOuter">
+    <div class="frame-header">
+        <span class="frame-title" id="frameTitle">SAND ENGINE</span>
+        <div class="frame-indicators">
+            <div class="frame-dot"></div>
+            <div class="frame-dot"></div>
+            <div class="frame-dot active"></div>
+        </div>
+    </div>
+    <div class="frame-screen" id="frameScreen">
+        <iframe id="gameFrame" allow="autoplay" scrolling="no"></iframe>
+    </div>
+    <div class="frame-footer">
+        <span class="frame-res"  id="frameRes">—</span>
+        <span class="frame-scale-badge" id="frameScale">—</span>
+    </div>
+</div>
+
+<script>
+const params  = new URLSearchParams(location.search);
+const src     = params.get('src')   || '';
+const scale   = parseInt(params.get('scale')) || 2;
+const gameW   = parseInt(params.get('w'))     || 320;
+const gameH   = parseInt(params.get('h'))     || 240;
+const label   = params.get('label') || src.split('/').pop().replace('.html','').toUpperCase();
+
+const dispW = gameW * scale;
+const dispH = gameH * scale;
+
+// 제목 / 해상도 / 배율 표시
+document.getElementById('frameTitle').textContent = label;
+document.getElementById('frameRes').textContent   = `${gameW}×${gameH}`;
+document.getElementById('frameScale').textContent = `${scale}×`;
+
+// 스크린 크기 설정
+const screen = document.getElementById('frameScreen');
+screen.style.width  = dispW + 'px';
+screen.style.height = dispH + 'px';
+
+// iframe: 게임 해상도로, CSS transform scale 적용
+const iframe = document.getElementById('gameFrame');
+iframe.style.width           = gameW + 'px';
+iframe.style.height          = gameH + 'px';
+iframe.style.transformOrigin = 'top left';
+iframe.style.transform       = `scale(${scale})`;
+
+// ready → start 중계
+window.addEventListener('message', ev => {
+    if (ev.source === iframe.contentWindow && ev.data?.type === 'ready') {
+        iframe.contentWindow.postMessage({ type: 'start' }, '*');
+    }
+});
+
+// 게임 로드
+iframe.src = src;
+</script>
+</body></html>

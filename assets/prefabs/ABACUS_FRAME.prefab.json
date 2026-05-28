@@ -1,0 +1,19 @@
+{
+  "prefab": "ABACUS_FRAME",
+  "type": "ABACUS_FRAME",
+  "asset": "pixels/abacus_frame.json",
+  "layer": 2,
+  "animation": {
+    "idle": { "frames": [0], "fps": 0, "loop": true }
+  },
+  "collider": null,
+  "props": {
+    "material": "wood"
+  },
+  "controls": {
+    "default": [
+      { "label": "리셋", "action": "reset", "icon": "↺" }
+    ],
+    "custom": []
+  }
+}

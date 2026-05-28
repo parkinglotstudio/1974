@@ -1,0 +1,18 @@
+{
+  "name": "palette_neon",
+  "description": "Scene 10 — 네온 폭발 팔레트 (Cyan + Magenta + Yellow)",
+  "palette": [
+    "transparent",
+    "#00ffff",
+    "#ff00ff",
+    "#ffff00",
+    "#ff0000",
+    "#00ff00",
+    "#0000ff",
+    "#ffffff",
+    "#ff8800",
+    "#8800ff",
+    "#00ff88",
+    "#ff0088"
+  ]
+}

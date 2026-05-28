@@ -1,0 +1,25 @@
+{
+  "prefab": "UI_TIMER",
+  "type": "UI_TIMER",
+  "asset": "pixels/ui_timer.json",
+  "layer": 3,
+  "animation": {
+    "normal":  { "frames": [0], "fps": 0, "loop": true },
+    "warning": { "frames": [0, 1], "fps": 4, "loop": true },
+    "danger":  { "frames": [0, 1], "fps": 8, "loop": true }
+  },
+  "collider": null,
+  "props": {
+    "duration": 60,
+    "warningThreshold": 15,
+    "dangerThreshold": 5
+  },
+  "controls": {
+    "default": [
+      { "label": "시작", "action": "play",  "icon": "▶" },
+      { "label": "정지", "action": "stop",  "icon": "■" },
+      { "label": "리셋", "action": "reset", "icon": "↺" }
+    ],
+    "custom": []
+  }
+}

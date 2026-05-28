@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#06060A; overflow:hidden; }
+</style>
+</head><body>
+<canvas id="sand-canvas"></canvas>
+<script type="module">
+'use strict';
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   1974 — INTRO  "픽셀의 탄생"
+   Sand Engine 버전 (engine/ 모듈 기반)
+
+   타임라인:
+     0.0s  페이드 인
+     1.0s  픽셀 비 (sand_rain)
+     4.5s  불꽃 × 3 (burst) + 플래시
+     6.5s  "SAND ENGINE" 수렴 (text_form)
+    10.8s  팔레트 플래시 + 쉐이크
+    12.2s  패럴랙스 레이어 전개 (drift × 3)
+    15.5s  타이핑: "1974년, 모든 것이 시작되었다"
+    19.8s  "1974" 수렴 + 별 버스트
+    23.5s  페이드 아웃
+    26.0s  씬 이동 → 'title'
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+import SandEngine from '../../engine/SandEngine.js';
+import { Scene }  from '../../engine/scene/SceneManager.js';
+
+const W = 320, H = 240;
+const _embed = window !== window.top;
+
+// palette_1bit.json 인덱스
+const P = {
+    FG:   1,   // #ffffff  — 주요 파티클·텍스트
+    GRAY: 4,   // #999999  — 보조
+    BLUE: 10,  // #aaaaff  — 스파크 강조
+};
+
+// flash / fade 에 사용할 CSS 색상 (팔레트 외)
+const COL_BG    = '#06060A';
+const COL_FLASH = '#ffffff';
+const COL_SPARK = '#aaaaff';
+
+// ── IntroScene ────────────────────────────────────────────────
+class IntroScene extends Scene {
+    constructor() {
+        super('intro');
+        this._flashAlpha = 0;
+        this._flashColor = COL_FLASH;
+        this._fadeAlpha  = 1;      // 검정에서 시작
+        this._fadeTgt    = 0;
+        this._fadeSpd    = 0.01;
+        this._rainOn     = false;
+        this._rainTimer  = 0;
+        this._typeHandle = null;
+        this._shakeX     = 0;
+        this._shakeY     = 0;
+        this._shakeAmt   = 0;
+    }
+
+    // ── 유틸 ─────────────────────────────────────────────────
+    _flash(color, alpha) { this._flashColor = color; this._flashAlpha = alpha; }
+    _fadeTo(tgt, spd)    { this._fadeTgt = tgt; this._fadeSpd = spd; }
+    _shake(amt)          { this._shakeAmt = Math.max(this._shakeAmt, amt); }
+
+    // ── 씬 진입 ──────────────────────────────────────────────
+    onEnter(engine) {
+        const p   = engine.particles;
+        const t   = engine.text;
+        const seq = engine.seq;
+
+        p.clear(); t.clearAll(); seq.clear();
+
+        seq
+            // Act 0 — 페이드 인 시작
+            .at(0.0, () => this._fadeTo(0, 0.010))
+
+            // Act 1 — 픽셀 비
+            .at(1.0, () => { this._rainOn = true; })
+
+            // Act 2 — 불꽃 (3회)
+            .at(4.5, () => {
+                this._rainOn = false;
+                p.clear('sand_rain');
+                for (let i = 0; i < 3; i++) setTimeout(() => {
+                    p.emit('burst', {
+                        count: 28, layer: 1,
+                        cx: W / 2, cy: H / 2,
+                        minSpeed: 40, maxSpeed: 120, gravity: 150,
+                        palIdx: i % 2 ? P.BLUE : P.FG,
+                    });
+                    this._flash(i % 2 ? COL_SPARK : COL_FLASH, 0.65);
+                }, i * 270);
+            })
+
+            // Act 3 — "SAND ENGINE" 수렴
+            .at(6.5, () => {
+                p.clear('burst');
+                p.emitTextForm({
+                    text: 'SAND ENGINE', cx: W / 2, cy: H / 2,
+                    fontSize: 13, speed: 0.065, layer: 1, palIdx: P.FG,
+                });
+            })
+
+            // Act 4 — 플래시 + 카메라 쉐이크
+            .at(10.8, () => {
+                this._flash(COL_SPARK, 1.0); this._shake(4);
+                setTimeout(() => this._flash(COL_FLASH, 0.7), 300);
+                setTimeout(() => this._flash(COL_SPARK, 0.4), 620);
+            })
+
+            // Act 5 — 패럴랙스 레이어 3단 전개 (drift)
+            .at(12.2, () => {
+                p.emit('drift', { count: 55, layer: 0, screenW: W, screenH: H,
+                    palIdx: P.FG, speedMult: 0.3, wrap: true });
+                setTimeout(() => p.emit('drift', { count: 55, layer: 1,
+                    screenW: W, screenH: H, palIdx: P.FG, speedMult: 0.6, wrap: true }), 700);
+                setTimeout(() => p.emit('drift', { count: 55, layer: 2,
+                    screenW: W, screenH: H, palIdx: P.GRAY, speedMult: 1.0, wrap: true }), 1400);
+            })
+
+            // Act 6 — 타이핑
+            .at(15.5, () => {
+                p.clear('drift'); p.clear('text_form'); t.clearAll();
+                this._typeHandle = t.type(
+                    '1974년, 모든 것이 시작되었다',
+                    { x: W / 2, y: Math.floor(H / 2 - 4), layer: 3,
+                      palIdx: P.FG, center: true, speed: 0.055 }
+                );
+            })
+
+            // Act 7 — "1974" 수렴 + 별 버스트
+            .at(19.8, () => {
+                this._typeHandle?.cancel();
+                t.clearAll();
+                p.emitTextForm({
+                    text: '1974', cx: W / 2, cy: H / 2,
+                    fontSize: 30, speed: 0.065, layer: 1, palIdx: P.FG,
+                });
+                for (let i = 0; i < 5; i++) setTimeout(() => {
+                    p.emit('burst', {
+                        count: 12, layer: 1,
+                        cx: 30 + Math.random() * 260,
+                        cy: 30 + Math.random() * 180,
+                        minSpeed: 20, maxSpeed: 80, gravity: 100,
+                        palIdx: i % 2 ? P.BLUE : P.FG,
+                    });
+                }, i * 320);
+            })
+
+            // Act 8 — 페이드 아웃
+            .at(23.5, () => this._fadeTo(1, 0.018))
+
+            // Act 9 — 씬 이동
+            .at(26.0, () => {
+                if (_embed) window.parent.postMessage({ type: 'navigate', to: 'title' }, '*');
+            })
+            .start();
+    }
+
+    // ── 업데이트 ─────────────────────────────────────────────
+    onUpdate(now, dt, input) {
+        const sec    = dt / 1000;
+        const engine = this.engine;
+
+        // PixelRenderer 매 프레임 클리어 (잔상 방지 — 엔티티가 없어 자동 클리어 안 됨)
+        for (let i = 0; i < 3; i++) {
+            const r = engine.entities.getRenderer(i);
+            if (r) r.clear();
+        }
+
+        // 픽셀 비 지속 스폰
+        if (this._rainOn) {
+            this._rainTimer -= sec;
+            if (this._rainTimer <= 0) {
+                engine.particles.emit('sand_rain', {
+                    count: 5, layer: 1, screenW: W,
+                    groundY: H + 10,
+                    minSpeed: 110, maxSpeed: 220,
+                    gravity: 80, palIdxRange: [P.FG, P.FG],
+                });
+                this._rainTimer = 0.016;   // ~60fps
+            }
+        }
+
+        // 플래시 감쇠
+        this._flashAlpha = Math.max(0, this._flashAlpha - 0.07 * sec * 60);
+
+        // 페이드 처리
+        const df = this._fadeSpd * sec * 60;
+        if (Math.abs(this._fadeAlpha - this._fadeTgt) <= df) {
+            this._fadeAlpha = this._fadeTgt;
+        } else {
+            this._fadeAlpha += df * (this._fadeTgt > this._fadeAlpha ? 1 : -1);
+        }
+
+        // 쉐이크 감쇠
+        if (this._shakeAmt > 0.2) {
+            this._shakeX   = (Math.random() - 0.5) * this._shakeAmt * 2;
+            this._shakeY   = (Math.random() - 0.5) * this._shakeAmt * 2;
+            this._shakeAmt *= Math.pow(0.80, sec * 60);
+        } else {
+            this._shakeX = this._shakeY = this._shakeAmt = 0;
+        }
+    }
+
+    // ── 렌더 (L3 정리만) ─────────────────────────────────────
+    onRender(cameraX) {
+        // TextRenderer가 매 프레임 깔끔하게 그릴 수 있도록 L3 클리어
+        const ctx = this.engine.layers.getCtx(3);
+        if (ctx) ctx.clearRect(0, 0, W, H);
+    }
+
+    // ── 포스트 렌더 (flash · fade · shake — 메인 캔버스 최상단) ─
+    onPostRender(canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.save();
+
+        // 카메라 쉐이크
+        if (this._shakeX || this._shakeY) {
+            ctx.translate(this._shakeX, this._shakeY);
+        }
+
+        // 플래시 (흰색 or 파란색)
+        if (this._flashAlpha > 0.005) {
+            ctx.globalAlpha = this._flashAlpha;
+            ctx.fillStyle   = this._flashColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // 페이드 (검정 — 인트로/아웃트로)
+        if (this._fadeAlpha > 0.005) {
+            ctx.globalAlpha = this._fadeAlpha;
+            ctx.fillStyle   = COL_BG;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        ctx.restore();
+    }
+
+    onExit() {
+        this.engine.particles.clear();
+        this.engine.text.clearAll();
+        this.engine.seq.clear();
+    }
+}
+
+// ── 메인 ─────────────────────────────────────────────────────
+async function main() {
+    const _scaleParam = parseInt(new URLSearchParams(location.search).get('scale')) || 0;
+
+    const canvas = document.getElementById('sand-canvas');
+    const engine = new SandEngine({ canvas, gameWidth: W, gameHeight: H });
+    await engine.init();
+
+    if (_scaleParam >= 1) {
+        const sc = _scaleParam;
+        canvas.style.width           = W * sc + 'px';
+        canvas.style.height          = H * sc + 'px';
+        canvas.style.imageRendering  = 'pixelated';
+        canvas.style.position        = 'fixed';
+        canvas.style.left            = Math.round((innerWidth  - W * sc) / 2) + 'px';
+        canvas.style.top             = Math.round((innerHeight - H * sc) / 2) + 'px';
+        document.body.style.background = '#000';
+        document.body.style.overflow   = 'hidden';
+    }
+
+    await engine.loadPalette('/assets/palettes/palette_1bit.json');
+
+    const scene = new IntroScene();
+    engine.scenes.register('intro', scene);
+    engine.scenes.change('intro');
+
+    if (_embed) {
+        window.parent.postMessage({ type: 'ready' }, '*');
+        window.addEventListener('message', e => {
+            if (e.data?.type === 'start')  engine.start();
+            if (e.data?.type === 'pause')  engine.stop();
+            if (e.data?.type === 'resume') engine.start();
+        });
+    } else {
+        engine.start();
+    }
+}
+
+main().catch(console.error);
+</script>
+</body></html>

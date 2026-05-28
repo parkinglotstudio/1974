@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>1974 · Ch.3 Console Sprite</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #03030d;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100vh;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+            background: #06061a;
+            border-bottom: 1px solid #10103a;
+            flex-shrink: 0;
+            height: 44px;
+        }
+        .header-logo {
+            font-size: 12px;
+            font-weight: 700;
+            color: #8080ff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-logo span { font-size: 10px; font-weight: 400; color: #2a2a5a; }
+        .header-actions { display: flex; gap: 6px; }
+        .hbtn {
+            font-size: 10px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: .5px solid #1a1a4a;
+            background: #08082a;
+            color: #4a4a8a;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .hbtn:hover { background: #0d0d38; color: #8080ff; }
+        .hbtn.primary { background: #8080ff; color: #03030d; border-color: #8080ff; }
+
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            min-height: 0;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-wrap {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        .canvas-outer {
+            background: #000;
+            border-radius: 4px;
+            border: 2px solid #10103a;
+            box-shadow: 0 4px 32px rgba(80,80,255,0.15), 0 0 0 1px #06061a;
+            overflow: hidden;
+            position: relative;
+        }
+        .canvas-wrap {
+            background: #000;
+            position: relative;
+            display: flex;
+        }
+        #sand-canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #ch-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            pointer-events: none;
+        }
+        .ch-title-block {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+        }
+        .ch-num {
+            font-size: 9px;
+            color: #2a2a6a;
+            letter-spacing: .15em;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .ch-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #8080ff;
+            letter-spacing: .04em;
+            line-height: 1.2;
+            text-shadow: 0 0 12px rgba(128,128,255,0.5);
+        }
+        .ch-years {
+            font-size: 9px;
+            color: #2a2a5a;
+            margin-top: 4px;
+            letter-spacing: .1em;
+        }
+        .ch-concept {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 8px;
+            color: #2a2a5a;
+            text-align: right;
+            line-height: 1.8;
+            letter-spacing: .05em;
+        }
+
+        /* 사이드 패널 */
+        .side-panel {
+            width: 180px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px;
+            align-self: flex-start;
+        }
+        .panel-box {
+            background: #06061a;
+            border-radius: 8px;
+            border: .5px solid #10103a;
+            padding: 10px 12px;
+        }
+        .panel-title {
+            font-size: 9px;
+            color: #2a2a5a;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .state-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            padding: 2px 0;
+        }
+        .sk { color: #2a2a5a; }
+        .sv { font-weight: 700; color: #8080ff; }
+
+        .ch-info {
+            font-size: 9px;
+            line-height: 1.9;
+            color: #2a2a5a;
+        }
+        .ch-info strong { color: #4a4a8a; }
+
+        /* 멀티컬러 팔레트 힌트 */
+        .palette-dots {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        .pdot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-logo">
+        🌙 1974
+        <span>Ch.3 · Console Sprite · 1986~1991</span>
+    </div>
+    <div class="header-actions">
+        <button class="hbtn" id="btnRestart">↺ 리스타트</button>
+        <button class="hbtn primary" id="btnPlay">▶ 실행</button>
+    </div>
+</div>
+
+<div class="main">
+    <div style="display:flex; gap:16px; align-items:flex-start; padding:16px;">
+
+        <!-- 게임 캔버스 -->
+        <div class="game-wrap">
+            <div class="canvas-outer">
+                <div class="canvas-wrap" id="canvasWrap">
+                    <canvas id="sand-canvas"></canvas>
+                    <div id="ch-overlay">
+                        <div class="ch-title-block">
+                            <div class="ch-num">Chapter 03</div>
+                            <div class="ch-name">Console Sprite</div>
+                            <div class="ch-years">1986 — 1991</div>
+                        </div>
+                        <div class="ch-concept">
+                            나이트 팔레트<br>
+                            PC통신 시대<br>
+                            데이터 흐름
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="font-size:9px; color:#2a2a5a; text-align:center; letter-spacing:.06em;">
+                NIGHT · MULTICOLOR · PC통신
+            </div>
+        </div>
+
+        <!-- 사이드 패널 -->
+        <div class="side-panel">
+            <div class="panel-box">
+                <div class="panel-title">엔진 상태</div>
+                <div class="state-row"><span class="sk">FPS</span><span class="sv" id="stFps">—</span></div>
+                <div class="state-row"><span class="sk">파티클</span><span class="sv" id="stParticles">—</span></div>
+                <div class="state-row"><span class="sk">팔레트</span><span class="sv" id="stPalette">Night</span></div>
+            </div>
+
+            <div class="panel-box">
+                <div class="panel-title">챕터 정보</div>
+                <div class="ch-info">
+                    <strong>시대</strong> 1986 ~ 1991<br>
+                    <strong>테마</strong> 콘솔 스프라이트<br>
+                    <strong>팔레트</strong> 나이트 멀티컬러<br>
+                    <strong>재화</strong> PC통신 리소스
+                </div>
+                <div class="palette-dots">
+                    <div class="pdot" style="background:#2020aa;"></div>
+                    <div class="pdot" style="background:#8080ff;"></div>
+                    <div class="pdot" style="background:#ff80ff;"></div>
+                    <div class="pdot" style="background:#80ffff;"></div>
+                    <div class="pdot" style="background:#ffff80;"></div>
+                    <div class="pdot" style="background:#ff8080;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+import SandEngine from '../../engine/SandEngine.js';
+import Ch3Scene  from './scripts/Ch3Scene.js';
+
+// ── embed 모드 감지 ───────────────────────────────────────────────
+const _isEmbed = window !== window.top;
+if (_isEmbed) {
+    document.querySelector('.header').style.display    = 'none';
+    document.querySelector('.side-panel').style.display = 'none';
+    document.body.style.background = '#000';
+    document.body.style.overflow   = 'hidden';
+    const main = document.querySelector('.main');
+    if (main) { main.style.padding = '0'; }
+}
+
+// ── postMessage API ──────────────────────────────────────────────
+let _started = false;
+let engine;
+window.addEventListener('message', (e) => {
+    if (!e.data?.type) return;
+    if (e.data.type === 'start'  && !_started) { _started = true; main(); }
+    if (e.data.type === 'pause' ) engine?.stop?.();
+    if (e.data.type === 'resume') engine?.start?.();
+});
+window.addEventListener('load', () => {
+    if (_isEmbed) window.parent.postMessage({ type: 'ready' }, '*');
+});
+
+// ── 해상도 ───────────────────────────────────────────────────────
+const GAME_W = 320, GAME_H = 240;
+const SCALE = _isEmbed
+    ? Math.max(1, Math.floor(Math.min(window.innerWidth / GAME_W, window.innerHeight / GAME_H)))
+    : Math.max(1, Math.floor(Math.min(
+          (window.innerWidth  - 220) / GAME_W,
+          (window.innerHeight -  60) * 0.88 / GAME_H)));
+
+const canvas  = document.getElementById('sand-canvas');
+const wrap    = document.getElementById('canvasWrap');
+const overlay = document.getElementById('ch-overlay');
+
+canvas.width  = GAME_W;  canvas.height  = GAME_H;
+canvas.style.width  = `${GAME_W * SCALE}px`;
+canvas.style.height = `${GAME_H * SCALE}px`;
+wrap.style.width    = `${GAME_W * SCALE}px`;
+wrap.style.height   = `${GAME_H * SCALE}px`;
+if (overlay) {
+    overlay.style.width  = `${GAME_W * SCALE}px`;
+    overlay.style.height = `${GAME_H * SCALE}px`;
+}
+
+// ── 엔진 & 씬 ────────────────────────────────────────────────────
+engine = new SandEngine({ canvas, gameWidth: GAME_W, gameHeight: GAME_H });
+const ch3Scene = new Ch3Scene();
+engine.scenes.register('ch3', ch3Scene);
+
+// ── 버튼 ─────────────────────────────────────────────────────────
+document.getElementById('btnPlay').addEventListener('click', () => main());
+document.getElementById('btnRestart').addEventListener('click', () => {
+    ch3Scene.onExit();
+    ch3Scene.onEnter(engine);
+});
+
+// ── FPS 표시 ─────────────────────────────────────────────────────
+let _fc = 0, _ft = performance.now();
+function updateStats() {
+    _fc++;
+    const now = performance.now();
+    if (now - _ft >= 500) {
+        document.getElementById('stFps').textContent =
+            Math.round(_fc * 1000 / (now - _ft));
+        document.getElementById('stParticles').textContent =
+            engine.particles?.liveCount ?? '—';
+        _fc = 0; _ft = now;
+    }
+    requestAnimationFrame(updateStats);
+}
+
+// ── 메인 ─────────────────────────────────────────────────────────
+async function main() {
+    engine.input.attach();
+    engine.canvas.width  = GAME_W;
+    engine.canvas.height = GAME_H;
+
+    await ch3Scene.onInit(engine);
+    await ch3Scene.onEnter(engine);
+    engine.scenes._stack.push(ch3Scene);
+    engine.scenes._inited.add('ch3');
+
+    engine.start();
+    if (!_isEmbed) updateStats();
+}
+
+if (!_isEmbed) main().catch(console.error);
+</script>
+</body>
+</html>
