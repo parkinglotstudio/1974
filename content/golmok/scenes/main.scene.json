@@ -1,0 +1,68 @@
+{
+  "schema": "SandEngine.Scene.v1",
+  "name": "main",
+  "resolution": {
+    "width": 540,
+    "height": 960
+  },
+  "layers": [
+    {
+      "id": "L0",
+      "parallax": 0.15,
+      "children": []
+    },
+    {
+      "id": "L1",
+      "parallax": 0.6,
+      "children": []
+    },
+    {
+      "id": "L2",
+      "parallax": 1,
+      "children": []
+    },
+    {
+      "id": "L3",
+      "parallax": 0,
+      "children": []
+    }
+  ],
+  "entities": [
+    {
+      "id": "bg_sky",
+      "type": "L0_sky_rainy",
+      "layer": 0,
+      "x": 0,
+      "y": 0,
+      "pw": 540,
+      "ph": 960,
+      "visible": true,
+      "asset": "L0_sky_rainy",
+      "assetCategory": "backgrounds"
+    },
+    {
+      "id": "bg_alley",
+      "type": "L1_alley_basic",
+      "layer": 1,
+      "x": 0,
+      "y": 0,
+      "pw": 540,
+      "ph": 960,
+      "visible": true,
+      "asset": "L1_alley_basic",
+      "assetCategory": "backgrounds"
+    },
+    {
+      "id": "player",
+      "type": "ch01_char_70s",
+      "layer": 2,
+      "x": 88,
+      "y": 276,
+      "pw": 365,
+      "ph": 654,
+      "visible": true,
+      "asset": "ch01_char_70s",
+      "assetCategory": "characters"
+    }
+  ]
+}

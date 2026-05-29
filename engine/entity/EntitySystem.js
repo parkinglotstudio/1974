@@ -134,8 +134,9 @@ export default class EntitySystem {
                 // ── 렌더 경로 분기 ────────────────────────────────
 
                 // [A] scanline 고속 경로 (배경 레이어 전용)
+                // stride = entity.pw (asset 실제 너비) — renderer 캔버스와 다를 수 있음
                 if (entity._scanline) {
-                    renderer.putScanline(entity._scanline, rgbaCache, ox, oy);
+                    renderer.putScanline(entity._scanline, rgbaCache, ox, oy, entity.pw || renderer.width);
                     continue;
                 }
 

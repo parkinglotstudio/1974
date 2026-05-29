@@ -114,7 +114,10 @@ export default class PixelRenderer {
 
     // scanline: Uint8Array | number[] (row-major, length = width * height)
     // 배경 레이어 전용 고속 경로 — sparse putPixels 대비 ~10배 빠름
-    putScanline(scanline, rgbaCache, ox = 0, oy = 0) {
+    // stride: scanline 데이터의 실제 행 너비 (픽셀 단위)
+    // 기본값은 renderer 너비이지만, asset이 다른 너비로 그려진 경우 명시해야 함.
+    // 예: L0 renderer=1080, asset scanline=540px → stride=540
+    putScanline(scanline, rgbaCache, ox = 0, oy = 0, stride = this.width) {
         const buf = this.buf;
         const imap = this._indexMap;
         const W = this.width;
@@ -127,8 +130,8 @@ export default class PixelRenderer {
             const rgba = rgbaCache.get(idx);
             if (!rgba) continue;
 
-            const sx = (i % W) + ox;
-            const sy = Math.floor(i / W) + oy;  // floor 최적화: 정수 단위 좌표만 사용
+            const sx = (i % stride) + ox;
+            const sy = Math.floor(i / stride) + oy;
             if (sx < 0 || sx >= W || sy < 0 || sy >= H) continue;
 
             const pos    = (sy * W + sx) << 2;

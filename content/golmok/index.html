@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+  <title>골목길의 하루</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#000; display:flex; align-items:center; justify-content:center;
+            height:100vh; overflow:hidden; }
+    canvas { display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#000; }
+  </style>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+<script type="module">
+import SandEngine from '../../engine/SandEngine.js';
+
+// ── 채널 API ────────────────────────────────────────────────
+const isEmbed = window !== window.top;
+
+const game = {
+    _engine: null,
+    _paused: false,
+    start()  { this._engine?.start(); },
+    pause()  { this._engine?.stop();  this._paused = true; },
+    resume() { if (this._paused) { this._engine?.start(); this._paused = false; } },
+    complete(result) {
+        if (isEmbed) window.parent.postMessage({ type: 'complete', result }, '*');
+    },
+    score(value) {
+        if (isEmbed) window.parent.postMessage({ type: 'score', value }, '*');
+    },
+    exit() {
+        if (isEmbed) window.parent.postMessage({ type: 'exit' }, '*');
+    },
+};
+window._game = game;
+
+window.addEventListener('message', (e) => {
+    if (!e.data?.type) return;
+    if (e.data.type === 'start')  game.start();
+    if (e.data.type === 'pause')  game.pause();
+    if (e.data.type === 'resume') game.resume();
+});
+
+// ── 헬퍼: flat 1D 픽셀 배열 → [[x, y, idx], ...] ──────────
+function flatToTriples(flat, width) {
+    const out = [];
+    for (let i = 0; i < flat.length; i++) {
+        const idx = flat[i];
+        if (idx === 0) continue;
+        out.push([i % width, Math.floor(i / width), idx]);
+    }
+    return out;
+}
+
+// ── asset 필드 기반 씬 로더 ─────────────────────────────────
+// PrefabSystem.applyScene() 대신 사용 — asset/assetCategory 직접 처리
+async function applyAssetScene(sceneJSON, assetPid) {
+    const engine   = game._engine;
+    const CATS     = ['backgrounds', 'characters', 'objects', 'items'];
+
+    // 레이어 설정
+    if (sceneJSON.layers) {
+        if (Array.isArray(sceneJSON.layers)) {
+            engine.layers.applySceneTree(sceneJSON.layers);
+        } else {
+            engine.layers.applyConfig(sceneJSON.layers);
+        }
+    }
+
+    // 씬 경계 (없으면 뷰포트 기본값)
+    if (sceneJSON.bounds) {
+        engine.bounds.fromJSON(sceneJSON.bounds);
+    } else {
+        engine.bounds.setSceneBounds(engine.gameWidth, engine.gameHeight);
+    }
+
+    const entities = sceneJSON.entities ?? [];
+    let loaded = 0;
+
+    for (const def of entities) {
+        // prefab 필드 — 레거시 PrefabSystem 경로
+        if (def.prefab) {
+            try {
+                await engine.prefabs.loadScene({ entities: [def] }, './', engine.entities);
+                loaded++;
+            } catch (e) {
+                console.warn('[golmok] prefab load failed:', def.id, e);
+            }
+            continue;
+        }
+
+        // asset 필드 — 에디터 저장 씬 형식
+        if (def.asset) {
+            const assetName = def.asset;
+            let pixelData   = null;
+
+            // 1. 카테고리 힌트 직접 시도
+            if (def.assetCategory) {
+                try {
+                    const r = await fetch(
+                        `/projects/${assetPid}/pixels/${def.assetCategory}/${assetName}.json`,
+                        { cache: 'no-store' }
+                    );
+                    if (r.ok) pixelData = await r.json();
+                } catch {}
+            }
+
+            // 2. 전체 카테고리 순서 탐색
+            if (!pixelData) {
+                for (const cat of CATS) {
+                    if (cat === def.assetCategory) continue;
+                    try {
+                        const r = await fetch(
+                            `/projects/${assetPid}/pixels/${cat}/${assetName}.json`,
+                            { cache: 'no-store' }
+                        );
+                        if (r.ok) { pixelData = await r.json(); break; }
+                    } catch {}
+                }
+            }
+
+            // 3. 레거시 assets/pixels/ 폴백
+            if (!pixelData) {
+                try {
+                    const r = await fetch(`/assets/pixels/${assetName}.json`, { cache: 'no-store' });
+                    if (r.ok) pixelData = await r.json();
+                } catch {}
+            }
+
+            if (!pixelData) {
+                console.warn(`[golmok] asset not found: ${assetName}`);
+                continue;
+            }
+
+            // 엔진 전역 팔레트에도 반영 (마지막 로드된 에셋 팔레트)
+            if (pixelData.palette?.length) engine.palette_mgr.load(pixelData.palette);
+
+            // 포맷 감지: scanline / pixels (top-level) / frames[]
+            const cfg = {
+                x:       def.x       ?? 0,
+                y:       def.y       ?? 0,
+                pw:      def.pw      ?? pixelData.width  ?? 16,
+                ph:      def.ph      ?? pixelData.height ?? 16,
+                layer:   def.layer   ?? 2,
+                visible: def.visible ?? true,
+                scale:   def.scale   ?? 1,
+                flipX:   def.flipX   ?? false,
+                flipY:   def.flipY   ?? false,
+                rotate:  def.rotate  ?? 0,
+                _palette: pixelData.palette ?? null,
+            };
+
+            if (pixelData.scanline) {
+                // 배경 고속 경로 — 1D 팔레트 인덱스 배열
+                cfg._scanline = pixelData.scanline;
+            } else if (pixelData.pixels) {
+                // 인라인 픽셀 [[x,y,idx], ...]
+                const raw = pixelData.pixels;
+                cfg.pixels = (raw.length > 0 && Array.isArray(raw[0]))
+                    ? raw
+                    : flatToTriples(raw, pixelData.width ?? 16);
+            } else if (pixelData.frames?.length) {
+                // 프레임 애니메이션
+                cfg.frames = pixelData.frames.map(f => {
+                    const raw = f.pixels ?? [];
+                    const pixels = (raw.length > 0 && Array.isArray(raw[0]))
+                        ? raw
+                        : flatToTriples(raw, pixelData.width ?? 16);
+                    return { pixels };
+                });
+            }
+
+            const entity   = engine.entities.add(def.id, cfg);
+            entity.type    = def.type ?? def.id;
+            loaded++;
+            continue;
+        }
+
+        console.warn('[golmok] entity has no asset/prefab:', def.id);
+    }
+
+    console.log(`[golmok] scene loaded: ${loaded}/${entities.length} entities`);
+}
+
+// ── 초기화 ──────────────────────────────────────────────────
+async function init() {
+    const canvas = document.getElementById('game-canvas');
+
+    // game.json 로드
+    const gj           = await fetch('./game.json', { cache: 'no-store' }).then(r => r.json());
+    const { width, height } = gj.resolution;
+    const assetPid     = gj.assetProject ?? gj.id;
+
+    game._engine = new SandEngine({ canvas, gameWidth: width, gameHeight: height });
+    await game._engine.init();
+
+    // 팔레트
+    if (gj.palette) {
+        await game._engine.loadPalette(
+            gj.palette.startsWith('/') ? gj.palette : './' + gj.palette
+        );
+    }
+
+    // 기본 씬 로드
+    const defaultScene = gj.defaultScene ?? 'main';
+    const sceneDef     = gj.scenes?.[defaultScene];
+    if (sceneDef?.type === 'json' && sceneDef.src) {
+        const src       = sceneDef.src.startsWith('/') ? sceneDef.src : './' + sceneDef.src;
+        const sceneJSON = await game._engine.assets.load(src);
+        await applyAssetScene(sceneJSON, assetPid);
+    }
+
+    game._engine.start();
+
+    // 준비 완료 알림
+    if (isEmbed) window.parent.postMessage({ type: 'ready' }, '*');
+}
+
+init().catch(e => console.error('[golmok]', e));
+</script>
+</body>
+</html>

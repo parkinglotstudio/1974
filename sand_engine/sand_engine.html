@@ -1631,15 +1631,16 @@
                     <span class="import-label">색상</span>
                     <label style="display:flex;align-items:center;gap:4px;cursor:pointer;
                         font-size:9px;font-family:'JetBrains Mono',monospace;color:#aaa;">
-                        <input type="radio" name="colorMode" id="colorModeExtract" value="extract" checked
+                        <input type="radio" name="colorMode" id="colorModePalette" value="palette" checked
                             style="accent-color:#C8922A;cursor:pointer;">
-                        이미지 색상 추출
+                        프로젝트 팔레트
+                        <span id="importPaletteLabel" style="color:#C8922A;margin-left:2px;"></span>
                     </label>
                     <label style="display:flex;align-items:center;gap:4px;cursor:pointer;
                         font-size:9px;font-family:'JetBrains Mono',monospace;color:#aaa;">
-                        <input type="radio" name="colorMode" id="colorModePalette" value="palette"
+                        <input type="radio" name="colorMode" id="colorModeExtract" value="extract"
                             style="accent-color:#C8922A;cursor:pointer;">
-                        프로젝트 팔레트
+                        이미지 색상 추출
                     </label>
                     <span id="importMaxColors" style="font-size:9px;color:#555;
                         font-family:'JetBrains Mono',monospace;margin-left:4px;"></span>
@@ -4127,8 +4128,10 @@ async function _runPreviewImport() {
     // GIF → 서버 변환 경로
     if (_importIsGif) { await _runGifConvert(); return; }
 
-    const colorMode = document.querySelector('input[name="colorMode"]:checked')?.value ?? 'extract';
-    const palColors = window._engine?.palette_mgr?.original ?? [];
+    const colorMode = document.querySelector('input[name="colorMode"]:checked')?.value ?? 'palette';
+    // _projectPaletteColors: 프로젝트 로드 시 저장된 팔레트 (에셋 로드 후에도 불변)
+    // palette_mgr.original은 마지막 에셋 팔레트로 덮어써지므로 사용하지 않음
+    const palColors = window._projectPaletteColors ?? window._engine?.palette_mgr?.original ?? [];
     if (colorMode === 'palette' && palColors.length < 2) {
         setStatus('팔레트 없음 — 프로젝트를 먼저 선택하세요');
         return;
@@ -4226,15 +4229,37 @@ async function _runPreviewImport() {
         if (span) span.textContent = `${finalPalette.length - 1}색`;
 
     } else {
-        // ── 프로젝트 팔레트 매핑 (기존 방식) ─────────────────────
+        // ── 프로젝트 팔레트 매핑 ──────────────────────────────────
+        // _projectPaletteColors: 프로젝트 로드 시 저장 (에셋 로드로 덮어써지지 않음)
         finalPalette = palColors;
-        const palRGB = palColors.map(c => {
+
+        // sRGB → linear → CIE-LAB 근사 (지각적 색 거리 — 붉은색/파란색 오인식 방지)
+        function srgbToLinear(v) {
+            v /= 255;
+            return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+        }
+        function rgbToLab(r, g, b) {
+            const lr = srgbToLinear(r), lg = srgbToLinear(g), lb = srgbToLinear(b);
+            // D65 XYZ
+            let X = (lr * 0.4124 + lg * 0.3576 + lb * 0.1805) / 0.95047;
+            let Y = (lr * 0.2126 + lg * 0.7152 + lb * 0.0722) / 1.00000;
+            let Z = (lr * 0.0193 + lg * 0.1192 + lb * 0.9505) / 1.08883;
+            const f = v => v > 0.008856 ? v ** (1/3) : 7.787 * v + 16/116;
+            return [116 * f(Y) - 16, 500 * (f(X) - f(Y)), 200 * (f(Y) - f(Z))];
+        }
+        const parseHex = c => {
             if (!c || c === 'transparent') return null;
             const h = c.replace('#', '');
             return h.length === 3
                 ? [parseInt(h[0]+h[0],16), parseInt(h[1]+h[1],16), parseInt(h[2]+h[2],16)]
                 : [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+        };
+        // 팔레트 LAB 캐시 사전 계산
+        const palLab = palColors.map(c => {
+            const rgb = parseHex(c);
+            return rgb ? rgbToLab(...rgb) : null;
         });
+
         pixels = [];
         for (let y = 0; y < th; y++) {
             for (let x = 0; x < tw; x++) {
@@ -4242,11 +4267,12 @@ async function _runPreviewImport() {
                 const r = imgData.data[i], g = imgData.data[i+1],
                       b = imgData.data[i+2], a = imgData.data[i+3];
                 if (a < 64) continue;
+                const [lL, la, lb2] = rgbToLab(r, g, b);
                 let bestIdx = 1, bestDist = Infinity;
-                for (let ci = 1; ci < palRGB.length; ci++) {
-                    const pc = palRGB[ci];
+                for (let ci = 1; ci < palLab.length; ci++) {
+                    const pc = palLab[ci];
                     if (!pc) continue;
-                    const d = (r-pc[0])**2 + (g-pc[1])**2 + (b-pc[2])**2;
+                    const d = (lL-pc[0])**2 + (la-pc[1])**2 + (lb2-pc[2])**2;
                     if (d < bestDist) { bestDist = d; bestIdx = ci; }
                 }
                 pixels.push([x, y, bestIdx]);
@@ -4847,6 +4873,14 @@ async function main() {
             });
             document.getElementById('stPalette').textContent =
                 gameJson.palette.split('/').pop().replace('.json', '');
+            // ── 프로젝트 팔레트 보존 ──────────────────────────────────────
+            // 에셋 로드 후 palette_mgr.original이 덮어써지므로 여기서 별도 저장.
+            // 이미지→픽셀 변환 패널의 palette 모드에서 사용.
+            window._projectPaletteColors = [...engine.palette_mgr.original];
+            window._projectPaletteName   = gameJson.palette.split('/').pop().replace('.json', '');
+            // 변환 패널 팔레트 상태 라벨 업데이트
+            const palLabel = document.getElementById('importPaletteLabel');
+            if (palLabel) palLabel.textContent = window._projectPaletteName;
         }
 
         // 6. 프리펩 로드
@@ -5814,14 +5848,10 @@ async function _loadEditorSceneJSON(sceneJSON, pid) {
                 continue;
             }
 
-            const frames = (pixelData.frames ?? []).map(f => {
-                const raw = f.pixels ?? [];
-                const pixels = (raw.length > 0 && Array.isArray(raw[0])) ? raw : flatToTriples(raw);
-                return { pixels };
-            });
             if (pixelData.palette?.length) engine.palette_mgr.load(pixelData.palette);
 
-            const entity = engine.entities.add(def.id, {
+            // 포맷 감지: scanline (배경 1D) / pixels (top-level 트리플) / frames[] (애니메이션)
+            const entityConfig = {
                 x:       def.x       ?? 0,
                 y:       def.y       ?? 0,
                 pw:      def.pw      ?? pixelData.width  ?? 16,
@@ -5832,9 +5862,25 @@ async function _loadEditorSceneJSON(sceneJSON, pid) {
                 flipX:   def.flipX   ?? false,
                 flipY:   def.flipY   ?? false,
                 rotate:  def.rotate  ?? 0,
-                frames,
                 _palette: pixelData.palette ?? null,
-            });
+            };
+            if (pixelData.scanline) {
+                // 배경 고속 경로 — 1D 팔레트 인덱스 배열
+                entityConfig._scanline = pixelData.scanline;
+            } else if (pixelData.pixels) {
+                // 인라인 픽셀 포맷 [[x,y,idx], ...]
+                const raw = pixelData.pixels;
+                entityConfig.pixels = (raw.length > 0 && Array.isArray(raw[0])) ? raw : flatToTriples(raw);
+            } else if (pixelData.frames?.length) {
+                // 프레임 애니메이션
+                entityConfig.frames = pixelData.frames.map(f => {
+                    const raw = f.pixels ?? [];
+                    const pixels = (raw.length > 0 && Array.isArray(raw[0])) ? raw : flatToTriples(raw);
+                    return { pixels };
+                });
+            }
+
+            const entity = engine.entities.add(def.id, entityConfig);
             entity.type = def.type ?? def.id;
             entity._asset = assetName;
             if (pixelData._category) entity._assetCategory = pixelData._category;
