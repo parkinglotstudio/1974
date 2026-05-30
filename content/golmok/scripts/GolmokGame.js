@@ -210,57 +210,36 @@ export default class GolmokGame extends Scene {
     _sandBand(ctx, lctx, cam, x0, bw, H, side) {
         let sx = cam + x0;
         if (sx < 0) sx = 0;
-        const img = lctx.getImageData(sx, 0, bw, H).data;
+        const src = lctx.getImageData(sx, 0, bw, H);
+        const sd  = src.data;
+        const out = ctx.createImageData(bw, H);
+        const od  = out.data;
+        const bwm = bw - 1;
 
-        // 바탕을 모래색 세로 그라데이션으로 채움 (검정 void 대신)
-        const grad = ctx.createLinearGradient(0, 0, 0, H);
-        grad.addColorStop(0,   SAND_HEX[0]);
-        grad.addColorStop(0.5, SAND_HEX[SAND_HEX.length >> 1]);
-        grad.addColorStop(1,   SAND_HEX[SAND_HEX.length - 1]);
-        ctx.fillStyle = grad;
-        ctx.fillRect(x0, 0, bw, H);
+        for (let ly = 0; ly < H; ly++) {
+            for (let lx = 0; lx < bw; lx++) {
+                // 바깥 가장자리 거리 → 생성 진행도 f (0=큰 픽셀, 1=완성 그림)
+                const distOuter = (side === 'left') ? lx : (bwm - lx);
+                let f = bwm > 0 ? distOuter / bwm : 1;
+                f = f * f * (3 - 2 * f);            // smoothstep
+                const bs = sandBlockSize(f);        // 블록 크기 16→8→4→2→1
 
-        const G       = SAND_GRAIN;
-        const pushMax = bw * SAND_PUSH;
-        const dirOut  = (side === 'left') ? -1 : 1;   // 바깥(모래) 방향
-        const N       = SAND_RGB.length;
+                // 월드 고정 블록 그리드에서 샘플 (스크롤해도 깜빡임 없이 콘텐츠가 통과)
+                const wx = sx + lx;
+                let blx = (Math.floor(wx / bs) * bs) - sx;
+                if (blx < 0) blx = 0; else if (blx >= bw) blx = bw - 1;
+                let bly = Math.floor(ly / bs) * bs;
+                if (bly >= H) bly = H - 1;
 
-        for (let ly = 0; ly < H; ly += G) {
-            const sc = SAND_RGB[Math.min(N - 1, (ly / H * N) | 0)];  // y 위치별 모래색
-            for (let lx = 0; lx < bw; lx += G) {
-                const i = (ly * bw + lx) * 4;
-                const real = img[i + 3] >= 8;
-
-                // 바깥 가장자리 거리 → 생성 진행도 f (0=모래, 1=완성 그림)
-                const distOuter = (side === 'left') ? lx : (bw - lx);
-                let f = distOuter / bw;
-                f = f * f * (3 - 2 * f);              // smoothstep
-                const unform = 1 - f;
-
-                // 입자색: 모래 → 실제 그림색으로 보간 (그림이 모래에서 그려져 나옴)
-                const rr = real ? (sc[0] + (img[i]     - sc[0]) * f) | 0 : sc[0];
-                const gg = real ? (sc[1] + (img[i + 1] - sc[1]) * f) | 0 : sc[1];
-                const bb = real ? (sc[2] + (img[i + 2] - sc[2]) * f) | 0 : sc[2];
-
-                // 미완성 입자일수록 바깥으로 밀리고 흩어짐
-                const jx = this._hash(lx, ly) - 0.5;
-                const jy = this._hash(ly, lx) - 0.5;
-                const dispX = dirOut * unform * pushMax + jx * unform * G * 4;
-                const dispY = jy * unform * G * 4;
-
-                const px = (x0 + lx + dispX) | 0;
-                const py = (ly + dispY) | 0;
-
-                ctx.fillStyle = `rgb(${rr},${gg},${bb})`;
-                ctx.fillRect(px, py, G, G);
+                const si = (bly * bw + blx) << 2;
+                const oi = (ly  * bw + lx ) << 2;
+                od[oi]     = sd[si];
+                od[oi + 1] = sd[si + 1];
+                od[oi + 2] = sd[si + 2];
+                od[oi + 3] = sd[si + 3];
             }
         }
-    }
-
-    // 화면 위치 기반 결정적 의사난수 0~1 (프레임 간 안정 → 깜빡임 없음)
-    _hash(x, y) {
-        const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-        return s - Math.floor(s);
+        ctx.putImageData(out, x0, 0);
     }
 
     // ── Convergence 픽셀 수렴/방산 (SceneManager 로직 이식) ──────────
