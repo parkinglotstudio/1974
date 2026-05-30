@@ -44,6 +44,10 @@ class Entity {
         this._rgbaCache = null;                     // EntitySystem.add()에서 구축
         this._frameIdx = 0;
 
+        // 정적 엔티티: 한 번 래스터되면 매 프레임 다시 그릴 필요 없음.
+        // 기본값 = scanline 배경은 정적(카메라만 움직이고 그림은 고정). config.static 으로 강제 지정 가능.
+        this._static = config.static ?? !!config._scanline;
+
         this.asm = null;
         if (config.stateDef) {
             this.asm = new AnimationStateMachine();
@@ -73,6 +77,9 @@ export default class EntitySystem {
         this._paletteMgr = paletteMgr;
         this._entities   = new Map();   // id → Entity
         this._renderers  = new Map();   // layerIndex → PixelRenderer
+
+        // 정적 레이어 1회 래스터 추적: 이 Set에 든 layerIdx는 이미 래스터됨 → 재렌더 skip
+        this._staticRendered = new Set();
     }
 
     // ── 엔티티 관리 ───────────────────────────────────────────────
@@ -87,13 +94,33 @@ export default class EntitySystem {
             entity._rgbaCache = this._buildRgbaCache(entity._palette);
         }
 
+        this._invalidateStatic();  // 구성 변경 → 다음 프레임에 정적 레이어 재래스터
         return entity;
     }
 
-    remove(id)   { this._entities.delete(id); }
-    clearAll()   { this._entities.clear(); }
+    remove(id)   { this._entities.delete(id); this._invalidateStatic(); }
+    clearAll()   { this._entities.clear();    this._invalidateStatic(); }
     get(id)      { return this._entities.get(id) ?? null; }
     has(id)      { return this._entities.has(id); }
+
+    /**
+     * 정적 레이어 래스터 상태를 무효화 (구성 변경 시).
+     * 다음 render()에서 정적 레이어를 다시 1회 래스터하고, 그 사이엔 clearAll()이 다시 지운다.
+     */
+    _invalidateStatic() {
+        this._staticRendered.clear();
+        for (let i = 0; i < 4; i++) {
+            const l = this._layers.get(i);
+            if (l) l.static = false;
+        }
+    }
+
+    /** 특정 레이어를 강제로 다음 프레임에 재래스터하도록 표시 (팔레트 swap, 배경 교체 등) */
+    markLayerDirty(layerIdx) {
+        this._staticRendered.delete(layerIdx);
+        const l = this._layers.get(layerIdx);
+        if (l) l.static = false;
+    }
 
     // CollisionSystem / ParticleSystem 이 직접 렌더러에 접근할 때 사용
     getRenderer(layerIdx) {
@@ -121,6 +148,16 @@ export default class EntitySystem {
             const renderer = this._getRenderer(layerIdx);
             if (!renderer) continue;
 
+            // ── 정적 레이어 최적화 ──────────────────────────────────
+            // 레이어의 모든 엔티티가 정적이면 1회만 래스터하고 캔버스를 유지.
+            // 이후 프레임은 LayerSystem.composite()의 drawImage slice 만으로 표시됨.
+            const layer    = this._layers.get(layerIdx);
+            const isStatic = entities.every(e => e._static);
+            if (layer) layer.static = isStatic;   // clearAll()이 이 플래그를 보고 정적 레이어를 건너뜀
+            if (isStatic && this._staticRendered.has(layerIdx)) {
+                continue;  // 이미 래스터됨 → clear/putScanline/flush 전부 skip
+            }
+
             renderer.clear();
 
             for (const entity of entities) {
@@ -133,10 +170,46 @@ export default class EntitySystem {
 
                 // ── 렌더 경로 분기 ────────────────────────────────
 
+                // [C] 샘플 이미지 엔티티 직접 그리기
+                if (entity._isSample && entity._img) {
+                    try {
+                        // 1. 지금까지의 픽셀 아트들을 먼저 실제 캔버스에 그린다.
+                        renderer.flush();
+
+                        // 2. 실제 캔버스 컨텍스트 renderer.ctx에 직접 그린다.
+                        const ew = entity.pw || 32;
+                        const eh = entity.ph || 32;
+                        renderer.ctx.save();
+                        renderer.ctx.translate(ox + ew / 2, oy + eh / 2);
+                        const sx = entity.flipX ? -1 : 1;
+                        const sy = entity.flipY ? -1 : 1;
+                        renderer.ctx.scale(sx, sy);
+                        if (entity.rotate) {
+                            renderer.ctx.rotate((entity.rotate * Math.PI) / 180);
+                        }
+                        renderer.ctx.drawImage(entity._img, -ew / 2, -eh / 2, ew, eh);
+                        renderer.ctx.restore();
+
+                        // 3. 렌더러 버퍼를 클리어하여 다음 픽셀 아트들을 그릴 준비를 한다.
+                        renderer.clear();
+                    } catch (e) {
+                        console.error("[EntitySystem] sample image draw failed", e);
+                    }
+                    continue;
+                }
+
                 // [A] scanline 고속 경로 (배경 레이어 전용)
                 // stride = entity.pw (asset 실제 너비) — renderer 캔버스와 다를 수 있음
+                // tileX = true 시 렌더러 캔버스 전체를 stride 단위로 반복 채움
                 if (entity._scanline) {
-                    renderer.putScanline(entity._scanline, rgbaCache, ox, oy, entity.pw || renderer.width);
+                    const stride = entity.pw || renderer.width;
+                    if (entity.tileX) {
+                        for (let tx = ox; tx < renderer.width; tx += stride) {
+                            renderer.putScanline(entity._scanline, rgbaCache, tx, oy, stride);
+                        }
+                    } else {
+                        renderer.putScanline(entity._scanline, rgbaCache, ox, oy, stride);
+                    }
                     continue;
                 }
 
@@ -162,6 +235,9 @@ export default class EntitySystem {
             }
 
             renderer.flush();
+
+            // 정적 레이어는 이번 1회 래스터로 충분 → 다음 프레임부터 skip
+            if (isStatic) this._staticRendered.add(layerIdx);
         }
     }
 
@@ -276,6 +352,7 @@ export default class EntitySystem {
 
     // LayerSystem 리사이즈 후 동기화
     resize(viewWidth, viewHeight) {
-        this._renderers.clear(); // 재생성 트리거 (다음 render()에서 _ensureRenderer 재호출)
+        this._renderers.clear();   // 재생성 트리거 (다음 render()에서 _ensureRenderer 재호출)
+        this._invalidateStatic();  // 캔버스 재생성 → 정적 레이어 재래스터 필요
     }
 }

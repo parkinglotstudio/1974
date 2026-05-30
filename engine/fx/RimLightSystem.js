@@ -45,7 +45,7 @@ export default class RimLightSystem {
         this._vw = viewWidth;
         this._vh = viewHeight;
 
-        this._enabled    = true;
+        this._enabled    = false;   // 기본 OFF — 씬이 engine.rim.enable()로 켤 때만 동작 (매 프레임 indexMap 스캔 비용 방지)
         this._color      = '#f8d080';    // 따뜻한 노란빛 (CH.01 골목 분위기)
         this._width      = 1;            // 림 두께 픽셀
         this._intensity  = 0.55;         // 강도 0~1

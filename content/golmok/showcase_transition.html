@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+  <title>씬 전환 쇼케이스 — 1974</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#fff; display:flex; align-items:center; justify-content:center; height:100vh; overflow:hidden; }
+    canvas { display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#ffffff; }
+  </style>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+<script type="module">
+import SandEngine from '../../engine/SandEngine.js';
+import { Scene }  from '../../engine/scene/SceneManager.js';
+
+const PID = '1974';
+const GW  = 540, GH = 960;
+const AUTO_MS = 3000;
+
+// Bayer 8×8 (dither 효과용)
+const BAYER = [
+  [ 0,32, 8,40, 2,34,10,42],[48,16,56,24,50,18,58,26],
+  [12,44, 4,36,14,46, 6,38],[60,28,52,20,62,30,54,22],
+  [ 3,35,11,43, 1,33, 9,41],[51,19,59,27,49,17,57,25],
+  [15,47, 7,39,13,45, 5,37],[63,31,55,23,61,29,53,21],
+];
+
+// 배경 세트 정의 (L0 제거 — 근경 L1만 사용, fx = 이 세트 → 다음 세트 전환 효과)
+const SETS = [
+  { L1:'L1_alley_basic',   L3:'L3_wall_basic',  fx:'fade',         night:false },
+  { L1:'L1_alley_window',  L3:'L3_wall_basic',  fx:'dither',       night:true  },
+  { L1:'L1_alley_arcade',  L3:'L3_wall_stairs', fx:'palette_flash',night:false },
+  { L1:'L1_alley_chimney', L3:'L3_wall_stairs', fx:'slide_left',   night:true  },
+  { L1:'L1_alley_rain',    L3:'L3_wall_basic',  fx:'convergence',  night:false },
+];
+const FX_DUR = { fade:500, dither:600, palette_flash:350, slide_left:500, convergence:600 };
+
+// 고유 배경 에셋 목록 (L0 원경 제외 — 근경 L1/L3만)
+const BG_ASSETS = {
+  L1: [...new Set(SETS.map(s => s.L1))],
+  L3: [...new Set(SETS.map(s => s.L3))],
+};
+const ALL_BG_IDS = [];
+
+let engine;
+let lastFxLabel = '';
+
+// ── 유틸 ────────────────────────────────────────────────────────────
+function flatToTriples(flat, w) {
+  const out = [];
+  for (let i = 0; i < flat.length; i++)
+    if (flat[i]) out.push([i % w, Math.floor(i / w), flat[i]]);
+  return out;
+}
+async function loadPx(name, cat) {
+  const r = await fetch(`/projects/${PID}/pixels/${cat}/${name}.json`, { cache:'no-store' });
+  return r.ok ? r.json() : null;
+}
+function makeEntityCfg(d, layer, visible) {
+  const cfg = { layer, visible, x:0, y:0, pw:d.width??GW, ph:d.height??GH, _palette:d.palette??null };
+  if      (d.scanline)     cfg._scanline = d.scanline;
+  else if (d.pixels)       cfg.pixels = Array.isArray(d.pixels[0]) ? d.pixels : flatToTriples(d.pixels, d.width??GW);
+  else if (d.frames?.length) {
+    cfg.frames = d.frames.map(f => {
+      const r = f.pixels??[]; return { pixels: Array.isArray(r[0]) ? r : flatToTriples(r, d.width??16) };
+    });
+    if (d.stateDef) cfg.stateDef = d.stateDef;
+  }
+  return cfg;
+}
+
+// ── ShowcaseScene (씬 1개, 배경만 교체) ─────────────────────────────
+class ShowcaseScene extends Scene {
+  constructor() {
+    super('showcase');
+    this._setIdx   = 0;
+    this._tr       = null;   // { fx, t, dur, snap } | null
+    this._autoTmr  = null;
+    // dither 전용 오프스크린 캔버스 (매 프레임 재사용 — 생성 비용 0)
+    this._ditherOff = (() => {
+      const c = document.createElement('canvas');
+      c.width = GW; c.height = GH;
+      return c;
+    })();
+  }
+
+  onEnter(eng) {
+    this._showBg(eng, 0);
+    this._lighting(eng, 0);
+    this._scheduleAuto();
+  }
+
+  // ── 배경 가시성 ──────────────────────────────────────────────────
+  _showBg(eng, idx) {
+    for (const id of ALL_BG_IDS) { const e = eng.entities.get(id); if (e) e.visible = false; }
+    const s = SETS[idx];
+    for (const id of [`L1_${s.L1}`, `L3_${s.L3}`]) {
+      const e = eng.entities.get(id); if (e) e.visible = true;
+    }
+  }
+
+  // ── 조명 ─────────────────────────────────────────────────────────
+  _lighting(eng, idx) {
+    eng.lighting.clearLights();
+    const night = SETS[idx].night;
+    eng.lighting.setAmbient(night ? 0.55 : 0.20, night ? '#081828' : '#1a0d05');
+    eng.lighting.addLight({ id:'lamp', x:270, y:360, radius:220, color:'#e8a050', intensity:0.9 });
+    eng.lighting.flickerLight('lamp', { speed:2.1, amplitude:0.07 });
+    eng.vignette.setPreset(night ? 'cold' : 'warm');
+    eng.glow.setPreset('warm_lamp');
+  }
+
+  // ── 네비게이션 ────────────────────────────────────────────────────
+  _navigate(toRaw) {
+    if (this._tr) {
+      // 전환이 아직 진행 중이면 강제 완료 후 다음 씬으로
+      this._tr = null;
+    }
+    const from = this._setIdx;
+    const to   = ((toRaw % SETS.length) + SETS.length) % SETS.length;
+    const fx   = SETS[from].fx;
+    const dur  = FX_DUR[fx] ?? 500;
+
+    // 현재 배경 레이어(L0/L1/L3)만 스냅샷 (캐릭터 L2 제외)
+    const snap = document.createElement('canvas');
+    snap.width = GW; snap.height = GH;
+    const sc = snap.getContext('2d');
+    // 흰 배경 먼저
+    sc.fillStyle = '#ffffff';
+    sc.fillRect(0, 0, GW, GH);
+    // L1/L3 근경만 (L0 원경 제외)
+    const l1 = engine.layers.getCanvas(1);
+    const l3 = engine.layers.getCanvas(3);
+    if (l1) sc.drawImage(l1, 0, 0, GW, GH, 0, 0, GW, GH);
+    if (l3) sc.drawImage(l3, 0, 0, GW, GH, 0, 0, GW, GH);
+
+    // 즉시 새 배경으로 교체 + 조명 변경
+    this._setIdx = to;
+    this._showBg(engine, to);
+    this._lighting(engine, to);
+
+    lastFxLabel = fx.replace(/_/g, ' ').toUpperCase();
+    this._tr = { fx, t:0, dur, snap };
+    this._scheduleAuto();
+  }
+
+  _scheduleAuto() {
+    clearTimeout(this._autoTmr);
+    this._autoTmr = setTimeout(() => this._navigate(this._setIdx + 1), AUTO_MS);
+  }
+
+  // ── 렌더 — composite 전 매 프레임 메인 캔버스를 흰색으로 클리어 ──
+  // L1/L3 배경의 투명 픽셀로 이전 프레임 잔상이 비치는 문제 방지
+  onRender(cameraX) {
+    const ctx = engine.canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, engine.canvas.width, engine.canvas.height);
+  }
+
+  // ── 업데이트 ─────────────────────────────────────────────────────
+  onUpdate(now, dt, input) {
+    if (input.isPressed('right')) this._navigate(this._setIdx + 1);
+    if (input.isPressed('left'))  this._navigate(this._setIdx - 1);
+    if (this._tr) {
+      this._tr.t += dt / this._tr.dur;
+      if (this._tr.t >= 1) this._tr = null;
+    }
+  }
+
+  // ── 포스트 렌더 ──────────────────────────────────────────────────
+  onPostRender(canvas) {
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    // 1. 전환 효과 (배경에만 적용)
+    if (this._tr) this._drawFx(ctx, W, H);
+
+    // 2. 캐릭터 L2 — 전환 효과 위에 항상 표시
+    const l2 = engine.layers.getCanvas(2);
+    if (l2) ctx.drawImage(l2, 0, 0);
+
+    // 3. HUD
+    this._drawHUD(ctx, W, H);
+  }
+
+  // ── 전환 효과 ────────────────────────────────────────────────────
+  _drawFx(ctx, W, H) {
+    const { fx, t, snap } = this._tr;
+    // t: 0→1 (진행), alpha: 1→0 (스냅샷이 점점 사라짐)
+    const alpha = 1 - t;
+
+    switch (fx) {
+
+      case 'fade':
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(snap, 0, 0);
+        ctx.restore();
+        break;
+
+      case 'dither': {
+        // 블록 Bayer 디더 (destination-out 방식 — GPU 가속, 32K ops)
+        // ① 오프스크린에 구 배경 스냅샷 그리기
+        const dc   = this._ditherOff;
+        const dCtx = dc.getContext('2d');
+        dCtx.clearRect(0, 0, GW, GH);
+        dCtx.drawImage(snap, 0, 0);
+        // ② Bayer 패턴으로 t만큼 블록 지우기 → 투명 구멍 생성
+        const BLOCK = 4;
+        dCtx.save();
+        dCtx.globalCompositeOperation = 'destination-out';
+        dCtx.fillStyle = '#000';
+        const threshold = t;
+        for (let by = 0; by < Math.ceil(GH / BLOCK); by++) {
+          const row = BAYER[(by * BLOCK) & 7];
+          for (let bx = 0; bx < Math.ceil(GW / BLOCK); bx++) {
+            if (row[(bx * BLOCK) & 7] / 64 < threshold) {
+              dCtx.fillRect(bx * BLOCK, by * BLOCK, BLOCK, BLOCK);
+            }
+          }
+        }
+        dCtx.restore();
+        // ③ 메인 캔버스(새 배경)에 구멍 뚫린 구 배경을 합성
+        ctx.drawImage(dc, 0, 0);
+        break;
+      }
+
+      case 'palette_flash': {
+        const half = 0.5;
+        if (t < half) {
+          // 전반: old + 흰빛 증가
+          ctx.save(); ctx.globalAlpha = 1 - t/half; ctx.drawImage(snap, 0, 0); ctx.restore();
+          ctx.save(); ctx.globalAlpha = (t/half)*0.85; ctx.fillStyle='#fffde0'; ctx.fillRect(0,0,W,H); ctx.restore();
+        } else {
+          // 후반: 흰빛 감소
+          ctx.save(); ctx.globalAlpha = ((1-t)/half)*0.85; ctx.fillStyle='#fffde0'; ctx.fillRect(0,0,W,H); ctx.restore();
+        }
+        break;
+      }
+
+      case 'slide_left':
+        // 구 배경이 왼쪽으로 슬라이드 아웃
+        ctx.drawImage(snap, -Math.round(W * t), 0);
+        break;
+
+      case 'convergence': {
+        // 구 배경이 중앙으로 수렴하며 소멸
+        if (alpha > 0.01) {
+          const sc = 1 - t * 0.45;
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.translate(W/2, H/2);
+          ctx.scale(sc, sc);
+          ctx.translate(-W/2, -H/2);
+          ctx.drawImage(snap, 0, 0);
+          ctx.restore();
+        }
+        break;
+      }
+    }
+  }
+
+  // ── HUD ─────────────────────────────────────────────────────────
+  _drawHUD(ctx, W, H) {
+    const n       = this._setIdx + 1;
+    const tot     = SETS.length;
+    const isNight = SETS[this._setIdx].night;
+    const nextFx  = SETS[this._setIdx].fx.replace(/_/g,' ').toUpperCase();
+    const hc      = isNight ? '#70b8f0' : '#e8c870';
+    const ha      = isNight ? 'rgba(112,184,240,0.4)' : 'rgba(232,200,112,0.4)';
+
+    // 상단 바
+    ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(0, 0, W, 40);
+    ctx.font = 'bold 14px "Courier New",monospace'; ctx.textAlign = 'left'; ctx.fillStyle = hc;
+    ctx.fillText(`SCENE ${n} / ${tot}${lastFxLabel ? '  ·  '+lastFxLabel : ''}`, 14, 27);
+    ctx.font = '11px "Courier New",monospace'; ctx.fillStyle = 'rgba(200,200,200,0.45)';
+    ctx.textAlign = 'right'; ctx.fillText(`NEXT: ${nextFx}  →`, W-14, 27);
+    ctx.fillStyle = ha; ctx.fillRect(0, 40, W, 2);
+
+    // 하단 바
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, H-34, W, 34);
+    ctx.fillStyle = ha; ctx.fillRect(0, H-36, W, 2);
+    ctx.font = '10px "Courier New",monospace'; ctx.fillStyle = 'rgba(180,180,180,0.5)';
+    ctx.textAlign = 'center'; ctx.fillText('← 이전  |  자동 3초  |  다음 →', W/2, H-13);
+  }
+}
+
+// ── 초기화 ──────────────────────────────────────────────────────────
+async function init() {
+  const canvas = document.getElementById('game-canvas');
+  engine = new SandEngine({ canvas, gameWidth:GW, gameHeight:GH });
+  await engine.init();
+  engine.input.attach();
+
+  const loads = [];
+  const lnum = { L1:1, L3:3 };
+
+  for (const [lk, names] of Object.entries(BG_ASSETS)) {
+    for (const name of names) {
+      loads.push(loadPx(name,'backgrounds').then(d => {
+        if (!d) return;
+        const id = `${lk}_${name}`;
+        ALL_BG_IDS.push(id);
+        engine.entities.add(id, makeEntityCfg(d, lnum[lk], false));
+      }));
+    }
+  }
+
+  // 캐릭터 — 화면 중앙 고정, 항상 표시
+  loads.push(loadPx('ch01_char_70s','characters').then(d => {
+    if (!d) return;
+    const cfg = makeEntityCfg(d, 2, true);
+    cfg.x = Math.round((GW - (d.width??182)) / 2);
+    cfg.y = GH - (d.height??327) - 143;
+    engine.entities.add('player', cfg);
+  }));
+
+  await Promise.all(loads);
+  console.log('[showcase] loaded:', ALL_BG_IDS.length, 'bg +character');
+
+  const scene = new ShowcaseScene();
+  engine.scenes.register('showcase', scene);
+  engine.scenes.change('showcase', 'none');
+  engine.start();
+
+  // 터치 (좌/우 절반)
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const cx = (t.clientX - rect.left) / rect.width * GW;
+    cx < GW/2 ? scene._navigate(scene._setIdx - 1) : scene._navigate(scene._setIdx + 1);
+  }, { passive:false });
+}
+
+init().catch(e => console.error('[showcase]', e));
+</script>
+</body>
+</html>

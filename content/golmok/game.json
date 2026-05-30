@@ -8,7 +8,7 @@
     "height": 960
   },
   "aspectLabel": "세로 9:16",
-  "palette": "palettes/palette_1bit.json",
+  "palette": "palettes/palette_ch01.json",
   "layers": {
     "0": {
       "name": "원경",

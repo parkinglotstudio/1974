@@ -31,7 +31,7 @@ export default class FogSystem {
         this._vw = viewWidth;
         this._vh = viewHeight;
 
-        this._enabled       = true;
+        this._enabled       = false;   // 기본 OFF — 씬이 engine.fog.enable()로 켤 때만 동작 (매 프레임 indexMap 스캔 비용 방지)
 
         // ── 픽셀 안개 설정 (idx=12) ──────────────────────────────────
         this._pixelFog      = true;

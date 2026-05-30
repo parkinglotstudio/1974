@@ -39,6 +39,7 @@ import RimLightSystem        from './fx/RimLightSystem.js';
 import FogSystem             from './fx/FogSystem.js';
 import VignetteSystem        from './fx/VignetteSystem.js';
 import FXSystem              from './fx/FXSystem.js';
+import DitherEngine          from './assets/DitherEngine.js';
 
 export default class SandEngine {
     /**
@@ -63,7 +64,7 @@ export default class SandEngine {
         this.prefabs     = new PrefabSystem(this.assets);
         this.entities    = new EntitySystem(this.layers, this.palette_mgr);
         this.particles   = new ParticleSystem(this.entities, this.palette_mgr);
-        this.collision   = new CollisionSystem(this.layers, this.palette_mgr);
+        this.collision   = new CollisionSystem(this.entities, 2);
         this.scenes      = new SceneManager(this);
         this.bounds      = new SceneBoundsSystem(gameWidth, gameHeight);
         this.input       = new InputManager(canvas, this.scale);
@@ -78,6 +79,7 @@ export default class SandEngine {
         this.fog         = new FogSystem(gameWidth, gameHeight);
         this.vignette    = new VignetteSystem(gameWidth, gameHeight);
         this.fx          = new FXSystem(gameWidth, gameHeight);
+        this.dither      = new DitherEngine();     // 1-bit 흑백 포스트프로세스 (palette_mgr.dithering=true 시 활성)
 
         // ── 보조 시스템 (직접 사용) ───────────────────────────────────
         this.AssetNormalizer  = AssetNormalizer;   // 정적 클래스 — engine.AssetNormalizer.normalize(...)
@@ -88,6 +90,7 @@ export default class SandEngine {
         this._running   = false;
         this._rafId     = null;
         this._lastTime  = 0;
+        this._frame     = 0;   // DitherEngine 체커보드 애니메이션 프레임 카운터
     }
 
     // ── 초기화 ───────────────────────────────────────────────────────
@@ -138,6 +141,7 @@ export default class SandEngine {
 
         const dt = Math.min(now - this._lastTime, 50); // 50ms 상한 (탭 포커스 복귀 보호)
         this._lastTime = now;
+        this._frame++;
 
         this._update(now, dt);
         this._render();
@@ -189,6 +193,13 @@ export default class SandEngine {
 
         // FX 최상단 (flash, colorShift)
         this.fx.renderPost(this.canvas);
+
+        // 1-bit 디더링 포스트프로세스 — palette_mgr.dithering=true 시 활성
+        // 씬 전환/FX 포함 전체 프레임을 흑백 Bayer 디더로 변환
+        if (this.palette_mgr.dithering) {
+            const ctx = this.canvas.getContext('2d');
+            this.dither.apply(ctx, this.gameWidth, this.gameHeight, this._frame);
+        }
     }
 
     // ── 유틸 ─────────────────────────────────────────────────────────

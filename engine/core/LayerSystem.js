@@ -33,11 +33,10 @@ export default class LayerSystem {
         this.layers     = [];
 
         // 캔버스 너비 = 뷰포트 × 배율
-        // L0(0.15): 거의 고정 → ×2 충분
-        // L1(0.6):  중간 스크롤 → ×4
-        // L2(1.0):  게임 월드 → ×4
-        // L3(1.4):  전경 빠름 → ×4 (SceneBoundsSystem에서 정밀 계산 예정)
-        const widthMults = [2, 4, 4, 4];
+        // L0/L1/L3: 월드 좌표 배경 → 넓게 (정적이라 1회만 래스터, 과대해도 프레임당 비용 없음)
+        // L2: 게임 오브젝트 — 스크린 좌표(worldX - cameraX)로 렌더되므로 뷰포트폭(×1)이면 충분.
+        //     (과거 ×8은 매 프레임 clear/flush가 8배 픽셀을 처리해 동적 레이어 병목의 주원인이었음)
+        const widthMults = [4, 8, 1, 8];
 
         for (let i = 0; i < 4; i++) {
             const cWidth = viewWidth * widthMults[i];
@@ -54,6 +53,7 @@ export default class LayerSystem {
                 parallax: LayerSystem.PARALLAX[i],
                 cWidth,
                 children: [],   // scene.json 트리 메타데이터 (에디터/파서용)
+                static:   false, // true면 정적 레이어 — clearAll()이 건너뜀 (EntitySystem이 설정)
             });
         }
     }
@@ -85,7 +85,12 @@ export default class LayerSystem {
     }
 
     clearAll() {
-        for (let i = 0; i < 4; i++) this.clear(i);
+        // 정적 레이어(static=true)는 1회 래스터된 픽셀을 유지하기 위해 건너뜀.
+        // (EntitySystem이 매 프레임 정적 여부를 갱신; 동적 레이어만 비움)
+        for (let i = 0; i < 4; i++) {
+            if (this.layers[i].static) continue;
+            this.clear(i);
+        }
     }
 
     // ── children 관리 (에디터 / 씬 파서용) ─────────────────────────
@@ -192,9 +197,11 @@ export default class LayerSystem {
             if (!layer.visible) continue;
 
             // L2는 entity가 이미 screen 좌표로 렌더됨 → srcX = 0
+            // 캔버스 범위를 넘어 검은 공백이 나오는 것을 막기 위해 maxSrcX 클램프 적용
+            const maxSrcX = Math.max(0, layer.canvas.width - W);
             const srcX = (i === 2)
                 ? 0
-                : Math.max(0, Math.floor(cameraX * layer.parallax));
+                : Math.min(maxSrcX, Math.max(0, Math.floor(cameraX * layer.parallax)));
 
             ctx.drawImage(layer.canvas, srcX, 0, W, H, 0, 0, W, H);
         }
@@ -207,13 +214,14 @@ export default class LayerSystem {
     resize(viewWidth, viewHeight) {
         this.viewWidth  = viewWidth;
         this.viewHeight = viewHeight;
-        const widthMults = [2, 4, 4, 4];
+        const widthMults = [4, 8, 1, 8];   // L2는 스크린 좌표 → ×1 (constructor와 동일)
         for (let i = 0; i < 4; i++) {
             const cWidth = viewWidth * widthMults[i];
             const l      = this.layers[i];
             l.cWidth        = cWidth;
-            l.canvas.width  = cWidth;
+            l.canvas.width  = cWidth;   // 캔버스 크기 변경 → 내용 비워짐
             l.canvas.height = viewHeight;
+            l.static        = false;    // 재래스터 필요 (EntitySystem.resize도 무효화)
         }
     }
 
