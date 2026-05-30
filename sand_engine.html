@@ -205,12 +205,92 @@
         }
         .scene-tab:hover  { background: #353530; color: #CCC; }
         .scene-tab.active { background: #3A3A36; color: #FFD080; border-bottom: 2px solid #FFD080; }
-        .scene-tab-add {
-            background: transparent; border: none; border-left: 1px solid #3A3A36;
-            color: #555; font-size: 14px; padding: 0 12px; cursor: pointer;
-            flex-shrink: 0;
+        /* ── 프로젝트 피커 모달 ─────────────────────────────── */
+        .proj-overlay {
+            position: fixed; inset: 0; z-index: 1000;
+            background: rgba(10,10,10,0.82);
+            display: flex; align-items: center; justify-content: center;
         }
-        .scene-tab-add:hover { color: #CCC; background: #2A2A26; }
+        .proj-overlay.hidden { display: none; }
+        .proj-modal {
+            background: #1E1E1A; border: 1px solid #3A3A36; border-radius: 8px;
+            width: 520px; max-width: 95vw;
+            padding: 0; overflow: hidden;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.7);
+        }
+        .proj-modal-header {
+            background: #161614; padding: 16px 20px 12px;
+            border-bottom: 1px solid #2A2A26;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .proj-modal-title {
+            font-size: 13px; font-weight: 700; color: #E8E6E0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .proj-modal-sub {
+            font-size: 9px; color: #555; font-family: 'JetBrains Mono', monospace;
+            margin-top: 2px;
+        }
+        .proj-list { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+        .proj-card {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 14px; border-radius: 5px; cursor: pointer;
+            border: 1px solid #2A2A26; background: #252520;
+            transition: border-color 0.1s, background 0.1s;
+        }
+        .proj-card:hover { border-color: #5A5A50; background: #2E2E28; }
+        .proj-card-icon { font-size: 22px; flex-shrink: 0; width: 32px; text-align: center; }
+        .proj-card-info { flex: 1; min-width: 0; }
+        .proj-card-name { font-size: 12px; font-weight: 600; color: #E8E6E0; font-family: 'JetBrains Mono', monospace; }
+        .proj-card-desc { font-size: 9px; color: #666; font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+        .proj-card-id   { font-size: 8px; color: #444; font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+        .proj-card-arrow { color: #444; font-size: 14px; }
+        .proj-card:hover .proj-card-arrow { color: #AAA; }
+        .proj-new-btn {
+            margin: 4px 10px 12px; padding: 9px;
+            border: 1px dashed #3A3A36; border-radius: 5px;
+            background: transparent; color: #666; cursor: pointer;
+            font-size: 10px; font-family: 'JetBrains Mono', monospace;
+            width: calc(100% - 20px); text-align: center;
+            transition: border-color 0.1s, color 0.1s;
+        }
+        .proj-new-btn:hover { border-color: #6A6A5A; color: #AAA; }
+
+        /* 새 프로젝트 폼 */
+        .proj-new-form { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+        .proj-form-row { display: flex; flex-direction: column; gap: 4px; }
+        .proj-form-label { font-size: 9px; color: #888; font-family: 'JetBrains Mono', monospace; }
+        .proj-form-input {
+            background: #2A2A26; border: 1px solid #3A3A36; color: #E8E6E0;
+            font-size: 11px; font-family: 'JetBrains Mono', monospace;
+            padding: 6px 8px; border-radius: 3px; outline: none;
+        }
+        .proj-form-input:focus { border-color: #6A6A5A; }
+        .proj-res-row { display: flex; gap: 6px; }
+        .proj-res-btn {
+            flex: 1; padding: 7px 4px; border: 1px solid #3A3A36;
+            background: #252520; color: #888; cursor: pointer; border-radius: 3px;
+            font-size: 9px; font-family: 'JetBrains Mono', monospace; text-align: center;
+        }
+        .proj-res-btn.active { border-color: #8A8A70; background: #333328; color: #E8E6E0; }
+        .proj-form-actions { display: flex; gap: 6px; margin-top: 4px; }
+        .proj-form-btn {
+            flex: 1; padding: 8px; border-radius: 3px; cursor: pointer;
+            font-size: 10px; font-family: 'JetBrains Mono', monospace; border: 1px solid;
+        }
+        .proj-form-btn.primary { background: #1A3A1A; border-color: #3A7A3A; color: #7FE07F; }
+        .proj-form-btn.primary:hover { background: #234A23; }
+        .proj-form-btn.cancel  { background: #2A2A26; border-color: #3A3A36; color: #888; }
+        .proj-form-btn.cancel:hover  { color: #CCC; }
+
+        /* 빈 에디터 상태 */
+        .editor-empty {
+            position: absolute; inset: 0; display: flex;
+            align-items: center; justify-content: center;
+            flex-direction: column; gap: 10px; color: #333; pointer-events: none;
+        }
+        .editor-empty-icon { font-size: 36px; opacity: 0.3; }
+        .editor-empty-text { font-size: 10px; font-family: 'JetBrains Mono', monospace; opacity: 0.4; }
 
         /* 씬 에디터 플레이 중 동결 오버레이 */
         .scene-editor-frozen {
@@ -865,12 +945,15 @@
         Sand Engine
         <span>v0.4 · Editor</span>
     </div>
-    <div class="header-scene" id="sceneLabel">abacus_game.scene.json</div>
+    <!-- 프로젝트 -->
+    <div style="display:flex;gap:6px;align-items:center;">
+        <button class="hbtn" id="btnOpenProject" onclick="showProjectPicker()"
+            style="font-size:9px;padding:3px 10px;">📁 프로젝트</button>
+        <span id="projBadge" style="font-size:9px;color:#666;font-family:'JetBrains Mono',monospace;">—</span>
+    </div>
+    <div class="header-scene" id="sceneLabel">—</div>
     <div class="header-actions">
         <button class="hbtn" id="btnSaveScene">↓ 씬 저장</button>
-        <button class="hbtn" id="btnPause">⏸ 정지</button>
-        <button class="hbtn" id="btnReset">↺ 리셋</button>
-        <button class="hbtn primary" id="btnPlay">▶ 실행</button>
     </div>
 </div>
 
@@ -908,9 +991,22 @@
                     <button class="zoom-btn" id="btnZoomIn">+</button>
                     <button class="zoom-fit" id="btnZoomFit">맞춤</button>
                 </div>
+
+                <!-- live 씬 플레이 중에만 표시되는 전체화면 툴바 -->
+                <div id="liveToolbar" style="display:none;padding:4px 0 2px;border-top:1px solid #D0CEC7;">
+                    <button id="btnLiveFS" onclick="toggleLiveFS()" style="
+                        width:100%;background:#1A1A2E;border:1px solid #4A4A8A;color:#AAAAEE;
+                        font-size:10px;font-family:'JetBrains Mono',monospace;
+                        padding:5px 0;border-radius:3px;cursor:pointer;letter-spacing:.06em;">
+                        ⛶ 전체화면으로 보기
+                    </button>
+                </div>
+
             </div>
 
-            <div class="preview-viewport" id="previewViewport">
+            <div class="preview-viewport" id="previewViewport" style="position:relative;">
+
+
                 <div class="preview-stage" id="previewStage">
                     <div class="phone-wrap">
                         <div class="phone-outer" id="phoneOuter">
@@ -926,6 +1022,11 @@
                                 <canvas id="sand-canvas" width="270" height="480"></canvas>
                                 <canvas id="game-overlay" width="270" height="480"></canvas>
                                 <canvas id="text-canvas" width="270" height="480"></canvas>
+                                <!-- Live 씬 플레이 전용 iframe (씬뷰 폰 목업 내부) -->
+                                <iframe id="livePreviewIframe"
+                                    style="position:absolute;top:0;left:0;width:100%;height:100%;
+                                           border:none;display:none;z-index:20;background:#0a0a0a;"
+                                    allow="autoplay"></iframe>
                             </div>
                             <div class="phone-homebar">
                                 <div class="homebar-line"></div>
@@ -992,10 +1093,19 @@
 
             <!-- 작업 캔버스 뷰포트 -->
             <div class="work-viewport" id="workViewport">
-                <div class="work-stage" id="workStage">
+                <div class="editor-empty" id="editorEmpty">
+                    <div class="editor-empty-icon">📂</div>
+                    <div class="editor-empty-text">📁 프로젝트 버튼으로 게임을 열거나 새로 만드세요</div>
+                </div>
+                <div class="work-stage" id="workStage" style="display:none;">
                     <canvas id="work-canvas" width="512" height="512"></canvas>
                 </div>
                 <div class="scene-editor-frozen" id="editorFrozen" style="display:none;"></div>
+                <!-- Live 씬 플레이스홀더 (에디터 모드 — 게임 미실행 상태) -->
+                <div id="livePlaceholder" style="display:none;position:absolute;inset:0;z-index:14;
+                     background:#1A1A18;display:none;align-items:center;justify-content:center;
+                     flex-direction:column;gap:6px;pointer-events:none;"></div>
+                <iframe id="runnerIframe" style="position:absolute;inset:0;width:100%;height:100%;border:none;display:none;z-index:15;background:#EDEBE4;" allow="autoplay"></iframe>
 
                 <div class="flow-conn-panel" id="flowConnPanel">
                     <div class="flow-panel-title">연결 설정</div>
@@ -1054,7 +1164,6 @@
                     </div>
                     <span class="insp-layer-badge" id="inspLayer"></span>
                     <button class="insp-export" id="btnExportSprite" title="PixelJSON 내보내기">↓ JSON</button>
-                    <button class="insp-export" id="btnAgGuide" title="Antigravity 제약 가이드 내보내기" style="margin-left:4px;">AG↓</button>
                 </div>
             </div>
 
@@ -1094,11 +1203,8 @@
     <!-- 씬 탭 스트립 -->
     <div class="scene-tabbar" id="sceneTabBar">
         <div class="scene-tabs" id="sceneTabs">
-            <button class="scene-tab active" id="sceneTab_abacus_game" onclick="switchEditorScene('abacus_game')">abacus_game</button>
-            <button class="scene-tab" id="sceneTab_lobby"       onclick="switchEditorScene('lobby')">lobby</button>
-            <button class="scene-tab" id="sceneTab_intro"        onclick="switchEditorScene('intro')">intro</button>
+            <!-- loadProject()가 동적으로 생성 -->
         </div>
-        <button class="scene-tab-add" title="씬 추가">＋</button>
     </div>
 
     <!-- 하단 바 -->
@@ -1135,6 +1241,56 @@
     </div>
 
 </div><!-- /workspace -->
+
+<!-- ── 프로젝트 피커 모달 ──────────────────────────────────── -->
+<div class="proj-overlay" id="projOverlay">
+    <div class="proj-modal">
+        <div class="proj-modal-header">
+            <div>
+                <div class="proj-modal-title">Sand Engine · 프로젝트</div>
+                <div class="proj-modal-sub">games/index.json</div>
+            </div>
+        </div>
+
+        <!-- 프로젝트 목록 뷰 -->
+        <div id="projListView">
+            <div class="proj-list" id="projList">
+                <!-- JS가 동적으로 생성 -->
+                <div style="padding:20px;text-align:center;font-size:9px;color:#555;font-family:'JetBrains Mono',monospace;">
+                    불러오는 중...
+                </div>
+            </div>
+            <button class="proj-new-btn" onclick="showNewProjectForm()">＋ 새 프로젝트 만들기</button>
+        </div>
+
+        <!-- 새 프로젝트 폼 뷰 (초기에 숨김) -->
+        <div id="projNewView" style="display:none;">
+            <div class="proj-new-form">
+                <div class="proj-form-row">
+                    <span class="proj-form-label">게임 이름</span>
+                    <input class="proj-form-input" id="newProjName" placeholder="My Awesome Game" />
+                </div>
+                <div class="proj-form-row">
+                    <span class="proj-form-label">폴더 ID (영문 소문자)</span>
+                    <input class="proj-form-input" id="newProjId" placeholder="my_game" />
+                </div>
+                <div class="proj-form-row">
+                    <span class="proj-form-label">해상도</span>
+                    <div class="proj-res-row" id="newProjResRow">
+                        <button class="proj-res-btn active" data-w="270" data-h="480">세로 9:16<br><span style="color:#555">270×480</span></button>
+                        <button class="proj-res-btn" data-w="320" data-h="240">가로 4:3<br><span style="color:#555">320×240</span></button>
+                        <button class="proj-res-btn" data-w="360" data-h="640">세로 HD<br><span style="color:#555">360×640</span></button>
+                        <button class="proj-res-btn" data-w="480" data-h="270">가로 HD<br><span style="color:#555">480×270</span></button>
+                    </div>
+                </div>
+                <div class="proj-form-actions">
+                    <button class="proj-form-btn cancel" onclick="showProjectList()">← 취소</button>
+                    <button class="proj-form-btn primary" onclick="createNewProject()">만들기 →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script type="module">
 import SandEngine    from './engine/SandEngine.js';
@@ -1173,7 +1329,7 @@ let ratioW = 9, ratioH = 16;
 let _scale = 1, _tx = 0, _ty = 0;
 const MIN_SCALE = 0.1, MAX_SCALE = 8;
 
-const BASE_W = 270, BASE_H = 480;
+let BASE_W = 270, BASE_H = 480;
 let pixelScale = 1;
 
 function applyTransform() {
@@ -1350,7 +1506,7 @@ makeHResizer('resizerBottom', document.querySelector('.panels-row'), document.ge
 // 레이어 토글
 // ══════════════════════════════════════════════════════════════
 const layerState = { 0: true, 1: true, 2: true, 3: true };
-const LAYER_NAMES = ['L0 원경', 'L1 근경', 'L2 게임', 'L3 UI'];
+let LAYER_NAMES = ['L0 원경', 'L1 근경', 'L2 게임', 'L3 UI'];
 const LAYER_SCALE = ['50%', '100%', '100%', '100%'];
 
 window.toggleLayer = (n) => {
@@ -1560,11 +1716,158 @@ function zoomToActiveFrame() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// 프로젝트 피커
+// ══════════════════════════════════════════════════════════════
+let _projList = [];     // games/index.json 에서 로드한 목록
+let _newProjRes = { w: 270, h: 480 };  // 새 프로젝트 선택 해상도
+
+window.showProjectPicker = async function() {
+    const overlay = document.getElementById('projOverlay');
+    overlay.classList.remove('hidden');
+    showProjectList();
+
+    // 목록 로드 (캐시 있으면 재사용)
+    if (_projList.length === 0) {
+        try {
+            const data = await fetch('/games/index.json').then(r => r.json());
+            _projList = data.projects ?? [];
+        } catch {
+            _projList = [];
+        }
+    }
+    _renderProjectList();
+};
+
+function hideProjectPicker() {
+    document.getElementById('projOverlay').classList.add('hidden');
+}
+
+function showProjectList() {
+    document.getElementById('projListView').style.display = '';
+    document.getElementById('projNewView').style.display  = 'none';
+}
+
+window.showNewProjectForm = function() {
+    document.getElementById('projListView').style.display = 'none';
+    document.getElementById('projNewView').style.display  = '';
+    document.getElementById('newProjName').value = '';
+    document.getElementById('newProjId').value   = '';
+    _newProjRes = { w: 270, h: 480 };
+
+    // 해상도 버튼 이벤트
+    document.querySelectorAll('#newProjResRow .proj-res-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (Number(btn.dataset.w) === 270) btn.classList.add('active');
+        btn.onclick = () => {
+            document.querySelectorAll('#newProjResRow .proj-res-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            _newProjRes = { w: Number(btn.dataset.w), h: Number(btn.dataset.h) };
+        };
+    });
+
+    // 이름 → ID 자동 완성
+    document.getElementById('newProjName').addEventListener('input', e => {
+        const auto = e.target.value.toLowerCase()
+            .replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').slice(0, 24);
+        document.getElementById('newProjId').value = auto;
+    });
+};
+
+function _renderProjectList() {
+    const list = document.getElementById('projList');
+    if (_projList.length === 0) {
+        list.innerHTML = `<div style="padding:24px;text-align:center;font-size:9px;color:#555;font-family:'JetBrains Mono',monospace;">
+            등록된 프로젝트가 없습니다<br><br>아래 버튼으로 새 프로젝트를 만드세요
+        </div>`;
+        return;
+    }
+    list.innerHTML = '';
+    _projList.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'proj-card';
+        card.innerHTML = `
+            <div class="proj-card-icon">${p.icon ?? '🎮'}</div>
+            <div class="proj-card-info">
+                <div class="proj-card-name">${p.name}</div>
+                <div class="proj-card-desc">${p.desc ?? ''}</div>
+                <div class="proj-card-id">games/${p.id}/game.json</div>
+            </div>
+            <div class="proj-card-arrow">›</div>`;
+        card.onclick = () => window.loadProject(p.id);
+        list.appendChild(card);
+    });
+}
+
+window.createNewProject = async function() {
+    const name = document.getElementById('newProjName').value.trim();
+    const id   = document.getElementById('newProjId').value.trim();
+    if (!name || !id) { alert('이름과 ID를 입력하세요'); return; }
+    if (!/^[a-z0-9_]+$/.test(id)) { alert('ID는 영문 소문자, 숫자, _만 가능합니다'); return; }
+    if (_projList.some(p => p.id === id)) { alert(`이미 존재하는 ID: ${id}`); return; }
+
+    const { w, h } = _newProjRes;
+    const isLandscape = w > h;
+
+    // game.json 템플릿 생성
+    const gameJson = {
+        id, name, version: '0.1',
+        resolution: { width: w, height: h },
+        aspectLabel: isLandscape ? `가로 ${w}:${h}` : `세로 ${w}:${h}`,
+        palette: 'assets/palettes/palette_1bit.json',
+        paletteAliases: [],
+        layers: {
+            '0': { name: '원경', parallax: 0.15 },
+            '1': { name: '근경', parallax: 0.6  },
+            '2': { name: '게임', parallax: 1.0  },
+            '3': { name: 'UI',   parallax: 0.0  }
+        },
+        prefabs: {},
+        scenes: {
+            main: { type: 'empty', label: '메인' }
+        },
+        defaultScene: 'main'
+    };
+
+    // 서버에 저장 시도
+    try {
+        const res = await fetch('/api/create-project', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, gameJson }),
+        });
+        if (res.ok) {
+            // index.json 업데이트
+            _projList.push({ id, name, icon: '🎮', desc: `${w}×${h}` });
+            log(`프로젝트 생성: ${name} (${id})`, 'ok');
+            await loadProject(id);
+            return;
+        }
+    } catch { /* 서버 없음 — 수동 안내 */ }
+
+    // 서버 없으면 다운로드로 대체
+    const blob = new Blob([JSON.stringify(gameJson, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'game.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    const msg = `games/${id}/ 폴더를 만들고 다운로드된 game.json을 넣은 뒤\ngames/index.json에 아래 줄을 추가하세요:\n{ "id": "${id}", "name": "${name}", "icon": "🎮" }`;
+    alert(msg);
+    showProjectList();
+};
+
+// ESC로 닫기 (프로젝트가 이미 로드된 경우만)
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && window._currentProject) hideProjectPicker();
+});
+
+// ══════════════════════════════════════════════════════════════
 // 팔레트
 // ══════════════════════════════════════════════════════════════
 window.switchPalette = (name) => {
     if (window._engine) {
-        window._engine.palette_mgr.load(`assets/palettes/${name}.json`)
+        window._engine.loadPalette(`assets/palettes/${name}.json`)
             .then(() => log(`팔레트: ${name}`, 'ok'))
             .catch(() => log(`팔레트 없음: ${name}`, 'err'));
     }
@@ -2346,6 +2649,16 @@ function _restoreSceneState(sceneName) {
 const layerPicker = document.getElementById('layerPicker');
 
 function showLayerPicker(cx, cy) {
+    // 현재 프로젝트 레이어 이름 + parallax로 버튼 업데이트
+    const proj = window._currentProject;
+    const layerColors = ['#5080FF', '#50C864', '#FFC83C', '#C864FF'];
+    layerPicker.querySelectorAll('.layer-picker-btn').forEach(btn => {
+        const i   = parseInt(btn.dataset.layer, 10);
+        const lbl = LAYER_NAMES[i] ?? `L${i}`;
+        const par = proj?.layers?.[String(i)]?.parallax ?? '';
+        const sub = par !== '' ? `<span class="layer-picker-sub">×${par}</span>` : '';
+        btn.innerHTML = `<div class="layer-picker-dot" style="background:${layerColors[i]};"></div>${lbl}${sub}`;
+    });
     layerPicker.style.left    = Math.min(cx, window.innerWidth  - 240) + 'px';
     layerPicker.style.top     = Math.min(cy, window.innerHeight - 210) + 'px';
     layerPicker.style.display = 'block';
@@ -2907,16 +3220,7 @@ async function main() {
     engine.scenes.register('lobby',       lobbyScene);
     engine.scenes.register('abacus_game', abacusScene);
 
-    await abacusScene.onInit(engine);
-
-    // 씬뷰 초기 표시: abacus_game 엔티티만 배치, 게임 로직은 ▶ 플레이 버튼까지 대기
-    const _initSceneJSON = await engine.assets.load('assets/scenes/abacus_game.scene.json');
-    await engine.applyScene(_initSceneJSON);
-    engine.scenes._stack.push(abacusScene);
-    engine.scenes._inited.add('abacus_game');
-
-    engine.start(); // 렌더 루프 시작 (엔티티 표시용) — 게임 로직은 _loaded=false로 차단
-    document.getElementById('stPalette').textContent = 'palette_1bit';
+    engine.start(); // 렌더 루프 시작 — 프로젝트 로드 전까지 빈 캔버스 표시
 
     // 미리보기 캔버스 클릭 (주판알 외 에셋)
     canvas.addEventListener('click', (e) => {
@@ -2971,15 +3275,26 @@ async function main() {
         }
     });
 
-    // 씬뷰 플레이/정지 토글
+    // 씬뷰 플레이/정지 토글 — live 씬(iframe)과 json 씬(engine) 분리
     window.scenePlay = async function() {
-        const btn    = document.getElementById('btnScenePlay');
-        const panel  = document.getElementById('previewPanel');
-        const frozen = document.getElementById('editorFrozen');
+        const btn               = document.getElementById('btnScenePlay');
+        const panel             = document.getElementById('previewPanel');
+        const frozen            = document.getElementById('editorFrozen');
+        const runnerIframe      = document.getElementById('runnerIframe');       // 중간 영역 (미사용)
+        const livePreviewIframe = document.getElementById('livePreviewIframe'); // 씬뷰 폰 목업 내부
+        const livePlaceholder   = document.getElementById('livePlaceholder');
+
+        // 현재 씬 타입 파악
+        const proj      = window._currentProject;
+        const sceneName = window._curEditorScene;
+        const sceneDef  = proj?.scenes?.[sceneName];
+        const isLive    = sceneDef?.type === 'live';
+
+        const fsBtn     = document.getElementById('btnLiveFS');
+        const liveToolbar = document.getElementById('liveToolbar');
 
         if (_sceneIsPlaying) {
-            // 정지
-            engine.stop();
+            // ── 정지 ─────────────────────────────────────────
             _sceneIsPlaying = false;
             btn.textContent       = '▶ 플레이';
             btn.style.background  = '#1A4A1A';
@@ -2987,32 +3302,211 @@ async function main() {
             btn.style.color       = '#7FE07F';
             panel.classList.remove('playing');
             if (frozen) frozen.style.display = 'none';
-            // 씬뷰 정적 상태 복원
-            await switchEditorScene(window._curEditorScene ?? 'abacus_game');
-            log('씬 정지', 'info');
+
+            // 전체화면 해제 후 툴바 숨김
+            if (_liveFS) toggleLiveFS();
+            if (liveToolbar) liveToolbar.style.display = 'none';
+
+            if (isLive) {
+                // live 씬: 씬뷰 iframe 언로드 후 플레이스홀더 복원
+                if (livePreviewIframe) {
+                    try { livePreviewIframe.contentWindow?._engine?.stop(); } catch {}
+                    livePreviewIframe.src = 'about:blank';
+                    livePreviewIframe.style.display = 'none';
+                }
+                if (livePlaceholder) livePlaceholder.style.display = 'flex';
+                log('씬 정지 (live)', 'info');
+            } else {
+                // json 씬: 엔진 정지 후 에디터 상태 복원
+                engine.stop();
+                if (window._curEditorScene) await switchEditorScene(window._curEditorScene);
+                log('씬 정지', 'info');
+            }
         } else {
-            // 플레이 — intro부터 시작
-            engine.scenes._activate('intro');
-            if (!engine._running) engine.start();
+            // ── 플레이 ───────────────────────────────────────
             _sceneIsPlaying = true;
             btn.textContent       = '⏹ 정지';
             btn.style.background  = '#4A1A1A';
             btn.style.borderColor = '#8A3A3A';
             btn.style.color       = '#FF8A80';
             panel.classList.add('playing');
-            if (frozen) frozen.style.display = 'block';
-            log('씬 플레이 (intro →)', 'ok');
+
+            if (isLive) {
+                // live 씬: 전체화면 툴바 표시 + iframe 게임 로드
+                if (liveToolbar) liveToolbar.style.display = 'block';
+
+                const liveUrl = '/' + (sceneDef?.liveEntry ?? proj.liveEntry ?? sceneName + '.html');
+                if (livePlaceholder) livePlaceholder.style.display = 'none';
+                if (livePreviewIframe) {
+                    // iframe을 게임 해상도로 고정하고 CSS transform으로 폰 목업에 맞춤
+                    const pw = BASE_W, ph = BASE_H;
+                    const wrap = document.getElementById('phoneCanvasWrap');
+                    const wrapW = wrap ? wrap.offsetWidth  : pw;
+                    const wrapH = wrap ? wrap.offsetHeight : ph;
+                    const sc = Math.min(wrapW / pw, wrapH / ph);
+                    livePreviewIframe.style.position        = 'absolute';
+                    livePreviewIframe.style.width           = pw + 'px';
+                    livePreviewIframe.style.height          = ph + 'px';
+                    livePreviewIframe.style.transform       = `scale(${sc})`;
+                    livePreviewIframe.style.transformOrigin = 'top left';
+                    livePreviewIframe.style.zIndex          = '20';
+                    livePreviewIframe.style.display         = 'block';
+                    const alreadyLoaded = livePreviewIframe.src && livePreviewIframe.src !== 'about:blank'
+                        && livePreviewIframe.src.includes(sceneDef?.liveEntry ?? proj.liveEntry ?? sceneName);
+                    if (alreadyLoaded) {
+                        try { livePreviewIframe.contentWindow.location.reload(); } catch {}
+                    } else {
+                        livePreviewIframe.src = liveUrl;
+                    }
+                }
+                if (frozen) frozen.style.display = 'none';
+                log(`씬 플레이: ${sceneName} (live · embed → ${liveUrl})`, 'ok');
+            } else {
+                // json 씬: 엔진으로 intro부터 시작
+                engine.scenes._activate('intro');
+                if (!engine._running) engine.start();
+                if (frozen) frozen.style.display = 'block';
+                log('씬 플레이 (intro →)', 'ok');
+            }
         }
     };
 
+    // ── 프로젝트 전환 ──────────────────────────────────────────────────
+    window._currentProject = null;
+
+    window.loadProject = async function(projectId) {
+        log(`프로젝트 로드 중: ${projectId}`, 'info');
+
+        // 1. game.json 로드
+        let gameJson;
+        try {
+            gameJson = await fetch(`/games/${projectId}/game.json`).then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+            });
+        } catch (e) {
+            log(`game.json 로드 실패: ${e.message}`, 'err');
+            return;
+        }
+        window._currentProject = gameJson;
+
+        // 2. 프로젝트 버튼 활성화
+        document.querySelectorAll('.proj-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.proj === projectId));
+
+        // 3. 해상도 업데이트
+        const { width, height } = gameJson.resolution;
+        BASE_W = width;  BASE_H = height;
+        canvas.width  = width;  canvas.height  = height;
+        overlay.width = width;  overlay.height = height;
+        if (_textCanvas) { _textCanvas.width = width; _textCanvas.height = height; }
+        ratioW = width;         ratioH = height;
+        phoneOuter.style.borderRadius = width > height ? '12px' : '24px';
+
+        // 4. 엔진 재설정
+        engine.gameWidth  = width;
+        engine.gameHeight = height;
+        engine.layers.resize(width, height);
+        engine.entities.resize(width, height);
+        engine.entities._entities.clear();
+        engine.layers.clearAll();
+        engine.scenes._stack.length = 0;
+
+        // 5. 팔레트 로드
+        if (gameJson.palette) {
+            await engine.loadPalette(gameJson.palette);
+            document.getElementById('stPalette').textContent =
+                gameJson.palette.split('/').pop().replace('.json', '');
+        }
+
+        // 6. 프리펩 로드
+        if (gameJson.prefabs && Object.keys(gameJson.prefabs).length > 0) {
+            await engine.loadPrefabs(gameJson.prefabs);
+        }
+
+        // 7. 레이어 이름 업데이트
+        const layerDefs = gameJson.layers ?? {};
+        for (let i = 0; i < 4; i++) {
+            const ldef = layerDefs[String(i)];
+            LAYER_NAMES[i] = ldef ? `L${i} ${ldef.name}` : `L${i}`;
+        }
+        buildLayerList();
+
+        // 8. 팔레트 버튼 재생성
+        const palRow = document.querySelector('.lp-pal-row');
+        if (palRow) {
+            palRow.innerHTML = '';
+            const mainName = gameJson.palette?.split('/').pop().replace('.json', '') ?? 'default';
+            const mkBtn = (palName, label) => {
+                const btn = document.createElement('button');
+                btn.className = 'pal-btn';
+                btn.textContent = label ?? palName;
+                btn.onclick = () => window.switchPalette(palName);
+                palRow.appendChild(btn);
+            };
+            mkBtn(mainName, mainName);
+            (gameJson.paletteAliases ?? []).forEach(p => {
+                const name = p.split('/').pop().replace('.json', '');
+                mkBtn(name, name);
+            });
+        }
+
+        // 9. 씬 탭 재생성
+        const sceneTabs = document.getElementById('sceneTabs');
+        if (sceneTabs) {
+            sceneTabs.innerHTML = '';
+            for (const [sname, sdef] of Object.entries(gameJson.scenes ?? {})) {
+                const btn = document.createElement('button');
+                btn.className = 'scene-tab';
+                btn.id = 'sceneTab_' + sname;
+                btn.textContent = sdef.label ?? sname;
+                if (sdef.type === 'live') btn.style.color = '#FFB830';
+                btn.onclick = () => switchEditorScene(sname);
+                sceneTabs.appendChild(btn);
+            }
+        }
+
+        // 10. SCENE_NAMES 업데이트 (live 타입 제외 — 프레임 뷰에 표시)
+        SCENE_NAMES = Object.entries(gameJson.scenes ?? {})
+            .filter(([, def]) => def.type !== 'live')
+            .map(([name]) => name);
+
+        // 11. 멀티프레임 위치 재계산
+        _initFramePositions(width, height);
+
+        // 12. 뷰 맞춤
+        fitCanvas();
+        requestAnimationFrame(fitToView);
+
+        // 13. 빈 상태 숨기기 + 작업 캔버스 표시
+        const emptyEl = document.getElementById('editorEmpty');
+        const stageEl = document.getElementById('workStage');
+        if (emptyEl) emptyEl.style.display = 'none';
+        if (stageEl) stageEl.style.display = '';
+
+        // 14. 헤더 프로젝트 배지 업데이트
+        const projBadge = document.getElementById('projBadge');
+        if (projBadge) projBadge.textContent = gameJson.name;
+
+        // 15. 기본 씬 전환
+        const def = gameJson.defaultScene;
+        window._curEditorScene = def;
+        await switchEditorScene(def);
+
+        // 16. 모달 닫기
+        hideProjectPicker();
+
+        log(`✓ ${gameJson.name} (${width}×${height})`, 'ok');
+    };
+
     // 에디터 씬 전환 (플레이 없이 정적 뷰만)
-    window._curEditorScene = 'abacus_game';
+    window._curEditorScene = null;
     window.switchEditorScene = async function(sceneName) {
         if (_sceneIsPlaying) return; // 플레이 중엔 무시
 
         // ── 현재 씬 자동저장 ──────────────────────────────────
         const prev = window._curEditorScene;
-        if (prev) _saveSceneState(prev);
+        if (prev && window._currentProject?.scenes?.[prev]?.type !== 'live') _saveSceneState(prev);
 
         window._curEditorScene = sceneName;
 
@@ -3025,6 +3519,53 @@ async function main() {
         const bc = document.getElementById('canvasBreadcrumb');
         if (bc) bc.innerHTML = `씬 뷰 &gt; <span class="ct-bc-cur">${sceneName}</span>`;
 
+        // ── 씬 전환 공통 준비 ────────────────────────────────
+        const runnerIframe    = document.getElementById('runnerIframe');
+        const workStage       = document.getElementById('workStage');
+        const livePlaceholder = document.getElementById('livePlaceholder');
+        const proj            = window._currentProject;
+        const sceneDef        = proj?.scenes?.[sceneName];
+
+        // Live 씬: iframe 언로드 + 플레이스홀더 표시 (게임 실행 안 함)
+        if (sceneDef?.type === 'live') {
+            engine.stop();
+            // iframe 안전 언로드
+            if (runnerIframe) {
+                try { runnerIframe.contentWindow?._engine?.stop(); } catch {}
+                runnerIframe.src = 'about:blank';
+                runnerIframe.style.display = 'none';
+            }
+            if (workStage) workStage.style.display = 'none';
+
+            // 플레이스홀더 — "▶ 플레이로 실행" 안내
+            const liveUrl = '/' + (sceneDef?.liveEntry ?? proj.liveEntry ?? sceneName + '.html');
+            if (livePlaceholder) {
+                livePlaceholder.style.display = 'flex';
+                livePlaceholder.innerHTML = `
+                    <div style="font-size:36px;opacity:0.25;margin-bottom:8px;">▶</div>
+                    <div style="font-size:11px;color:#888;font-family:'JetBrains Mono',monospace;
+                                letter-spacing:.06em;">${sceneName}</div>
+                    <div style="font-size:8px;color:#555;font-family:'JetBrains Mono',monospace;
+                                margin-top:2px;">${liveUrl}</div>
+                    <div style="font-size:8px;color:#444;font-family:'JetBrains Mono',monospace;
+                                margin-top:10px;border:1px solid #333;padding:3px 8px;
+                                border-radius:4px;">▶ 플레이 버튼으로 실행</div>
+                `;
+            }
+            document.getElementById('sceneLabel').textContent = sceneName + ' · live';
+            log(`씬 전환: ${sceneName} (live — 에디터 모드, 미실행)`, 'info');
+            return;
+        }
+
+        // json/정적 씬: iframe + 플레이스홀더 숨기고 작업 캔버스 복원
+        if (runnerIframe) {
+            try { runnerIframe.contentWindow?._engine?.stop(); } catch {}
+            runnerIframe.src = 'about:blank';
+            runnerIframe.style.display = 'none';
+        }
+        if (livePlaceholder) livePlaceholder.style.display = 'none';
+        if (workStage) workStage.style.display = '';
+
         // 씬 스택 / 엔티티 / 레이어 클리어
         engine.scenes._stack.length = 0;
         engine.entities._entities.clear();
@@ -3034,14 +3575,15 @@ async function main() {
 
         if (!engine._running) engine.start();
 
-        if (sceneName === 'abacus_game') {
-            // 인메모리 저장 있으면 복원, 없으면 JSON에서 최초 로드
-            if (!_restoreSceneState('abacus_game')) {
-                const sceneJSON = await engine.assets.load('assets/scenes/abacus_game.scene.json');
+        const scDef = window._currentProject?.scenes?.[sceneName];
+        if (scDef?.type === 'json' && scDef.src) {
+            // JSON 씬: 저장 복원 or 파일 로드
+            if (!_restoreSceneState(sceneName)) {
+                const sceneJSON = await engine.assets.load(scDef.src);
                 await engine.applyScene(sceneJSON);
             }
         } else {
-            // intro / lobby: 저장된 씬 복원 or 빈 씬 안내
+            // empty / 알 수 없음: 빈 씬 안내 텍스트
             if (!_restoreSceneState(sceneName)) {
                 const ctx = engine.layers.getCtx(3);
                 const W = engine.gameWidth, H = engine.gameHeight;
@@ -3053,26 +3595,16 @@ async function main() {
                 ctx.fillText(`[ ${sceneName} ]`, W / 2, H / 2);
             }
         }
+        const scLabel = document.getElementById('sceneLabel');
+        if (scLabel) scLabel.textContent = scDef?.src?.split('/').pop() ?? sceneName;
         log(`씬 전환: ${sceneName}`, 'info');
     };
 
     // 헤더 버튼
     document.getElementById('btnSaveScene').addEventListener('click', saveScene);
-    document.getElementById('btnPlay').addEventListener('click', () => {
-        engine.start(); log('실행', 'ok');
-    });
-    document.getElementById('btnPause').addEventListener('click', () => {
-        engine.stop?.(); log('정지');
-    });
-    document.getElementById('btnReset').addEventListener('click', () => {
-        engine.entities._entities.forEach(e =>
-            e.setState?.(Object.keys(e.asm?.states ?? {})[0] ?? 'idle'));
-        log('전체 리셋', 'ok');
-    });
 
     // 인스펙터 내보내기
     document.getElementById('btnExportSprite').addEventListener('click', exportCurrentSprite);
-    document.getElementById('btnAgGuide').addEventListener('click', exportAgGuide);
 
     // 터미널 입력
     const termInput = document.getElementById('termInput');
@@ -3115,13 +3647,14 @@ async function main() {
     window._abacusScene = abacusScene;
 
     log('[Sand Engine v0.4] 초기화 완료');
-    log('scene: abacus_game 로드', 'ok');
-    log(`엔티티 ${engine.entities._entities.size}개`, 'ok');
     log('작업 캔버스: 파란=인터랙티브 회색=비주얼 노란=UI');
 
     // undo/redo 버튼 연결
     document.getElementById('btnUndo').addEventListener('click', () => historyUndo());
     document.getElementById('btnRedo').addEventListener('click', () => historyRedo());
+
+    // 프로젝트 피커 열기 (시작 시 빈 상태)
+    await showProjectPicker();
 
     // 초기 진입: 플로우 모드
     requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -3498,7 +4031,7 @@ const FLOW_GAP = 60, FLOW_PAD_X = 40, FLOW_PAD_Y = 70;
 // ── 멀티프레임 레이아웃 (Figma 스타일) ─────────────────────────
 // 프레임 = 씬 하나. 항상 모든 프레임이 캔버스에 펼쳐짐.
 // 클릭 = 해당 씬 활성화 → 에셋/엔티티 편집은 활성 프레임 안에서.
-const SCENE_NAMES  = ['intro', 'lobby', 'abacus_game'];
+let SCENE_NAMES  = ['intro', 'lobby', 'abacus_game'];
 const FRAME_GAP    = 80;   // 프레임 간 간격
 const FRAME_PAD_X  = 60;   // 좌우 여백
 const FRAME_PAD_Y  = 60;   // 상하 여백
@@ -4027,64 +4560,6 @@ function exportCurrentSprite() {
     log(`내보내기: ${filename}  (${frames.length}프레임)`, 'ok');
 }
 
-// Antigravity 제약 가이드 내보내기 (선택 엔티티 기준)
-function exportAgGuide() {
-    const e = _selectedEntity;
-    const assetData = e ? (e._frames ? {
-        name:    e.type ?? e.id,
-        width:   e._frames[0]?.width  ?? e.pw,
-        height:  e._frames[0]?.height ?? e.ph,
-        fps:     8,
-        palette: e._palette ?? e._frames[0]?.palette ?? [],
-        frames:  e._frames,
-    } : null) : null;
-
-    // 전체 에셋 목록에서 선택된 카드도 참조
-    const src = assetData ?? _selectedCard;
-    if (!src) { log('에셋을 먼저 선택하세요 (에셋 브라우저 클릭 or 씬 뷰 클릭)', 'err'); return; }
-
-    const palette = src.palette ?? [];
-    const palColors = palette.filter(c => c && c !== 'transparent');
-    const frameCount = (src.frames ?? []).length;
-    const w = src.width ?? '?', h = src.height ?? '?', fps = src.fps ?? '?';
-
-    const lines = [
-        `# Antigravity 작업 가이드 — ${src.name ?? '(unnamed)'}`,
-        `생성일: ${new Date().toLocaleDateString('ko-KR')}`,
-        ``,
-        `## 잠금 항목 (절대 변경 불가)`,
-        `- width  : ${w}`,
-        `- height : ${h}`,
-        `- fps    : ${fps}`,
-        `- frames : ${frameCount}프레임`,
-        ``,
-        `## 팔레트 (이 색상 안에서만 사용)`,
-        ...palette.map((c, i) => `  ${i}: ${c}`),
-        ``,
-        `## 자유 수정 가능`,
-        `- frames[n].pixels 배열 (픽셀 데이터 전부)`,
-        `- 단, 팔레트 인덱스는 0~${palette.length - 1} 범위 안에서`,
-        ``,
-        `## 파일명`,
-        `- 원본 파일명 그대로 덮어쓰기 (${src.name ?? 'filename'}.json)`,
-        ``,
-        `## 포맷 예시`,
-        `{`,
-        `  "width": ${w}, "height": ${h}, "fps": ${fps},`,
-        `  "palette": [${palette.slice(0,3).map(c=>`"${c}"`).join(', ')}, ...],`,
-        `  "frames": [{ "pixels": [[x, y, colorIndex], ...] }]`,
-        `}`,
-    ];
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `AG_guide_${src.name ?? 'asset'}.txt`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    log(`AG 가이드 내보내기: AG_guide_${src.name ?? 'asset'}.txt`, 'ok');
-}
-
 // ── 명령어 처리 ──────────────────────────────────────────────
 function handleCommand(text, engine, ctrl) {
     const cmd = text.toLowerCase().trim();
@@ -4119,6 +4594,91 @@ main().catch(err => {
     console.error(err);
     log('오류: ' + err.message, 'err');
 });
+
+// ── 전체화면 토글 (live 씬 플레이 중 전용) ───────────────────
+let _liveFS = false;
+
+window.toggleLiveFS = function() {
+    const iframe  = document.getElementById('livePreviewIframe');
+    const overlay = document.getElementById('liveFSOverlay');
+    const btn     = document.getElementById('btnLiveFS');
+    if (!iframe || iframe.style.display === 'none') return;
+
+    _liveFS = !_liveFS;
+
+    if (_liveFS) {
+        // ── 전체화면 ────────────────────────────────────────
+        const sc = Math.min(window.innerWidth / BASE_W, window.innerHeight / BASE_H);
+        const iw = BASE_W * sc, ih = BASE_H * sc;
+        const il = (window.innerWidth  - iw) / 2;
+        const it = (window.innerHeight - ih) / 2;
+
+        iframe.style.position        = 'fixed';
+        iframe.style.left            = il + 'px';
+        iframe.style.top             = it + 'px';
+        iframe.style.width           = BASE_W + 'px';
+        iframe.style.height          = BASE_H + 'px';
+        iframe.style.transform       = `scale(${sc})`;
+        iframe.style.transformOrigin = 'top left';
+        iframe.style.zIndex          = '9999';
+
+        overlay.style.display = 'flex';
+        btn.textContent       = '⊠ 원래 사이즈';
+        btn.style.background  = '#2A1A1A';
+        btn.style.borderColor = '#6A3A3A';
+        btn.style.color       = '#EF8A8A';
+    } else {
+        // ── 폰 목업으로 복귀 ────────────────────────────────
+        _restoreLiveIframe(iframe);
+        overlay.style.display = 'none';
+        btn.textContent       = '⛶ 전체화면으로 보기';
+        btn.style.background  = '#1A1A2E';
+        btn.style.borderColor = '#4A4A8A';
+        btn.style.color       = '#AAAAEE';
+    }
+};
+
+// iframe을 폰 목업 크기로 복원
+function _restoreLiveIframe(iframe) {
+    const wrap  = document.getElementById('phoneCanvasWrap');
+    const wrapW = wrap ? wrap.offsetWidth  : BASE_W;
+    const wrapH = wrap ? wrap.offsetHeight : BASE_H;
+    const sc    = Math.min(wrapW / BASE_W, wrapH / BASE_H);
+
+    iframe.style.position        = 'absolute';
+    iframe.style.top             = '0';
+    iframe.style.left            = '0';
+    iframe.style.width           = BASE_W + 'px';
+    iframe.style.height          = BASE_H + 'px';
+    iframe.style.transform       = `scale(${sc})`;
+    iframe.style.transformOrigin = 'top left';
+    iframe.style.zIndex          = '20';
+}
+
+// ESC 키로 전체화면 해제
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && _liveFS) toggleLiveFS();
+});
+
+// 오버레이 리사이즈 대응
+window.addEventListener('resize', () => {
+    if (_liveFS) {
+        const iframe = document.getElementById('livePreviewIframe');
+        if (!iframe || iframe.style.display === 'none') return;
+        const sc = Math.min(window.innerWidth / BASE_W, window.innerHeight / BASE_H);
+        const iw = BASE_W * sc, ih = BASE_H * sc;
+        iframe.style.left      = (window.innerWidth  - iw) / 2 + 'px';
+        iframe.style.top       = (window.innerHeight - ih) / 2 + 'px';
+        iframe.style.transform = `scale(${sc})`;
+    }
+});
+
 </script>
+
+<!-- 전체화면 배경 오버레이 (ESC 또는 버튼으로 닫기) -->
+<div id="liveFSOverlay" onclick="toggleLiveFS()" style="
+    display:none;position:fixed;inset:0;background:#000;z-index:9998;cursor:pointer;"
+    title="클릭하거나 ESC로 닫기"></div>
+
 </body>
 </html>

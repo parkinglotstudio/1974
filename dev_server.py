@@ -364,8 +364,15 @@ init().catch(e => console.error('[{pid}]', e));
             img      = Image.open(_io.BytesIO(gif_bytes))
             n_frames = getattr(img, 'n_frames', 1)
             orig_w, orig_h = img.size
-            tw = max(1, round(orig_w * scale_pct / 100))
-            th = max(1, round(orig_h * scale_pct / 100))
+
+            # crop if requested
+            trim_lr = max(0, int(body.get('trimLR', 0)))
+            trim_tb = max(0, int(body.get('trimTB', 0)))
+            cw = max(1, orig_w - 2 * trim_lr)
+            ch = max(1, orig_h - 2 * trim_tb)
+
+            tw = max(1, round(cw * scale_pct / 100))
+            th = max(1, round(ch * scale_pct / 100))
 
             # ── 전체 프레임 픽셀 수집 ─────────────────────────────
             all_colors = {}
@@ -373,7 +380,10 @@ init().catch(e => console.error('[{pid}]', e));
             for i in range(n_frames):
                 img.seek(i)
                 delay = img.info.get('duration', 100)
-                frame = img.convert('RGBA').resize((tw, th), Image.NEAREST)
+                f_rgba = img.convert('RGBA')
+                if trim_lr > 0 or trim_tb > 0:
+                    f_rgba = f_rgba.crop((trim_lr, trim_tb, orig_w - trim_lr, orig_h - trim_tb))
+                frame = f_rgba.resize((tw, th), Image.NEAREST)
                 pdata = list(frame.getdata())
                 raw_frames.append({'pixels': pdata, 'delay': delay})
                 for r, g, b, a in pdata:
@@ -457,6 +467,9 @@ init().catch(e => console.error('[{pid}]', e));
                                 with open(os.path.join(cat_dir, fname), encoding='utf-8') as f:
                                     d = json.load(f)
                                     d['_category'] = cat
+                                    # 파일명(확장자 제외)을 name으로 보장
+                                    if not d.get('name'):
+                                        d['name'] = os.path.splitext(fname)[0]
                                     entries.append(d)
                             except Exception:
                                 pass
@@ -625,6 +638,36 @@ init().catch(e => console.error('[{pid}]', e));
                 self.send_response(502); self.end_headers()
             return
 
+        # assets/samples 정적 파일 한글 서빙 대응 프록시
+        if self.path.startswith('/assets/samples/'):
+            rel_path = unquote(self.path).lstrip('/')
+            full_path = os.path.join(ROOT, rel_path)
+            print(f"[DEBUG SAMPLE PROXY] request={self.path} -> rel={rel_path} -> full={full_path}", flush=True)
+            if os.path.isfile(full_path):
+                ext = os.path.splitext(full_path)[1].lower()
+                mime = 'image/png'
+                if ext in ['.jpg', '.jpeg']: mime = 'image/jpeg'
+                elif ext == '.gif': mime = 'image/gif'
+                elif ext == '.webp': mime = 'image/webp'
+                elif ext == '.bmp': mime = 'image/bmp'
+                try:
+                    with open(full_path, 'rb') as f:
+                        data = f.read()
+                    print(f"  [OK] size={len(data)} mime={mime}", flush=True)
+                    self.send_response(200)
+                    self.send_header('Content-Type', mime)
+                    self.send_header('Content-Length', str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
+                except Exception as e:
+                    print(f"  [ERROR] read failed: {e}", flush=True)
+                    self.send_response(500)
+                    self.end_headers()
+                    return
+            else:
+                print(f"  [FAIL] file not found!", flush=True)
+
         # 단축 경로는 301 redirect — 브라우저 URL이 바뀌어야 상대경로 정상 해석
         redirects = {
             '/':                '/sand_engine/sand_engine.html',
@@ -646,8 +689,8 @@ init().catch(e => console.error('[{pid}]', e));
         self.send_header('Access-Control-Allow-Origin', '*')
         super().end_headers()
 
-    def log_message(self, fmt, *args):
-        pass  # 불필요한 로그 억제
+    # def log_message(self, fmt, *args):
+    #     pass  # 불필요한 로그 억제
 
 if __name__ == '__main__':
     os.chdir(ROOT)

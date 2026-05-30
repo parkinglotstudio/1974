@@ -245,6 +245,262 @@
         }
         .pixel-modal-btn.primary:hover { background: #E0A030; }
 
+        /* ── 변환 중 로딩 오버레이 ─────────────────────────── */
+        .loading-overlay {
+            position: fixed; inset: 0; z-index: 4000;
+            background: rgba(10, 10, 10, 0.85);
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+            transition: opacity 0.2s ease;
+        }
+        .loading-overlay.hidden { display: none; }
+        .loading-spinner-wrap {
+            display: flex; flex-direction: column; align-items: center; gap: 16px;
+            background: #1E1E1A; border: 1px solid #3A3A36; padding: 24px 40px;
+            border-radius: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+        .loading-spinner {
+            width: 32px; height: 32px;
+            border: 3px solid rgba(200, 146, 42, 0.2);
+            border-top: 3px solid #C8922A;
+            border-radius: 50%;
+            animation: convert-spin 1s linear infinite;
+        }
+        @keyframes convert-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: #EEE; font-size: 11px; font-family: 'JetBrains Mono', monospace;
+            font-weight: bold; letter-spacing: 0.05em;
+        }
+
+        /* ── 에셋 프리뷰 모달 ───────────────────────────────── */
+        .ap-overlay {
+            position: fixed; inset: 0; z-index: 3000;
+            background: rgba(0,0,0,0.82);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .ap-overlay.hidden { display: none; }
+        .ap-box {
+            background: #1A1A18; border: 1px solid #3A3A36; border-radius: 8px;
+            display: flex; flex-direction: column; overflow: hidden;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.9);
+            max-width: 92vw; max-height: 90vh;
+        }
+        .ap-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px; border-bottom: 1px solid #2E2E2A; flex-shrink: 0;
+        }
+        .ap-title {
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            color: #CCC; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .ap-close {
+            background: none; border: none; color: #888; font-size: 14px;
+            cursor: pointer; padding: 2px 6px; border-radius: 4px; line-height: 1;
+        }
+        .ap-close:hover { background: #333; color: #EEE; }
+        .ap-copy-btn {
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            background: #2A2A26; border: .5px solid #3A3A36; color: #AAA;
+            cursor: pointer; padding: 3px 8px; border-radius: 4px;
+        }
+        .ap-copy-btn:hover { background: #C8922A; color: #fff; border-color: #C8922A; }
+        .ap-copy-btn.copied { background: #3A8A3A; color: #fff; border-color: #3A8A3A; }
+        .ap-toolbar {
+            display: flex; align-items: center; gap: 6px;
+            padding: 6px 12px; border-bottom: 1px solid #2E2E2A; flex-shrink: 0;
+        }
+        .ap-zoom-btn {
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            padding: 2px 7px; border-radius: 3px; cursor: pointer;
+            border: .5px solid #3A3A36; background: #222; color: #888;
+        }
+        .ap-zoom-btn:hover { background: #333; color: #CCC; }
+        .ap-zoom-btn.active { background: #C8922A; color: #fff; border-color: #C8922A; }
+        .ap-info {
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            color: #555; margin-left: auto;
+        }
+        .ap-canvas-wrap {
+            overflow: auto; flex: 1;
+            /* 체커보드 (투명 영역 표시) */
+            background-image:
+                linear-gradient(45deg, #2A2A26 25%, transparent 25%),
+                linear-gradient(-45deg, #2A2A26 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #2A2A26 75%),
+                linear-gradient(-45deg, transparent 75%, #2A2A26 75%);
+            background-size: 12px 12px;
+            background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+            background-color: #1E1E1A;
+            padding: 12px;
+        }
+        #apCanvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+        #apCanvas.edit-mode { cursor: crosshair; }
+
+        /* ── 편집 툴바 ───────────────────────────────────────── */
+        .ap-edit-toggle {
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            background: #2A2A26; border: .5px solid #3A3A36; color: #AAA;
+            cursor: pointer; padding: 3px 8px; border-radius: 4px; margin-left: 6px;
+        }
+        .ap-edit-toggle:hover { border-color: #C8922A; color: #C8922A; }
+        .ap-edit-toggle.active { background: #C8922A; color: #fff; border-color: #C8922A; }
+        .ap-convert-btn {
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            background: #C8922A; border: .5px solid #C8922A; color: #fff;
+            cursor: pointer; padding: 3px 8px; border-radius: 4px; margin-left: 6px;
+            font-weight: bold;
+        }
+        .ap-convert-btn:hover { background: #E0A63F; border-color: #E0A63F; }
+        .ap-edit-bar {
+            display: none; align-items: center; gap: 4px;
+            padding: 5px 10px; border-bottom: 1px solid #2E2E2A;
+            flex-shrink: 0; flex-wrap: wrap; row-gap: 4px;
+        }
+        .ap-edit-bar.visible { display: flex; }
+        .ap-edit-sep {
+            width: 1px; height: 14px; background: #3A3A36; margin: 0 4px;
+        }
+        .ap-brush-btn {
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            background: #222; border: .5px solid #3A3A36; color: #777;
+            cursor: pointer; padding: 2px 6px; border-radius: 3px; min-width: 28px;
+        }
+        .ap-brush-btn:hover { border-color: #888; color: #CCC; }
+        .ap-brush-btn.active { background: #444; color: #EEE; border-color: #888; }
+        .ap-undo-btn {
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            background: #252522; border: .5px solid #3A3A36; color: #888;
+            cursor: pointer; padding: 2px 7px; border-radius: 3px;
+        }
+        .ap-undo-btn:hover { color: #EEE; border-color: #888; }
+        .ap-undo-btn:disabled { opacity: 0.35; cursor: default; }
+        .ap-save-btn {
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            background: #C8922A; border: none; color: #fff;
+            cursor: pointer; padding: 3px 10px; border-radius: 3px; margin-left: auto;
+        }
+        .ap-save-btn:hover { background: #E0A030; }
+        .ap-save-btn:disabled { opacity: 0.5; cursor: default; }
+        .ap-warn {
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            color: #FFB830; background: rgba(255,184,48,.12);
+            padding: 4px 12px; text-align: center;
+            border-bottom: 1px solid rgba(255,184,48,.2);
+            opacity: 0; transition: opacity .2s; flex-shrink: 0;
+        }
+        /* ── 토스트 ─────────────────────────────────────────── */
+        .ap-toast {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            z-index: 9999; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            color: #fff; border-radius: 6px; padding: 8px 20px;
+            pointer-events: none; opacity: 0; transition: opacity .2s;
+        }
+        .ap-toast.show { opacity: 1; }
+
+        /* ── 복사 버튼 ───────────────────────────────────────── */
+        /* ── PixelJSON 파일명 리스트 행 ────────────────────────── */
+        /* ── PixelJSON 파일명 리스트 행 (바둑판 칩 스타일) ── */
+        .asset-file-row {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 8px;
+            background: #FFFFFF;
+            border: 1px solid #D2D0C9;
+            border-radius: 4px;
+            cursor: pointer; user-select: none;
+            transition: all 0.1s ease;
+            box-sizing: border-box;
+            margin: 2px;
+            flex-shrink: 0;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+        .asset-file-row:hover  {
+            background: #FDFDFB;
+            border-color: #A09E96;
+        }
+        .asset-file-row.selected {
+            background: #FFF8EE;
+            border-color: #C8922A;
+            box-shadow: 0 0 0 1px #C8922A;
+        }
+        .asset-file-row.selected .asset-file-name {
+            color: #C8922A;
+        }
+        .asset-file-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px; color: #222; font-weight: bold;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            max-width: 140px;
+        }
+        .asset-file-meta {
+            font-family: 'JetBrains Mono', monospace; font-size: 8px;
+            color: #999; flex-shrink: 0;
+            background: #F0EFEA;
+            padding: 1px 3px;
+            border-radius: 3px;
+        }
+        .asset-file-del {
+            background: none; border: none; color: #888; cursor: pointer;
+            font-size: 10px; padding: 1px 3px; border-radius: 3px;
+            flex-shrink: 0; transition: all 0.1s;
+            line-height: 1;
+            font-weight: bold;
+        }
+        .asset-file-del:hover {
+            color: #FFF; background: #FF4D4F;
+        }
+
+        /* ── 복사 팝업 (오버레이 모달) ─────────────────────────── */
+        .acp-overlay {
+            position: fixed; inset: 0; z-index: 4000;
+            background: rgba(0,0,0,.55);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .acp-overlay.hidden { display: none; }
+        .asset-copy-popup {
+            background: #1A1A18; border: 1px solid #3A3A36; border-radius: 10px;
+            box-shadow: 0 24px 64px rgba(0,0,0,.85);
+            padding: 24px 28px; min-width: 320px; max-width: 480px;
+            display: flex; flex-direction: column; gap: 16px;
+            position: relative;
+        }
+        .acp-close {
+            position: absolute; top: 10px; right: 14px;
+            background: none; border: none; color: #555;
+            cursor: pointer; font-size: 16px; line-height: 1; padding: 4px;
+        }
+        .acp-close:hover { color: #EEE; }
+        .acp-label {
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            color: #555; text-transform: uppercase; letter-spacing: .08em;
+        }
+        .acp-name {
+            font-family: 'JetBrains Mono', monospace; font-size: 16px;
+            color: #E8E6E0; word-break: break-all; line-height: 1.4;
+            font-weight: 700;
+        }
+        .acp-meta {
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            color: #666;
+        }
+        .acp-btn {
+            font-family: 'JetBrains Mono', monospace; font-size: 13px;
+            background: #C8922A; color: #fff; border: none;
+            border-radius: 6px; padding: 12px 0; cursor: pointer; width: 100%;
+            letter-spacing: .03em;
+        }
+        .acp-btn:hover { background: #E0A030; }
+        .acp-btn.copied { background: #3A8A3A; }
+
+        /* asset-card-name 원래 스타일 (샘플 탭 등에서 사용) */
+        .asset-card-name {
+            font-size: 7px; color: #888; padding: 2px 4px;
+            font-family: 'JetBrains Mono', monospace;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
         /* ── 프로젝트 피커 모달 ─────────────────────────────── */
         .proj-overlay {
             position: fixed; inset: 0; z-index: 1000;
@@ -497,21 +753,22 @@
 
         /* 하단 컨트롤 패널 (선택 에셋) */
         .work-control {
-            flex-shrink: 0; background: #2A2A26;
-            border-top: 1px solid #3A3A36;
-            padding: 6px 10px; min-height: 34px;
+            flex-shrink: 0; background: #FAFAF7;
+            border-top: 1px solid #D0CEC7;
+            padding: 6px 10px; min-height: 58px;
             display: flex; align-items: center; gap: 8px; overflow: hidden;
+            box-sizing: border-box;
         }
-        .wc-empty { font-size: 10px; color: #555; font-family: 'JetBrains Mono', monospace; }
-        .wc-info { font-size: 10px; color: #AAA; font-family: 'JetBrains Mono', monospace; }
+        .wc-empty { font-size: 11px; color: #777; font-weight: bold; font-family: 'JetBrains Mono', monospace; }
+        .wc-info { font-size: 11px; color: #333; font-weight: bold; font-family: 'JetBrains Mono', monospace; }
         .wc-type {
-            font-size: 9px; background: #1A4A8A; color: #7AC0FF;
-            border-radius: 3px; padding: 1px 5px;
-            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px; background: #E2F2FF; color: #18A0FB;
+            border-radius: 3px; padding: 2px 6px;
+            font-family: 'JetBrains Mono', monospace; font-weight: bold;
         }
-        .wc-type.visual { background: #3A3A3A; color: #888; }
-        .wc-type.ui-type { background: #4A3A1A; color: #C8922A; }
-        .wc-coords { font-size: 9px; color: #666; font-family: 'JetBrains Mono', monospace; }
+        .wc-type.visual { background: #EAEAEA; color: #666; }
+        .wc-type.ui-type { background: #FFF3CD; color: #856404; }
+        .wc-coords { font-size: 10px; color: #555; font-family: 'JetBrains Mono', monospace; font-weight: bold; }
 
         /* ── 오른쪽 — 레이어 패널 ────────────────────────────── */
         .layer-panel {
@@ -622,17 +879,7 @@
         .import-scale-btn:disabled { opacity: .3; cursor: default; }
         /* 샘플 카드 변환 버튼 */
         .asset-card { position: relative; }
-        .sample-convert-btn {
-            display: none;
-            position: absolute; bottom: 3px; left: 0; right: 0;
-            margin: 0 auto; width: calc(100% - 6px);
-            font-size: 7px; font-family: 'JetBrains Mono', monospace;
-            padding: 2px 0; border-radius: 3px;
-            background: #C8922A; color: #111; border: none; cursor: pointer;
-            letter-spacing: .04em;
-        }
-        .sample-convert-btn:hover { background: #E0A030; }
-        .asset-card.import-selected .sample-convert-btn { display: block; }
+
 
         /* 에셋 브라우저 */
         .asset-panel {
@@ -679,11 +926,7 @@
             background: #1A1A18; image-rendering: pixelated;
             display: block;
         }
-        .asset-card-name {
-            font-size: 7px; color: #888; padding: 2px 4px;
-            font-family: 'JetBrains Mono', monospace;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
+
         .asset-loading {
             flex: 1; display: flex; align-items: center; justify-content: center;
             font-size: 10px; color: #CCC; font-family: 'JetBrains Mono', monospace;
@@ -877,12 +1120,27 @@
 
         /* 인스펙터 내보내기 버튼 */
         .insp-export {
-            font-size: 9px; padding: 3px 8px; border-radius: 4px;
-            border: .5px solid #4A4A46; background: #2A2A26; color: #AAA;
+            font-size: 11px; font-weight: bold;
+            padding: 5px 12px; border-radius: 4px;
+            border: 1px solid #C8922A; background: #C8922A; color: #FFFFFF;
             cursor: pointer; font-family: 'JetBrains Mono', monospace;
-            margin-left: auto; flex-shrink: 0; transition: all .1s;
+            flex-shrink: 0; transition: all 0.15s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
-        .insp-export:hover { background: #C8922A; color: #fff; border-color: #C8922A; }
+        .insp-export:hover { background: #E0A030; border-color: #E0A030; transform: translateY(-1px); }
+        .insp-export:active { transform: translateY(0); }
+
+        /* 인스펙터 픽셀 변환 버튼 */
+        .insp-convert {
+            font-size: 11px; font-weight: bold;
+            padding: 5px 12px; border-radius: 4px;
+            border: 1px solid #155724; background: #28a745; color: #FFFFFF;
+            cursor: pointer; font-family: 'JetBrains Mono', monospace;
+            flex-shrink: 0; transition: all 0.15s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .insp-convert:hover { background: #218838; border-color: #218838; transform: translateY(-1px); }
+        .insp-convert:active { transform: translateY(0); }
 
         /* 터미널 */
         .terminal-panel {
@@ -963,44 +1221,59 @@
 
         /* ── 인스펙터 ─────────────────────────────────────────── */
         .inspector {
-            display: flex; align-items: center; gap: 10px;
+            display: flex; align-items: center; gap: 16px;
             flex: 1; overflow: hidden;
         }
         .insp-name {
-            font-size: 10px; font-weight: 700; color: #EEE;
+            font-size: 12px; font-weight: 700; color: #1A1A18;
             font-family: 'JetBrains Mono', monospace;
-            flex-shrink: 0; max-width: 120px;
+            flex-shrink: 0; max-width: 150px;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .insp-badge {
-            font-size: 8px; padding: 2px 6px; border-radius: 3px;
-            background: #1A4A8A; color: #7AC0FF; flex-shrink: 0;
+            font-size: 9px; padding: 2px 6px; border-radius: 4px;
+            background: #E2F2FF; color: #18A0FB; flex-shrink: 0;
+            font-weight: bold;
             font-family: 'JetBrains Mono', monospace;
         }
-        .insp-badge.visual { background: #333; color: #888; }
-        .insp-badge.ui     { background: #4A3A1A; color: #C8922A; }
-        .insp-badge.asset  { background: #1A3A2A; color: #5ECE8A; max-width: 110px;
+        .insp-badge.visual { background: #EAEAEA; color: #666; }
+        .insp-badge.ui     { background: #FFF3CD; color: #856404; }
+        .insp-badge.asset  { background: #D4EDDA; color: #155724; max-width: 110px;
                              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .insp-sep { width: 1px; height: 16px; background: #3A3A36; flex-shrink: 0; }
+        .insp-sep { width: 1px; height: 20px; background: #D0CEC7; flex-shrink: 0; }
         .insp-field {
-            display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+            display: flex; align-items: center; gap: 6px; flex-shrink: 0;
         }
         .insp-label {
-            font-size: 9px; color: #666; font-family: 'JetBrains Mono', monospace;
+            font-size: 10px; color: #444; font-family: 'JetBrains Mono', monospace;
+            font-weight: bold;
             flex-shrink: 0; width: 10px; text-align: right;
+            text-transform: uppercase;
         }
         .insp-input {
-            width: 46px; height: 22px;
-            background: #1A1A18; border: 1px solid #3A3A36;
-            border-radius: 4px; color: #EEE; padding: 0 5px;
-            font-family: 'JetBrains Mono', monospace; font-size: 10px;
-            outline: none; text-align: right;
+            width: 60px; height: 22px;
+            background: #FFFFFF; border: 1px solid #C8C5BC;
+            border-radius: 4px; color: #1A1A18; padding: 0 5px;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: bold;
+            outline: none; text-align: left;
+            transition: border-color 0.15s, box-shadow 0.15s;
         }
-        .insp-input:focus { border-color: #C8922A; background: #222; }
+        .insp-input:focus { border-color: #18A0FB; background: #FFFFFF; box-shadow: 0 0 0 2px rgba(24, 160, 251, 0.2); }
         .insp-layer-badge {
-            font-size: 9px; color: #666; font-family: 'JetBrains Mono', monospace;
-            flex-shrink: 0; margin-left: auto;
+            font-size: 11px; color: #C8922A; font-family: 'JetBrains Mono', monospace;
+            font-weight: bold; background: #FFF8EE; border: 1px solid #F3E2C7;
+            padding: 3px 8px; border-radius: 4px;
+            flex-shrink: 0;
         }
+        .btn-lock-aspect {
+            background: #FFFFFF; border: 1px solid #C8C5BC; color: #888;
+            border-radius: 4px; width: 22px; height: 22px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; padding: 0; flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .btn-lock-aspect:hover { background: #F0EFEA; border-color: #A09E96; color: #333; }
+        .btn-lock-aspect.active { background: #C8922A; border-color: #C8922A; color: #FFFFFF; }
 
         /* 레이어 솔로 */
         .layer-item.solo { background: #E8E0CC; }
@@ -1207,6 +1480,9 @@
     <button class="layer-picker-btn" data-layer="3">
         <div class="layer-picker-dot" style="background:#C864FF;"></div>
         L3 UI <span class="layer-picker-sub">고정 HUD</span>
+    </button>
+    <button class="layer-picker-btn" id="layerPickerNoScene" data-layer="-1" style="border: 1px dashed #FF5500; color: #FF5500; font-weight: bold; justify-content: center; height: 34px; margin-top: 4px; display: flex; align-items: center; gap: 6px;">
+        🔗 씬 비포함 (캔버스 단독 표기)
     </button>
     <button class="layer-picker-cancel" id="layerPickerCancel">취소</button>
 </div>
@@ -1497,29 +1773,49 @@
             <!-- 인스펙터 -->
             <div class="work-control" id="workControl">
                 <span class="wc-empty" id="wcEmpty">캔버스에서 엔티티를 클릭하세요</span>
-                <div class="inspector" id="inspector" style="display:none;">
-                    <span class="insp-name" id="inspName"></span>
-                    <span class="insp-badge" id="inspBadge"></span>
-                    <div class="insp-sep"></div>
-                    <div class="insp-field">
-                        <span class="insp-label">x</span>
-                        <input class="insp-input" id="inspX" type="number" step="1">
+                <div class="inspector" id="inspector" style="display:none; flex-direction:column; gap:6px; width:100%;">
+                    
+                    <!-- 1행: 정보 (이름 & 배지) 및 저장/레이어 -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+                        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0; min-width:0;">
+                            <span class="insp-name" id="inspName"></span>
+                            <span class="insp-badge" id="inspTypeBadge" style="background:#18A0FB; color:#FFF; font-weight:bold; font-size:9px; padding:2px 6px; border-radius:4px; text-transform:uppercase;">PIXEL</span>
+                            <span class="insp-badge" id="inspBadge"></span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                            <span class="insp-layer-badge" id="inspLayer"></span>
+                            <button class="insp-convert" id="btnConvertSprite" style="display:none;" title="PixelJSON으로 변환">▶ 픽셀 변환</button>
+                            <button class="insp-export" id="btnExportSprite" title="PixelJSON/Image 내보내기">↓ 저장</button>
+                        </div>
                     </div>
-                    <div class="insp-field">
-                        <span class="insp-label">y</span>
-                        <input class="insp-input" id="inspY" type="number" step="1">
+                    
+                    <!-- 2행: 레이아웃 입력창들 -->
+                    <div style="display:flex; align-items:center; gap:6px; width:100%; border-top:1px solid #EAEAE6; padding-top:5px;">
+                        <span style="font-size:10px; color:#777; font-family:'JetBrains Mono',monospace; font-weight:bold; text-transform:uppercase; letter-spacing: 0.05em; margin-right:4px; flex-shrink:0;">Layout</span>
+                        
+                        <div class="insp-field">
+                            <span class="insp-label">X</span>
+                            <input class="insp-input" id="inspX" type="number" step="1">
+                        </div>
+                        <div class="insp-field">
+                            <span class="insp-label">Y</span>
+                            <input class="insp-input" id="inspY" type="number" step="1">
+                        </div>
+                        
+                        <div class="insp-field">
+                            <span class="insp-label">W</span>
+                            <input class="insp-input" id="inspW" type="number" step="1" min="1">
+                        </div>
+                        
+                        <!-- 비율 잠금 토글 버튼 -->
+                        <button id="btnLockAspect" class="btn-lock-aspect" title="비율 잠금 토글">🔗</button>
+                        
+                        <div class="insp-field">
+                            <span class="insp-label">H</span>
+                            <input class="insp-input" id="inspH" type="number" step="1" min="1">
+                        </div>
                     </div>
-                    <div class="insp-sep"></div>
-                    <div class="insp-field">
-                        <span class="insp-label">w</span>
-                        <input class="insp-input" id="inspW" type="number" step="1" min="1">
-                    </div>
-                    <div class="insp-field">
-                        <span class="insp-label">h</span>
-                        <input class="insp-input" id="inspH" type="number" step="1" min="1">
-                    </div>
-                    <span class="insp-layer-badge" id="inspLayer"></span>
-                    <button class="insp-export" id="btnExportSprite" title="PixelJSON 내보내기">↓ JSON</button>
+                    
                 </div>
             </div>
 
@@ -1674,11 +1970,83 @@
 
 </div><!-- /workspace -->
 
+<!-- ── 변환 중 로딩 오버레이 ─────────────────────────────── -->
+<div class="loading-overlay hidden" id="convertLoadingOverlay">
+    <div class="loading-spinner-wrap">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="convertLoadingText">변환 중입니다...</div>
+    </div>
+</div>
+
+<!-- ── 에셋 저장 옵션 모달 ─────────────────────────────── -->
+<div class="pixel-modal-overlay hidden" id="assetSaveOptionModal" style="z-index: 5000;">
+    <div class="pixel-modal" style="width: 320px; text-align: center; padding: 24px; gap: 16px;">
+        <div class="pixel-modal-title" style="align-self: center; font-size: 13px;">에셋 저장 옵션</div>
+        <div style="font-size: 11px; color: #888; font-family: 'JetBrains Mono', monospace; line-height: 1.5;" id="saveModalDesc">
+            현재 에셋을 어떻게 저장하시겠습니까?
+        </div>
+        
+        <!-- 다른 이름으로 저장할 때의 이름 입력창 (기본 숨김) -->
+        <div id="saveAsInputWrap" style="display: none; flex-direction: column; gap: 6px; width: 100%; text-align: left;">
+            <label style="font-size: 9px; color: #888; font-family: 'JetBrains Mono', monospace; font-weight: bold;">새로운 파일명</label>
+            <input type="text" id="saveAsNameInput" style="background:#0A0A08; border:1px solid #3A3A36; border-radius:4px; color:#EEE; font-size:10px; padding:6px 8px; font-family:'JetBrains Mono',monospace; width:100%; box-sizing:border-box;" />
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+            <button class="pixel-modal-btn primary" id="btnSaveOverwrite" style="width: 100%; padding: 8px;">원본 파일 덮어쓰기</button>
+            <button class="pixel-modal-btn" id="btnSaveAs" style="width: 100%; padding: 8px; background: #2A3A2A; border-color: #3A5A3A; color: #7FE07F;">다른 이름으로 저장</button>
+            <button class="pixel-modal-btn" id="btnSaveOptionCancel" style="width: 100%; padding: 8px;">취소</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── 픽셀 임포트 미리보기 모달 ─────────────────────────── -->
 <div class="pixel-modal-overlay hidden" id="pixelImportModal">
-    <div class="pixel-modal">
+    <div class="pixel-modal" style="width: fit-content; max-width: 90vw; min-width: 320px;">
         <div class="pixel-modal-title" id="pixelModalTitle">미리보기</div>
-        <canvas class="pixel-modal-canvas" id="pixelModalCanvas"></canvas>
+        
+        <!-- 비교 래퍼 (원본 vs 변환 결과) -->
+        <div class="pixel-compare-wrap" style="display:flex;gap:24px;align-items:center;justify-content:center;max-width:100%;margin:10px 0;">
+            <div class="pixel-compare-box" style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+                <div style="font-size:9px;color:#888;font-family:'JetBrains Mono',monospace;font-weight:bold;">원본 (Original)</div>
+                <div id="pixelModalOrigWrap" style="overflow:hidden;position:relative;border:1px solid #3A3A36;background:#0A0A0A;display:block;">
+                    <img id="pixelModalOrigImg" style="image-rendering:pixelated;image-rendering:crisp-edges;position:absolute;display:block;margin:0;padding:0;border:none;max-width:none;max-height:none;" />
+                </div>
+            </div>
+            <div style="font-size:18px;color:#C8922A;font-weight:bold;user-select:none;margin-top:14px;">➔</div>
+            <div class="pixel-compare-box" style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+                <div style="font-size:9px;color:#C8922A;font-family:'JetBrains Mono',monospace;font-weight:bold;">변환 결과 (Converted)</div>
+                <canvas class="pixel-modal-canvas" id="pixelModalCanvas" style="display:block;margin:0;"></canvas>
+            </div>
+        </div>
+
+        <!-- 조절 컨트롤 패널 -->
+        <div class="pixel-import-controls" style="display:flex;flex-wrap:wrap;gap:12px;width:100%;background:#151512;padding:12px;border-radius:6px;border:1px solid #2E2E2A;box-sizing:border-box;">
+            <!-- 파일명 입력 -->
+            <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:150px;">
+                <label style="font-size:9px;color:#888;font-family:'JetBrains Mono',monospace;font-weight:bold;">저장할 파일명</label>
+                <input type="text" id="pixelModalNameInput" style="background:#0A0A08;border:1px solid #3A3A36;border-radius:4px;color:#EEE;font-size:10px;padding:4px 8px;font-family:'JetBrains Mono',monospace;width:100%;box-sizing:border-box;" />
+            </div>
+            
+            <!-- 비율 조절 -->
+            <div style="display:flex;flex-direction:column;gap:4px;width:90px;">
+                <label style="font-size:9px;color:#888;font-family:'JetBrains Mono',monospace;font-weight:bold;">스케일 (%)</label>
+                <input type="number" id="pixelModalScaleInput" value="100" min="10" max="200" step="5" style="background:#0A0A08;border:1px solid #3A3A36;border-radius:4px;color:#EEE;font-size:10px;padding:4px 6px;font-family:'JetBrains Mono',monospace;width:100%;box-sizing:border-box;" />
+            </div>
+
+            <!-- 좌우 자르기 -->
+            <div style="display:flex;flex-direction:column;gap:4px;width:90px;">
+                <label style="font-size:9px;color:#888;font-family:'JetBrains Mono',monospace;font-weight:bold;">좌우 자르기 (px)</label>
+                <input type="number" id="pixelModalTrimLR" value="0" min="0" step="1" style="background:#0A0A08;border:1px solid #3A3A36;border-radius:4px;color:#EEE;font-size:10px;padding:4px 6px;font-family:'JetBrains Mono',monospace;width:100%;box-sizing:border-box;" />
+            </div>
+
+            <!-- 상하 자르기 -->
+            <div style="display:flex;flex-direction:column;gap:4px;width:90px;">
+                <label style="font-size:9px;color:#888;font-family:'JetBrains Mono',monospace;font-weight:bold;">상하 자르기 (px)</label>
+                <input type="number" id="pixelModalTrimTB" value="0" min="0" step="1" style="background:#0A0A08;border:1px solid #3A3A36;border-radius:4px;color:#EEE;font-size:10px;padding:4px 6px;font-family:'JetBrains Mono',monospace;width:100%;box-sizing:border-box;" />
+            </div>
+        </div>
+
         <div class="pixel-modal-info" id="pixelModalInfo"></div>
         <div id="pixelModalFrameBar" style="display:none;font-size:9px;color:#C8922A;
             font-family:'JetBrains Mono',monospace;text-align:center;
@@ -1687,6 +2055,63 @@
             <button class="pixel-modal-btn" id="pixelModalCancel">취소</button>
             <button class="pixel-modal-btn primary" id="pixelModalSave">저장</button>
         </div>
+    </div>
+</div>
+
+<!-- ── 에셋 프리뷰 모달 ───────────────────────────────────────── -->
+<div class="ap-overlay hidden" id="apOverlay">
+    <div class="ap-box">
+        <div class="ap-header">
+            <span class="ap-title" id="apTitle">sprite.json</span>
+            <button class="ap-copy-btn" id="apCopyBtn" title="파일명 복사">⧉ 복사</button>
+            <button class="ap-close" id="apClose">✕</button>
+        </div>
+        <div class="ap-toolbar">
+            <button class="ap-zoom-btn" data-scale="0.25">25%</button>
+            <button class="ap-zoom-btn" data-scale="0.5">50%</button>
+            <button class="ap-zoom-btn active" data-scale="1">100%</button>
+            <button class="ap-zoom-btn" data-scale="1.5">150%</button>
+            <button class="ap-zoom-btn" data-scale="2">200%</button>
+            <span class="ap-info" id="apInfo"></span>
+            <button class="ap-edit-toggle" id="apEditToggle">✏ 투명 마킹</button>
+            <button class="ap-convert-btn" id="apConvertBtn" style="display:none;">▶ 픽셀 변환</button>
+        </div>
+        <div class="ap-edit-bar" id="apEditBar">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:#555;">브러시</span>
+            <button class="ap-brush-btn active" data-brush="1">1</button>
+            <button class="ap-brush-btn" data-brush="3">3</button>
+            <button class="ap-brush-btn" data-brush="5">5</button>
+            <button class="ap-brush-btn" data-brush="10">10</button>
+            <button class="ap-brush-btn" data-brush="20">20</button>
+            <button class="ap-brush-btn" data-brush="30">30</button>
+            <button class="ap-brush-btn" data-brush="40">40</button>
+            <button class="ap-brush-btn" data-brush="50">50</button>
+            <button class="ap-brush-btn" data-brush="60">60</button>
+            <button class="ap-brush-btn" data-brush="70">70</button>
+            <button class="ap-brush-btn" data-brush="80">80</button>
+            <button class="ap-brush-btn" data-brush="90">90</button>
+            <button class="ap-brush-btn" data-brush="100">100</button>
+            <div class="ap-edit-sep"></div>
+            <button class="ap-undo-btn" id="apUndoBtn" disabled>↩ 실행취소</button>
+            <button class="ap-save-btn" id="apSaveBtn">💾 저장</button>
+        </div>
+        <div class="ap-warn" id="apWarn"></div>
+        <div class="ap-canvas-wrap" style="position:relative;">
+            <canvas id="apCanvas"></canvas>
+            <canvas id="apCursorCanvas" style="position:absolute;top:12px;left:12px;pointer-events:none;image-rendering:pixelated;display:none;"></canvas>
+            <img id="apImage" style="display:none;image-rendering:pixelated;image-rendering:crisp-edges;" />
+        </div>
+    </div>
+</div>
+
+<!-- ── PixelJSON 복사 팝업 ─────────────────────────────────── -->
+<div class="acp-overlay hidden" id="acpOverlay">
+    <div class="asset-copy-popup" id="assetCopyPopup">
+        <button class="acp-close" id="acpClose">✕</button>
+        <div class="acp-label">에셋 파일명</div>
+        <div class="acp-name" id="acpName">filename.json</div>
+        <div class="acp-meta" id="acpMeta"></div>
+        <button class="acp-btn" id="acpCopyBtn">⧉  파일명 복사</button>
     </div>
 </div>
 
@@ -2037,7 +2462,7 @@ window.setSoloLayer = function(idx) {
 
 // 레이어 아이템 생성
 // 레이어별 접힘 상태 (true = 접힘)
-const _layerCollapsed = { 0: false, 1: false, 2: false, 3: false };
+const _layerCollapsed = { 0: false, 1: false, 2: false, 3: false, [-1]: false };
 
 function buildLayerList() {
     const list = document.getElementById('layerList');
@@ -2103,6 +2528,49 @@ function buildLayerList() {
         wrap.appendChild(children);
         list.appendChild(wrap);
     }
+
+    // ── 씬 비포함 레이어 (i = -1) 추가 ──────────────────────
+    {
+        const i = -1;
+        const wrap = document.createElement('div');
+        wrap.className = 'layer-wrap';
+        wrap.id = 'lwrap-1';
+
+        const item = document.createElement('div');
+        item.className = 'layer-item' + (_layerCollapsed[i] ? ' collapsed' : '');
+        item.id = 'litem-1';
+        item.innerHTML = `
+            <span class="layer-expand-arrow">▾</span>
+            <div class="layer-thumb-wrap" style="display:flex; align-items:center; justify-content:center; background:#222; border-radius:4px; font-size:16px; width:44px; height:44px;">
+                🔗
+            </div>
+            <div class="layer-meta">
+                <div class="layer-name" style="color:#FF5500; font-weight:bold;">씬 비포함</div>
+                <div class="layer-scale" id="lscale-1">캔버스 단독</div>
+                <div class="layer-res" id="lres-1">-</div>
+            </div>
+            <button class="layer-toggle-solo" id="lsolo-1" style="display:none;">S</button>
+            <div class="layer-toggle" id="ltog-1" style="display:none;"></div>`;
+
+        item.addEventListener('click', () => {
+            _layerCollapsed[i] = !_layerCollapsed[i];
+            item.classList.toggle('collapsed', _layerCollapsed[i]);
+            const childEl = document.getElementById('lchildren-1');
+            if (childEl) childEl.classList.toggle('lc-hidden', _layerCollapsed[i]);
+        });
+
+        const children = document.createElement('div');
+        children.className = 'layer-children' + (_layerCollapsed[i] ? ' lc-hidden' : '');
+        children.id = 'lchildren-1';
+
+        const entityList = document.createElement('div');
+        entityList.id = 'lentities-1';
+        children.appendChild(entityList);
+
+        wrap.appendChild(item);
+        wrap.appendChild(children);
+        list.appendChild(wrap);
+    }
 }
 buildLayerList();
 
@@ -2117,13 +2585,13 @@ const _groupCollapsed = {};
 // 레이어별 엔티티 자식 목록 갱신 (엔티티 추가/삭제/선택/에셋교체 시 호출)
 function refreshLayerChildren() {
     const engine = window._engine;
-    for (let i = 0; i < 4; i++) {
+    for (let i = -1; i < 4; i++) {
         const el = document.getElementById('lentities' + i);
         if (!el) continue;
         el.innerHTML = '';
 
         const all = engine
-            ? [...engine.entities._entities.values()].filter(e => e.layer === i && !e._detached)
+            ? [...engine.entities._entities.values()].filter(e => (i === -1 ? e._detached : (e.layer === i && !e._detached)))
             : [];
 
         // 그룹에 속하는 엔티티와 나머지 분리
@@ -2858,6 +3326,8 @@ let _dragMode    = null;
 let _dragStartGx = 0, _dragStartGy = 0;
 let _dragOrigX   = 0, _dragOrigY   = 0;
 let _dragOrigW   = 0, _dragOrigH   = 0;
+let _dragRatio   = 1;
+let _isAspectLocked = false;
 
 // 마우스 → 캔버스 픽셀 좌표 (CSS 스케일 역변환)
 function workRawToCanvas(e) {
@@ -2978,6 +3448,7 @@ workCanvas.addEventListener('mousedown', e => {
             _dragOrigY   = _selectedEntity.y;
             _dragOrigW   = _selectedEntity.pw ?? 0;
             _dragOrigH   = _selectedEntity.ph ?? 0;
+            _dragRatio   = _dragOrigW / (_dragOrigH || 1);
             workViewport.style.cursor = getCursorForHandle(h);
             e.preventDefault(); return;
         }
@@ -3054,22 +3525,51 @@ document.addEventListener('mousemove', e => {
             } else {
                 // 리사이즈 — 핸들별 x/y/pw/ph 갱신
                 _willDetach = false;
-                if (_dragMode === 'nw') {
-                    en.x  = _dragOrigX + dx;
-                    en.y  = _dragOrigY + dy;
-                    en.pw = Math.max(4, _dragOrigW - dx);
-                    en.ph = Math.max(4, _dragOrigH - dy);
-                } else if (_dragMode === 'ne') {
-                    en.y  = _dragOrigY + dy;
-                    en.pw = Math.max(4, _dragOrigW + dx);
-                    en.ph = Math.max(4, _dragOrigH - dy);
-                } else if (_dragMode === 'sw') {
-                    en.x  = _dragOrigX + dx;
-                    en.pw = Math.max(4, _dragOrigW - dx);
-                    en.ph = Math.max(4, _dragOrigH + dy);
-                } else if (_dragMode === 'se') {
-                    en.pw = Math.max(4, _dragOrigW + dx);
-                    en.ph = Math.max(4, _dragOrigH + dy);
+                const isLocked = _isAspectLocked || e.shiftKey;
+                if (isLocked) {
+                    if (_dragMode === 'nw') {
+                        const npw = Math.max(4, _dragOrigW - dx);
+                        const nph = Math.max(4, Math.round(npw / _dragRatio));
+                        en.pw = npw;
+                        en.ph = nph;
+                        en.x  = _dragOrigX + (_dragOrigW - npw);
+                        en.y  = _dragOrigY + (_dragOrigH - nph);
+                    } else if (_dragMode === 'ne') {
+                        const npw = Math.max(4, _dragOrigW + dx);
+                        const nph = Math.max(4, Math.round(npw / _dragRatio));
+                        en.pw = npw;
+                        en.ph = nph;
+                        en.y  = _dragOrigY + (_dragOrigH - nph);
+                    } else if (_dragMode === 'sw') {
+                        const npw = Math.max(4, _dragOrigW - dx);
+                        const nph = Math.max(4, Math.round(npw / _dragRatio));
+                        en.pw = npw;
+                        en.ph = nph;
+                        en.x  = _dragOrigX + (_dragOrigW - npw);
+                    } else if (_dragMode === 'se') {
+                        const npw = Math.max(4, _dragOrigW + dx);
+                        const nph = Math.max(4, Math.round(npw / _dragRatio));
+                        en.pw = npw;
+                        en.ph = nph;
+                    }
+                } else {
+                    if (_dragMode === 'nw') {
+                        en.x  = _dragOrigX + dx;
+                        en.y  = _dragOrigY + dy;
+                        en.pw = Math.max(4, _dragOrigW - dx);
+                        en.ph = Math.max(4, _dragOrigH - dy);
+                    } else if (_dragMode === 'ne') {
+                        en.y  = _dragOrigY + dy;
+                        en.pw = Math.max(4, _dragOrigW + dx);
+                        en.ph = Math.max(4, _dragOrigH - dy);
+                    } else if (_dragMode === 'sw') {
+                        en.x  = _dragOrigX + dx;
+                        en.pw = Math.max(4, _dragOrigW - dx);
+                        en.ph = Math.max(4, _dragOrigH + dy);
+                    } else if (_dragMode === 'se') {
+                        en.pw = Math.max(4, _dragOrigW + dx);
+                        en.ph = Math.max(4, _dragOrigH + dy);
+                    }
                 }
             }
         }
@@ -3078,6 +3578,7 @@ document.addEventListener('mousemove', e => {
         const wcCoords = document.getElementById('wcCoords');
         if (wcCoords) wcCoords.textContent =
             `x:${Math.round(en.x)} y:${Math.round(en.y)} ${Math.round(en.pw??0)}×${Math.round(en.ph??0)}  L${en.layer}`;
+        syncInspectorInputs(en);
         return;
     }
 
@@ -3252,7 +3753,7 @@ workViewport.addEventListener('drop', e => {
         selectEntity(hit);
         applyAssetToEntity(_dragAssetData);
     } else {
-        // 빈 영역 드롭 → 레이어 선택 후 생성
+        // 빈 영역 드롭 → 레이어 선택 후 생성 (씬 비포함 옵션 추가됨)
         _pendingAssetData = _dragAssetData;
         _pendingDropGx    = gx;
         _pendingDropGy    = gy;
@@ -3270,6 +3771,7 @@ function _saveSceneState(sceneName) {
     if (!engine) return;
     const snapshot = [];
     for (const [id, e] of engine.entities._entities) {
+        if (e._detached) continue; // 씬 비포함 엔티티 스킵
         snapshot.push({
             id,
             type:       e.type      ?? null,
@@ -3327,11 +3829,18 @@ function showLayerPicker(cx, cy) {
     const titleEl = layerPicker.querySelector('.layer-picker-title');
     if (titleEl) titleEl.textContent = _pendingBgMode ? '배경 레이어 선택' : '레이어 선택';
 
+    // 배경 지정 모드 시 씬 비포함 버튼 숨기기
+    const noSceneBtn = document.getElementById('layerPickerNoScene');
+    if (noSceneBtn) {
+        noSceneBtn.style.display = _pendingBgMode ? 'none' : 'flex';
+    }
+
     // 현재 프로젝트 레이어 이름 + parallax로 버튼 업데이트
     const proj = window._currentProject;
     const layerColors = ['#5080FF', '#50C864', '#FFC83C', '#C864FF'];
     layerPicker.querySelectorAll('.layer-picker-btn').forEach(btn => {
         const i   = parseInt(btn.dataset.layer, 10);
+        if (i === -1) return; // 씬 비포함 버튼은 마크업 텍스트 덮어쓰기 방지
         const lbl = LAYER_NAMES[i] ?? `L${i}`;
         const par = proj?.layers?.[String(i)]?.parallax ?? '';
         const sub = par !== '' ? `<span class="layer-picker-sub">×${par}</span>` : '';
@@ -3403,32 +3912,58 @@ document.addEventListener('click', e => {
 function _createEntityFromAsset(data, gx, gy, layer) {
     const engine = window._engine;
     if (!data || !engine) return;
-    const frames = (data.frames ?? []).map(f => {
-        const raw = f.pixels ?? [];
-        const pixels = (raw.length > 0 && Array.isArray(raw[0])) ? raw : flatToTriples(raw);
-        return { pixels };
-    });
-    // 에셋 자체 팔레트를 palette_mgr에 로드 — 없으면 rgbaCache miss로 픽셀 전체 invisible
-    if (data.palette?.length) engine.palette_mgr.load(data.palette);
 
+    let entity;
     const id = `entity_${Date.now()}`;
-    const entity = engine.entities.add(id, {
-        x:       Math.round(gx),
-        y:       Math.round(gy),
-        pw:      data.width  ?? 16,
-        ph:      data.height ?? 16,
-        layer,
-        visible: true,
-        scale:   1,
-        frames,
-        _palette: data.palette ?? null,
-        flipX: false, flipY: false, rotate: 0,
-    });
+    const targetLayer = layer === -1 ? 2 : layer;
+
+    if (data._isSample) {
+        entity = engine.entities.add(id, {
+            x:       Math.round(gx),
+            y:       Math.round(gy),
+            pw:      data.width  ?? 128,
+            ph:      data.height ?? 128,
+            layer:   targetLayer,
+            visible: true,
+            scale:   1,
+            flipX: false, flipY: false, rotate: 0,
+        });
+        entity._isSample = true;
+        entity._imgSrc   = data.src;
+        const imgObj = new Image();
+        imgObj.src = data.src;
+        entity._img = imgObj;
+    } else {
+        const frames = (data.frames ?? []).map(f => {
+            const raw = f.pixels ?? [];
+            const pixels = (raw.length > 0 && Array.isArray(raw[0])) ? raw : flatToTriples(raw);
+            return { pixels };
+        });
+        if (data.palette?.length) engine.palette_mgr.load(data.palette);
+
+        entity = engine.entities.add(id, {
+            x:       Math.round(gx),
+            y:       Math.round(gy),
+            pw:      data.width  ?? 16,
+            ph:      data.height ?? 16,
+            layer:   targetLayer,
+            visible: true,
+            scale:   1,
+            frames,
+            _palette: data.palette ?? null,
+            flipX: false, flipY: false, rotate: 0,
+        });
+    }
+
+    if (layer === -1) {
+        entity._detached = true; // 씬 저장에서 제외되는 마크
+    }
+
     entity.type = data.name ?? id;
     entity._asset = data.name ?? null;
     if (data._category) entity._assetCategory = data._category;
     selectEntity(entity);
-    log(`생성: ${entity.type}  L${layer}  (${Math.round(gx)}, ${Math.round(gy)})`, 'ok');
+    log(`생성: ${entity.type}  L${targetLayer}${layer === -1 ? ' (씬 비포함)' : ''}  (${Math.round(gx)}, ${Math.round(gy)})`, 'ok');
 }
 
 // ── 컨텍스트 메뉴 ─────────────────────────────────────────────
@@ -3463,8 +3998,8 @@ function _duplicateEntity(en) {
     const engine = window._engine;
     if (!en || !engine) return;
     const id = `entity_${Date.now()}`;
-    const frames = en._frames ? en._frames.map(f => ({ pixels: [...(f.pixels ?? [])] })) : null;
-    const copy = engine.entities.add(id, {
+    
+    const copyConfig = {
         x:       en.x + 12,
         y:       en.y + 12,
         pw:      en.pw,
@@ -3475,9 +4010,24 @@ function _duplicateEntity(en) {
         flipX:   en.flipX   ?? false,
         flipY:   en.flipY   ?? false,
         rotate:  en.rotate  ?? 0,
-        frames,
         _palette: en._palette ?? null,
-    });
+    };
+
+    if (en._isSample) {
+        copyConfig._isSample = true;
+        copyConfig._imgSrc   = en._imgSrc;
+    } else {
+        copyConfig.frames = en._frames ? en._frames.map(f => ({ pixels: [...(f.pixels ?? [])] })) : null;
+    }
+
+    const copy = engine.entities.add(id, copyConfig);
+
+    if (en._isSample) {
+        copy._isSample = true;
+        copy._imgSrc   = en._imgSrc;
+        copy._img      = en._img;
+    }
+
     copy.type = en.type ?? id;
     if (en._asset) { copy._asset = en._asset; if (en._assetCategory) copy._assetCategory = en._assetCategory; }
     selectEntity(copy);
@@ -3538,7 +4088,7 @@ function selectEntity(entity) {
     const isUI       = entity.layer === 3;
 
     wcEmpty.style.display   = 'none';
-    inspector.style.display = '';
+    inspector.style.display = 'flex'; // flex로 변경하여 내부 요소 배치 최적화
 
     document.getElementById('inspName').textContent  = name;
     const badge = document.getElementById('inspBadge');
@@ -3551,11 +4101,45 @@ function selectEntity(entity) {
         badge.className   = 'insp-badge' + (isInteract ? '' : isUI ? ' ui' : ' visual');
         badge.title       = '';
     }
-    document.getElementById('inspLayer').textContent = `L${entity.layer}`;
+    document.getElementById('inspLayer').textContent = entity._detached ? '씬 비포함' : `L${entity.layer}`;
+
+    // 에셋 타입 표기 뱃지 업데이트
+    const typeBadge = document.getElementById('inspTypeBadge');
+    if (typeBadge) {
+        if (entity._isSample) {
+            typeBadge.textContent = 'IMAGE';
+            typeBadge.style.background = '#FF5500';
+        } else {
+            typeBadge.textContent = 'PIXEL';
+            typeBadge.style.background = '#18A0FB';
+        }
+    }
+
+    // 비율 잠금 상태 UI 연동
+    const lockBtn = document.getElementById('btnLockAspect');
+    if (lockBtn) {
+        if (_isAspectLocked) {
+            lockBtn.classList.add('active');
+        } else {
+            lockBtn.classList.remove('active');
+        }
+        lockBtn.style.background = '';
+        lockBtn.style.color = '';
+        lockBtn.style.borderColor = '';
+    }
+
+    _dragRatio = (entity.pw ?? 16) / ((entity.ph ?? 16) || 1);
 
     syncInspectorInputs(entity);
     selInfo.textContent = `${name} @ (${Math.round(entity.x)},${Math.round(entity.y)})`;
     log(`선택: ${name}  (${entity.pw}×${entity.ph})`, 'ok');
+    
+    // 픽셀 변환 버튼 노출 여부 제어
+    const btnConvert = document.getElementById('btnConvertSprite');
+    if (btnConvert) {
+        btnConvert.style.display = entity._isSample ? 'inline-block' : 'none';
+    }
+    
     refreshLayerChildren();
 }
 
@@ -3576,14 +4160,59 @@ function syncInspectorInputs(entity) {
         if (isNaN(v)) return;
         if (id === 'inspX') _selectedEntity.x  = v;
         if (id === 'inspY') _selectedEntity.y  = v;
-        if (id === 'inspW') _selectedEntity.pw = Math.max(1, v);
-        if (id === 'inspH') _selectedEntity.ph = Math.max(1, v);
+        if (id === 'inspW') {
+            const wVal = Math.max(1, v);
+            _selectedEntity.pw = wVal;
+            if (_isAspectLocked) {
+                _selectedEntity.ph = Math.max(1, Math.round(wVal / _dragRatio));
+                const hInput = document.getElementById('inspH');
+                if (hInput) hInput.value = _selectedEntity.ph;
+            }
+        }
+        if (id === 'inspH') {
+            const hVal = Math.max(1, v);
+            _selectedEntity.ph = hVal;
+            if (_isAspectLocked) {
+                _selectedEntity.pw = Math.max(1, Math.round(hVal * _dragRatio));
+                const wInput = document.getElementById('inspW');
+                if (wInput) wInput.value = _selectedEntity.pw;
+            }
+        }
         const selInfo = document.getElementById('selectedInfo');
         if (selInfo) selInfo.textContent =
             `${_selectedEntity.type??_selectedEntity.id} @ (${Math.round(_selectedEntity.x)},${Math.round(_selectedEntity.y)})`;
     });
     // 드래그 이후 인스펙터 동기화 (mouseup 이후 RAF)
     input.addEventListener('focus', () => input.select());
+});
+
+// 비율 잠금 버튼 토글 이벤트 리스너 등록
+document.getElementById('btnLockAspect')?.addEventListener('click', () => {
+    _isAspectLocked = !_isAspectLocked;
+    const lockBtn = document.getElementById('btnLockAspect');
+    if (lockBtn) {
+        if (_isAspectLocked) {
+            lockBtn.classList.add('active');
+        } else {
+            lockBtn.classList.remove('active');
+        }
+        lockBtn.style.background = '';
+        lockBtn.style.color = '';
+        lockBtn.style.borderColor = '';
+    }
+    if (_selectedEntity) {
+        _dragRatio = (_selectedEntity.pw ?? 16) / ((_selectedEntity.ph ?? 16) || 1);
+    }
+    log(`비율 잠금: ${_isAspectLocked ? 'ON' : 'OFF'}`, 'info');
+});
+
+// 인스펙터 픽셀 변환 버튼 클릭 리스너 등록
+document.getElementById('btnConvertSprite')?.addEventListener('click', () => {
+    if (!_selectedEntity || !_selectedEntity._isSample) return;
+    _apWasOpenBeforeImport = true;
+    document.getElementById('apOverlay')?.classList.add('hidden');
+    _setImportSrc(_selectedEntity._img.src, _selectedEntity.type ?? _selectedEntity.id);
+    _runPreviewImport();
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -3922,10 +4551,12 @@ function _initImportPanel() {
 
     // 모달 버튼
     document.getElementById('pixelModalSave')?.addEventListener('click', async () => {
-        _stopModalAnim();
-        document.getElementById('pixelImportModal').classList.add('hidden');
-        document.getElementById('pixelModalFrameBar').style.display = 'none';
-        await _runSavePixel();
+        const saved = await _runSavePixel();
+        if (saved) {
+            _stopModalAnim();
+            document.getElementById('pixelImportModal').classList.add('hidden');
+            document.getElementById('pixelModalFrameBar').style.display = 'none';
+        }
     });
     document.getElementById('pixelModalCancel')?.addEventListener('click', () => {
         _stopModalAnim();
@@ -3933,6 +4564,10 @@ function _initImportPanel() {
         document.getElementById('pixelModalFrameBar').style.display = 'none';
         _importedPixelData = null;
         document.getElementById('importStatus').textContent = '취소됨';
+        if (_apWasOpenBeforeImport) {
+            _apWasOpenBeforeImport = false;
+            document.getElementById('apOverlay').classList.remove('hidden');
+        }
     });
     // 오버레이 클릭으로도 닫기
     document.getElementById('pixelImportModal')?.addEventListener('click', (e) => {
@@ -3941,6 +4576,10 @@ function _initImportPanel() {
             e.currentTarget.classList.add('hidden');
             document.getElementById('pixelModalFrameBar').style.display = 'none';
             _importedPixelData = null;
+            if (_apWasOpenBeforeImport) {
+                _apWasOpenBeforeImport = false;
+                document.getElementById('apOverlay').classList.remove('hidden');
+            }
         }
     });
 }
@@ -3951,7 +4590,7 @@ function _stopModalAnim() {
 }
 
 // ── GIF 애니 모달 표시 ────────────────────────────────────────
-function _startModalAnim(frames, palette, mc, sc) {
+function _startModalAnim(frames, palette, mc) {
     _stopModalAnim();
     _modalFrameIdx = 0;
     const frameBar = document.getElementById('pixelModalFrameBar');
@@ -3966,7 +4605,7 @@ function _startModalAnim(frames, palette, mc, sc) {
             const c = palette[ci];
             if (!c || c === 'transparent') return;
             mCtx.fillStyle = c;
-            mCtx.fillRect(px * sc, py * sc, sc, sc);
+            mCtx.fillRect(px, py, 1, 1);
         });
         if (frameBar)
             frameBar.textContent =
@@ -3975,6 +4614,20 @@ function _startModalAnim(frames, palette, mc, sc) {
         _modalAnimTimer = setTimeout(tick, fr.delay);
     }
     tick();
+}
+
+// ── 변환 중 로딩 헬퍼 함수 ──────────────────────────────
+function showConvertLoading(msg) {
+    const el = document.getElementById('convertLoadingOverlay');
+    const txt = document.getElementById('convertLoadingText');
+    if (el) {
+        if (txt) txt.textContent = msg || '변환 중입니다...';
+        el.classList.remove('hidden');
+    }
+}
+function hideConvertLoading() {
+    const el = document.getElementById('convertLoadingOverlay');
+    if (el) el.classList.add('hidden');
 }
 
 // ── GIF → 서버 변환 → 애니 모달 ──────────────────────────────
@@ -4027,35 +4680,66 @@ function _gifToast(msg, isErr = false, loading = false) {
     }
 }
 
-async function _runGifConvert() {
+async function _runGifConvert(params = null) {
     const statusEl = document.getElementById('importStatus');
     const setStatus = t => { if (statusEl) statusEl.textContent = t; };
-    const name = (document.getElementById('importName')?.value.trim() || 'animated_sprite');
-    const pct  = parseInt(document.getElementById('importScale')?.value ?? '100');
+
+    let scale, trimLR, trimTB, name;
+    if (params) {
+        scale = params.scale;
+        trimLR = params.trimLR;
+        trimTB = params.trimTB;
+        name = params.name;
+    } else {
+        scale = parseInt(document.getElementById('importScale')?.value ?? '100');
+        trimLR = 0;
+        trimTB = 0;
+        name = document.getElementById('importName')?.value.trim() || 'animated_sprite';
+
+        // 모달 입력창 리셋
+        const mName = document.getElementById('pixelModalNameInput');
+        const mScale = document.getElementById('pixelModalScaleInput');
+        const mTrimLR = document.getElementById('pixelModalTrimLR');
+        const mTrimTB = document.getElementById('pixelModalTrimTB');
+        if (mName) mName.value = name;
+        if (mScale) mScale.value = scale;
+        if (mTrimLR) mTrimLR.value = 0;
+        if (mTrimTB) mTrimTB.value = 0;
+    }
 
     _gifToast('파일 읽는 중...', false, true);
     setStatus('GIF 읽는 중...');
+    showConvertLoading('GIF 파일 분석 중...');
 
     let payload;
     if (_importGifFile) {
-        // 업로드된 파일 → base64
-        const b64 = await new Promise((res, rej) => {
-            const reader = new FileReader();
-            reader.onload  = e => res(e.target.result.split(',')[1]);
-            reader.onerror = rej;
-            reader.readAsDataURL(_importGifFile);
-        });
-        payload = { gifBase64: b64, scale: pct, name };
+        try {
+            // 업로드된 파일 → base64
+            const b64 = await new Promise((res, rej) => {
+                const reader = new FileReader();
+                reader.onload  = e => res(e.target.result.split(',')[1]);
+                reader.onerror = rej;
+                reader.readAsDataURL(_importGifFile);
+            });
+            payload = { gifBase64: b64, scale, trimLR, trimTB, name };
+        } catch (e) {
+            _gifToast('파일 로드 실패: ' + e.message, true);
+            setStatus('변환 실패: ' + e.message);
+            hideConvertLoading();
+            return;
+        }
     } else if (_importGifPath) {
         // 샘플 탭 GIF → 로컬 경로
-        payload = { gifPath: _importGifPath, scale: pct, name };
+        payload = { gifPath: _importGifPath, scale, trimLR, trimTB, name };
     } else {
         setStatus('GIF 소스가 없습니다');
+        hideConvertLoading();
         return;
     }
 
     _gifToast('프레임 변환 중...', false, true);
     setStatus('서버에서 변환 중...');
+    showConvertLoading('서버에서 GIF 프레임 변환 중...');
     let data;
     try {
         const resp = await fetch('/api/convert-gif', {
@@ -4067,11 +4751,13 @@ async function _runGifConvert() {
     } catch (e) {
         _gifToast('변환 실패: ' + e.message, true);
         setStatus('변환 실패: 서버 오류 — ' + e.message);
+        hideConvertLoading();
         return;
     }
     if (!data.ok) {
         _gifToast('변환 실패: ' + data.error, true);
         setStatus('변환 실패: ' + data.error);
+        hideConvertLoading();
         return;
     }
 
@@ -4095,28 +4781,61 @@ async function _runGifConvert() {
     const mInfo  = document.getElementById('pixelModalInfo');
     const mTitle = document.getElementById('pixelModalTitle');
 
-    const maxW = Math.floor(window.innerWidth  * 0.8);
-    const maxH = Math.floor(window.innerHeight * 0.55);
-    const sc   = Math.max(1, Math.floor(Math.min(maxW / data.width, maxH / data.height)));
-    mc.width   = data.width  * sc;
-    mc.height  = data.height * sc;
+    // ── 디스플레이 크기 계산 (최대 너비 200px, 최대 높이 150px 제한) ──
+    const maxW = 200;
+    const maxH = 150;
+    let dw = data.width;
+    let dh = data.height;
+    if (dw > maxW || dh > maxH) {
+        const ratio = Math.min(maxW / dw, maxH / dh);
+        dw = Math.round(dw * ratio);
+        dh = Math.round(dh * ratio);
+    } else {
+        const zoom = Math.max(1, Math.min(2, Math.floor(Math.min(maxW / data.width, maxH / data.height))));
+        dw = data.width * zoom;
+        dh = data.height * zoom;
+    }
+
+    mc.width   = data.width;
+    mc.height  = data.height;
+    mc.style.width  = dw + 'px';
+    mc.style.height = dh + 'px';
+
+    // ── 원본 이미지 표시 (CSS 크롭 래퍼 적용) ───────────────────────
+    const mOrigWrap = document.getElementById('pixelModalOrigWrap');
+    const mOrigImg = document.getElementById('pixelModalOrigImg');
+    if (mOrigWrap && mOrigImg) {
+        mOrigImg.src = _importSrcUrl;
+        
+        mOrigWrap.style.width = dw + 'px';
+        mOrigWrap.style.height = dh + 'px';
+        
+        const cw = data.origWidth - 2 * trimLR;
+        const imgScale = dw / cw;
+        mOrigImg.style.width = (data.origWidth * imgScale) + 'px';
+        mOrigImg.style.height = (data.origHeight * imgScale) + 'px';
+        
+        mOrigImg.style.left = - (trimLR * imgScale) + 'px';
+        mOrigImg.style.top = - (trimTB * imgScale) + 'px';
+    }
 
     mTitle.textContent = name;
     mInfo.textContent  =
         `${data.width}×${data.height} · ${data.frameCount}프레임 · ` +
-        `팔레트 ${data.palette.length - 1}색 · ×${sc}`;
+        `팔레트 ${data.palette.length - 1}색`;
     modal.classList.remove('hidden');
 
-    _startModalAnim(data.frames, data.palette, mc, sc);
+    _startModalAnim(data.frames, data.palette, mc);
 
     const doneMsg = `${data.width}×${data.height} · ${data.frameCount}프레임 변환 완료`;
     _gifToast(doneMsg);
     setTimeout(() => { const t = document.getElementById('_gifToast'); if(t) t.style.opacity='0'; }, 2000);
     setStatus(doneMsg);
     log(`GIF 임포트: ${data.width}×${data.height} (${data.frameCount}f)`, 'ok');
+    hideConvertLoading();
 }
 
-async function _runPreviewImport() {
+async function _runPreviewImport(params = null) {
     const statusEl = document.getElementById('importStatus');
     const setStatus = t => { if (statusEl) statusEl.textContent = t; };
 
@@ -4125,18 +4844,40 @@ async function _runPreviewImport() {
         return;
     }
 
+    let scale, trimLR, trimTB, name;
+    if (params) {
+        scale = params.scale;
+        trimLR = params.trimLR;
+        trimTB = params.trimTB;
+        name = params.name;
+    } else {
+        scale = parseInt(document.getElementById('importScale')?.value ?? '100');
+        trimLR = 0;
+        trimTB = 0;
+        name = document.getElementById('importName')?.value.trim() || 'imported_sprite';
+
+        // 모달 입력창 리셋
+        const mName = document.getElementById('pixelModalNameInput');
+        const mScale = document.getElementById('pixelModalScaleInput');
+        const mTrimLR = document.getElementById('pixelModalTrimLR');
+        const mTrimTB = document.getElementById('pixelModalTrimTB');
+        if (mName) mName.value = name;
+        if (mScale) mScale.value = scale;
+        if (mTrimLR) mTrimLR.value = 0;
+        if (mTrimTB) mTrimTB.value = 0;
+    }
+
     // GIF → 서버 변환 경로
-    if (_importIsGif) { await _runGifConvert(); return; }
+    if (_importIsGif) { await _runGifConvert({ scale, trimLR, trimTB, name }); return; }
 
     const colorMode = document.querySelector('input[name="colorMode"]:checked')?.value ?? 'palette';
-    // _projectPaletteColors: 프로젝트 로드 시 저장된 팔레트 (에셋 로드 후에도 불변)
-    // palette_mgr.original은 마지막 에셋 팔레트로 덮어써지므로 사용하지 않음
     const palColors = window._projectPaletteColors ?? window._engine?.palette_mgr?.original ?? [];
     if (colorMode === 'palette' && palColors.length < 2) {
         setStatus('팔레트 없음 — 프로젝트를 먼저 선택하세요');
         return;
     }
 
+    showConvertLoading('이미지 픽셀 변환 중...');
     setStatus('변환 중...');
 
     // 이미지 로드 — 9192 포트 이미지는 프록시로 CORS 우회
@@ -4150,29 +4891,37 @@ async function _runPreviewImport() {
         await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
     } catch {
         setStatus('이미지 로드 실패');
+        hideConvertLoading();
         return;
     }
 
-    // 목표 크기: 원본 픽셀 1:1 기준, 스테퍼 % 적용
-    const pct = parseInt(document.getElementById('importScale')?.value ?? '100');
-    let tw = Math.max(1, Math.round(img.naturalWidth  * pct / 100));
-    let th = Math.max(1, Math.round(img.naturalHeight * pct / 100));
+    // 크롭 영역 계산
+    const cw = img.naturalWidth - 2 * trimLR;
+    const ch = img.naturalHeight - 2 * trimTB;
+    if (cw <= 0 || ch <= 0) {
+        setStatus('크롭 영역이 이미지 크기보다 큽니다');
+        hideConvertLoading();
+        return;
+    }
 
-    // 오프스크린 변환
+    // 목표 크기: 크롭 후 크기 기준, 배율 적용
+    let tw = Math.max(1, Math.round(cw * scale / 100));
+    let th = Math.max(1, Math.round(ch * scale / 100));
+
+    // 오프스크린 변환 (크롭하고 축소)
     const off  = document.createElement('canvas');
     off.width  = tw;  off.height = th;
     const octx = off.getContext('2d');
     octx.imageSmoothingEnabled = true;
     octx.imageSmoothingQuality = 'high';
-    octx.drawImage(img, 0, 0, tw, th);
+    octx.drawImage(img, trimLR, trimTB, cw, ch, 0, 0, tw, th);
     const imgData = octx.getImageData(0, 0, tw, th);
 
     let finalPalette, pixels;
 
     if (colorMode === 'extract') {
-        // ── 이미지 색상 직접 추출 (퀀타이즈 없이 실제 픽셀 색 그대로) ──
         const MAX_COLORS = 256;
-        const colorMap   = new Map();   // 24bit key → count
+        const colorMap   = new Map();
 
         for (let i = 0; i < imgData.data.length; i += 4) {
             if (imgData.data[i+3] < 64) continue;
@@ -4180,25 +4929,19 @@ async function _runPreviewImport() {
             colorMap.set(key, (colorMap.get(key) ?? 0) + 1);
         }
 
-        // 빈도 내림차순 → 상위 MAX_COLORS (색이 많으면 잘라냄)
         const sorted = [...colorMap.entries()]
             .sort((a, b) => b[1] - a[1])
             .slice(0, MAX_COLORS);
 
-        // 팔레트: 0 = transparent, 1~ = 실제 색
         finalPalette = ['transparent', ...sorted.map(([key]) =>
             '#' + [(key>>16)&0xFF, (key>>8)&0xFF, key&0xFF]
                 .map(v => v.toString(16).padStart(2,'0')).join('')
         )];
 
-        // 팔레트 역방향 조회 Map (24bit key → paletteIndex)
         const palIdx = new Map(sorted.map(([key], i) => [key, i + 1]));
-
-        // 팔레트 RGB 배열 (nearest-color 폴백용)
         const extRGB = sorted.map(([key]) =>
             [(key>>16)&0xFF, (key>>8)&0xFF, key&0xFF]);
 
-        // 픽셀 → 팔레트 인덱스
         pixels = [];
         for (let y = 0; y < th; y++) {
             for (let x = 0; x < tw; x++) {
@@ -4209,8 +4952,6 @@ async function _runPreviewImport() {
                 const key = (r << 16) | (g << 8) | b;
                 let idx = palIdx.get(key);
                 if (idx === undefined) {
-                    // 팔레트 초과 색 → 지각적 거리 최근접 색 매핑
-                    // 가중치: R×0.299 G×0.587 B×0.114 (luminance 보정)
                     let best = Infinity, bestI = 1;
                     for (let ci = 0; ci < extRGB.length; ci++) {
                         const pc = extRGB[ci];
@@ -4229,18 +4970,14 @@ async function _runPreviewImport() {
         if (span) span.textContent = `${finalPalette.length - 1}색`;
 
     } else {
-        // ── 프로젝트 팔레트 매핑 ──────────────────────────────────
-        // _projectPaletteColors: 프로젝트 로드 시 저장 (에셋 로드로 덮어써지지 않음)
         finalPalette = palColors;
 
-        // sRGB → linear → CIE-LAB 근사 (지각적 색 거리 — 붉은색/파란색 오인식 방지)
         function srgbToLinear(v) {
             v /= 255;
             return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
         }
         function rgbToLab(r, g, b) {
             const lr = srgbToLinear(r), lg = srgbToLinear(g), lb = srgbToLinear(b);
-            // D65 XYZ
             let X = (lr * 0.4124 + lg * 0.3576 + lb * 0.1805) / 0.95047;
             let Y = (lr * 0.2126 + lg * 0.7152 + lb * 0.0722) / 1.00000;
             let Z = (lr * 0.0193 + lg * 0.1192 + lb * 0.9505) / 1.08883;
@@ -4254,7 +4991,6 @@ async function _runPreviewImport() {
                 ? [parseInt(h[0]+h[0],16), parseInt(h[1]+h[1],16), parseInt(h[2]+h[2],16)]
                 : [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
         };
-        // 팔레트 LAB 캐시 사전 계산
         const palLab = palColors.map(c => {
             const rgb = parseHex(c);
             return rgb ? rgbToLab(...rgb) : null;
@@ -4290,35 +5026,77 @@ async function _runPreviewImport() {
     const mInfo  = document.getElementById('pixelModalInfo');
     const mTitle = document.getElementById('pixelModalTitle');
 
-    // 캔버스 크기: 최대 80vw × 60vh 기준 정수 스케일
-    const maxW = Math.floor(window.innerWidth  * 0.8);
-    const maxH = Math.floor(window.innerHeight * 0.6);
-    const sc   = Math.max(1, Math.floor(Math.min(maxW / tw, maxH / th)));
-    mc.width   = tw * sc;
-    mc.height  = th * sc;
+    // ── 디스플레이 크기 계산 (최대 너비 200px, 최대 높이 150px 제한) ──
+    const maxW = 200;
+    const maxH = 150;
+    let dw = tw;
+    let dh = th;
+    if (dw > maxW || dh > maxH) {
+        const ratio = Math.min(maxW / dw, maxH / dh);
+        dw = Math.round(dw * ratio);
+        dh = Math.round(dh * ratio);
+    } else {
+        const zoom = Math.max(1, Math.min(2, Math.floor(Math.min(maxW / tw, maxH / th))));
+        dw = tw * zoom;
+        dh = th * zoom;
+    }
+
+    mc.width   = tw;
+    mc.height  = th;
+    mc.style.width  = dw + 'px';
+    mc.style.height = dh + 'px';
+
+    // ── 원본 이미지 표시 (CSS 크롭 래퍼 적용) ───────────────────────
+    const mOrigWrap = document.getElementById('pixelModalOrigWrap');
+    const mOrigImg = document.getElementById('pixelModalOrigImg');
+    if (mOrigWrap && mOrigImg) {
+        mOrigImg.src = _importSrcUrl;
+        
+        mOrigWrap.style.width = dw + 'px';
+        mOrigWrap.style.height = dh + 'px';
+        
+        const cw = img.naturalWidth - 2 * trimLR;
+        const imgScale = dw / cw;
+        mOrigImg.style.width = (img.naturalWidth * imgScale) + 'px';
+        mOrigImg.style.height = (img.naturalHeight * imgScale) + 'px';
+        
+        mOrigImg.style.left = - (trimLR * imgScale) + 'px';
+        mOrigImg.style.top = - (trimTB * imgScale) + 'px';
+    }
 
     const mCtx = mc.getContext('2d');
-    mCtx.clearRect(0, 0, mc.width, mc.height);
+    mCtx.clearRect(0, 0, tw, th);
     pixels.forEach(([px, py, ci]) => {
         const c = finalPalette[ci];
         if (!c || c === 'transparent') return;
         mCtx.fillStyle = c;
-        mCtx.fillRect(px * sc, py * sc, sc, sc);
+        mCtx.fillRect(px, py, 1, 1);
     });
 
-    const name = document.getElementById('importName')?.value.trim() || 'imported_sprite';
     mTitle.textContent = name;
-    mInfo.textContent  = `${tw}×${th} · ${pixels.length}px · 팔레트 ${palColors.length}색 · ×${sc}`;
+    mInfo.textContent  = `${tw}×${th} · ${pixels.length}px · 팔레트 ${palColors.length}색`;
     modal.classList.remove('hidden');
 
     setStatus(`${tw}×${th} · ${pixels.length}px 변환 완료`);
     log(`임포트 미리보기: ${tw}×${th} (${pixels.length}px)`, 'ok');
+    hideConvertLoading();
 }
 
 async function _runSavePixel() {
-    if (!_importedPixelData) return;
-    const name = (document.getElementById('importName')?.value.trim() || 'imported_sprite')
-        .replace(/[^a-zA-Z0-9_-]/g, '_');
+    if (!_importedPixelData) return false;
+    const nameVal = document.getElementById('pixelModalNameInput')?.value.trim() || 
+                    document.getElementById('importName')?.value.trim() || 'imported_sprite';
+
+    const name = nameVal.replace(/[^a-zA-Z0-9_-]/g, '_');
+    if (!name) {
+        alert("올바른 파일 이름을 입력해주세요.");
+        return false;
+    }
+
+    if (!confirm(`"${name}.json" 으로 저장하시겠습니까?`)) {
+        return false;
+    }
+
     const statusEl = document.getElementById('importStatus');
     const setStatus = t => { if (statusEl) statusEl.textContent = t; };
 
@@ -4340,7 +5118,7 @@ async function _runSavePixel() {
             const catMap = await listRes.json();
             const allNames = Object.values(catMap).flat();
             if (allNames.includes(name)) {
-                if (!confirm(`"${name}.json" 이 이미 존재합니다.\n덮어쓰시겠습니까?`)) return;
+                if (!confirm(`"${name}.json" 이 이미 존재합니다.\n덮어쓰시겠습니까?`)) return false;
             }
         }
     } catch { /* 목록 확인 실패 시 그냥 저장 진행 */ }
@@ -4361,9 +5139,11 @@ async function _runSavePixel() {
         log(`픽셀 에셋 저장: ${name} → ${category} (${_importedPixelData.width}×${_importedPixelData.height})`, 'ok');
         _importedPixelData = null;
         window.loadAssets();
+        return true;
     } catch (e) {
         setStatus(`저장 오류: ${e.message}`);
         log(`픽셀 저장 실패: ${e.message}`, 'err');
+        return false;
     }
 }
 
@@ -4510,148 +5290,668 @@ function renderAssetGrid() {
         const img = document.createElement('img');
         img.className = 'asset-card-thumb';
         img.style.objectFit = 'contain';
+        img.loading = 'lazy'; // 레이지 로딩 적용하여 캐시/메모리 부하 및 렉 최소화
         img.src = imgUrl;
         const sName = document.createElement('div');
         sName.className   = 'asset-card-name';
         sName.textContent = decodeURIComponent(item._file.split('/').pop());
-        const cvtBtn = document.createElement('button');
-        cvtBtn.className   = 'sample-convert-btn';
-        cvtBtn.textContent = '▶ 픽셀 변환';
-        cvtBtn.addEventListener('click', e => {
-            e.stopPropagation();
-            _setImportSrc(imgUrl, decodeURIComponent(item._file.split('/').pop()));
-            document.querySelectorAll('.asset-card.import-selected')
-                .forEach(c => c.classList.remove('import-selected'));
-            card.classList.add('import-selected');
-            _runPreviewImport();
-        });
+
         card.appendChild(img);
         card.appendChild(sName);
-        card.appendChild(cvtBtn);
         card.title = item._file ?? '';
+
+        // 샘플 카드 드래그 활성화
+        card.draggable = true;
+        card.addEventListener('dragstart', e => {
+            const name = decodeURIComponent(item._file.split('/').pop());
+            const thumbImg = card.querySelector('.asset-card-thumb');
+            const nw = thumbImg?.naturalWidth || 100;
+            const nh = thumbImg?.naturalHeight || 100;
+            _dragAssetData = {
+                name: name,
+                _isSample: true,
+                src: imgUrl,
+                width: nw,
+                height: nh
+            };
+            e.dataTransfer.effectAllowed = 'copy';
+            e.dataTransfer.setData('text/plain', name);
+            card.classList.add('dragging');
+        });
+        card.addEventListener('dragend', () => card.classList.remove('dragging'));
+
         card.addEventListener('click', () => {
             _setImportSrc(imgUrl, decodeURIComponent(item._file.split('/').pop()));
             document.querySelectorAll('.asset-card.import-selected')
                 .forEach(c => c.classList.remove('import-selected'));
             card.classList.add('import-selected');
             log(`샘플: ${decodeURIComponent(item._file.split('/').pop())}`, 'ok');
+
+            // 샘플 이미지 미리보기 팝업(모달) 띄우기
+            const imgObj = new Image();
+            imgObj.src = imgUrl;
+            imgObj.onload = () => {
+                openAssetPreview({
+                    name: decodeURIComponent(item._file.split('/').pop()),
+                    width: imgObj.naturalWidth,
+                    height: imgObj.naturalHeight,
+                    _isSample: true,
+                    src: imgUrl
+                });
+            };
         });
 
         grid.appendChild(card);
     });
 }
 
-// PixelJSON 카드 생성 헬퍼 (renderAssetGrid에서 분리)
+// PixelJSON 파일명 리스트 행 생성
 function _buildPixelCard(grid, item, cat) {
-    const card = document.createElement('div');
-    card.className = 'asset-card';
+    const row = document.createElement('div');
+    row.className = 'asset-file-row';
+    row.draggable = true;
 
-    const isIcon = _assetViewMode === 'icon';
-    const tw     = isIcon ? 44 : 72;
-    const th     = isIcon ? 33 : 54;
-    const w      = item.width  ?? '?';
-    const h      = item.height ?? '?';
-    const fps    = item.fps    ?? '?';
-    const fc     = (item.frames ?? []).length;
+    const w = item.width  ?? '?';
+    const h = item.height ?? '?';
 
-    // 썸네일 캔버스
-    const tc = document.createElement('canvas');
-    tc.className = 'asset-card-thumb';
-    tc.width = tw; tc.height = th;
-    renderPixelJSON(tc, item);
-    card.appendChild(tc);
+    // 파일명
+    const nameEl = document.createElement('span');
+    nameEl.className   = 'asset-file-name';
+    nameEl.textContent = item.name ?? '?';
 
-    // 레이어 배경 지정 버튼
-    const bgBtn = document.createElement('button');
-    bgBtn.className   = 'asset-card-bg';
-    bgBtn.textContent = '⊞';
-    bgBtn.title       = '레이어 배경으로 지정';
-    bgBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const scene = window._curEditorScene;
-        const sDef  = window._currentProject?.scenes?.[scene];
-        if (!scene || sDef?.type !== 'live') {
-            log('live 씬을 먼저 선택하세요', 'warn'); return;
-        }
-        _pendingAssetData = item;
-        _pendingBgMode    = true;
-        showLayerPicker(e.clientX, e.clientY);
-    });
-    card.appendChild(bgBtn);
+    // 크기 메타
+    const metaEl = document.createElement('span');
+    metaEl.className   = 'asset-file-meta';
+    metaEl.textContent = `${w}×${h}`;
 
     // 삭제 버튼
     const delBtn = document.createElement('button');
-    delBtn.className   = 'asset-card-del';
+    delBtn.className   = 'asset-file-del';
     delBtn.textContent = '✕';
     delBtn.title       = '삭제';
     delBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        _hideTip();
         if (!confirm(`"${item.name}.json" 을 삭제하시겠습니까?`)) return;
         await _deletePixel(item.name, cat ?? item._category);
     });
-    card.appendChild(delBtn);
 
-    // 파일명
-    const nameEl = document.createElement('div');
-    nameEl.className   = 'asset-card-name';
-    nameEl.textContent = item.name ?? '?';
-    card.appendChild(nameEl);
+    row.appendChild(nameEl);
+    row.appendChild(metaEl);
+    row.appendChild(delBtn);
 
-    if (!isIcon) {
-        // 상세 뷰: 메타 + AG 가이드
-        const meta = document.createElement('div');
-        meta.className = 'asset-card-meta';
-        meta.innerHTML =
-            `<span class="asset-meta-tag tag-size">${w}×${h}</span>` +
-            `<span class="asset-meta-tag tag-fps">${fps}fps</span>` +
-            `<span class="asset-meta-tag tag-frames">${fc}f</span>`;
-        card.appendChild(meta);
-        const agGuide = document.getElementById('agGuide');
-        card.addEventListener('mouseenter', e => {
-            const palCount = (item.palette ?? []).filter(c => c !== 'transparent').length;
-            document.getElementById('agLockLine').textContent =
-                `${w}×${h} · ${fps}fps · ${fc}프레임 — 변경 불가`;
-            document.getElementById('agPalLine').textContent =
-                `팔레트 ${palCount}색 — 이 색 안에서만`;
-            document.getElementById('agMeta').textContent =
-                (item.palette ?? []).filter(c => c !== 'transparent').join('  ');
-            agGuide.style.display = 'block';
-            agGuide.style.left = (e.clientX + 14) + 'px';
-            agGuide.style.top  = (e.clientY - 10) + 'px';
-        });
-        card.addEventListener('mousemove', e => {
-            agGuide.style.left = (e.clientX + 14) + 'px';
-            agGuide.style.top  = (e.clientY - 10) + 'px';
-        });
-        card.addEventListener('mouseleave', () => { agGuide.style.display = 'none'; });
-    } else {
-        // 아이콘 뷰: 호버 프리뷰
-        card.addEventListener('mouseenter', e => _showHoverTip(item, e));
-        card.addEventListener('mousemove',  e => _moveTip(e));
-        card.addEventListener('mouseleave', _hideTip);
-    }
+    // 클릭 → 선택 + 에셋 적용 + 프리뷰 모달
+    row.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.asset-file-row.selected')
+            .forEach(r => r.classList.remove('selected'));
+        row.classList.add('selected');
+        _selectedCard = item;
+        applyAssetToEntity(item);
+        openAssetPreview(item);
+    });
 
-    card.title     = `${item.name ?? '?'}.json`;
-    card.draggable = true;
-    card.addEventListener('dragstart', e => {
+    // 드래그
+    row.addEventListener('dragstart', e => {
         _dragAssetData = item;
         e.dataTransfer.effectAllowed = 'copy';
         e.dataTransfer.setData('text/plain', item.name ?? '');
-        card.classList.add('dragging');
+        row.classList.add('dragging');
     });
-    card.addEventListener('dragend', () => card.classList.remove('dragging'));
+    row.addEventListener('dragend', () => row.classList.remove('dragging'));
 
-    card.addEventListener('click', () => {
-        document.querySelectorAll('.asset-card.selected')
-            .forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        _selectedCard = item;
-        applyAssetToEntity(item);
-    });
-
-    grid.appendChild(card);
+    grid.appendChild(row);
 }
+
+// ══════════════════════════════════════════════════════════════
+// 에셋 프리뷰 모달
+// ══════════════════════════════════════════════════════════════
+let _apItem  = null;
+let _apScale = 1;
+let _apWasOpenBeforeImport = false;
+
+function openAssetPreview(item) {
+    _apItem      = item;
+    _apWorkData  = null;
+    _apUndoStack = [];
+    _apEditMode  = false;
+    // 큰 에셋(배경 등)은 기본 25%, 중간 에셋은 50%, 작은 에셋은 100%
+    const w = item.width || item.pw || 16;
+    _apScale = w >= 400 ? 0.25 : w >= 100 ? 0.5 : 1;
+    
+    // 샘플 이미지는 확장자 .json을 붙이지 않고 본래 이름 표시
+    document.getElementById('apTitle').textContent = item._isSample ? (item.name ?? '') : ((item.name ?? '?') + '.json');
+    
+    // 편집 UI 토글 제어 (샘플 사진은 드로잉 편집 불가)
+    const editToggle = document.getElementById('apEditToggle');
+    if (editToggle) editToggle.style.display = item._isSample ? 'none' : 'inline-block';
+    const saveBtn = document.getElementById('apSaveBtn');
+    if (saveBtn) saveBtn.style.display = item._isSample ? 'none' : 'inline-block';
+    const convertBtn = document.getElementById('apConvertBtn');
+    if (convertBtn) convertBtn.style.display = item._isSample ? 'inline-block' : 'none';
+
+    // 편집 UI 리셋
+    document.getElementById('apEditToggle').classList.remove('active');
+    document.getElementById('apEditToggle').textContent = '✏ 투명 마킹';
+    document.getElementById('apEditBar').classList.remove('visible');
+    document.getElementById('apUndoBtn').disabled = true;
+    document.getElementById('apCanvas').classList.remove('edit-mode');
+    document.getElementById('apWarn').style.opacity = '0';
+    _apRender();
+    _apUpdateZoom();
+    document.getElementById('apOverlay').classList.remove('hidden');
+}
+
+function _apRender() {
+    const canvas = document.getElementById('apCanvas');
+    const item   = _apItem;
+    if (!item || !canvas) return;
+
+    const W = item.width  || 16;
+    const H = item.height || 16;
+    const s = _apScale;
+    const cw = Math.round(W * s);
+    const ch = Math.round(H * s);
+    canvas.width  = cw;
+    canvas.height = ch;
+
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.imageSmoothingEnabled = false;
+
+    const apImg = document.getElementById('apImage');
+
+    // ── 샘플 이미지 렌더링 분기 ──────────────────────────────
+    if (item._isSample) {
+        const isGif = item.src && item.src.toLowerCase().endsWith('.gif');
+        if (isGif) {
+            if (canvas) canvas.style.display = 'none';
+            const cursorCanvas = document.getElementById('apCursorCanvas');
+            if (cursorCanvas) cursorCanvas.style.display = 'none';
+
+            if (apImg) {
+                apImg.style.display = 'block';
+                if (apImg.src !== item.src) {
+                    apImg.src = item.src;
+                }
+                apImg.style.width = cw + 'px';
+                apImg.style.height = ch + 'px';
+            }
+            document.getElementById('apInfo').textContent =
+                `${W}×${H} · ${Math.round(s*100)}% · 애니메이션 GIF`;
+            return;
+        } else {
+            if (apImg) apImg.style.display = 'none';
+            if (canvas) canvas.style.display = 'block';
+        }
+
+        if (!item._img) {
+            const img = new Image();
+            img.src = item.src;
+            img.onload = () => {
+                item._img = img;
+                _apRender();
+            };
+            return;
+        }
+        ctx.drawImage(item._img, 0, 0, W, H, 0, 0, cw, ch);
+        document.getElementById('apInfo').textContent =
+            `${W}×${H} · ${Math.round(s*100)}% · 샘플 이미지`;
+        return;
+    } else {
+        if (apImg) apImg.style.display = 'none';
+        if (canvas) canvas.style.display = 'block';
+    }
+
+    const pal = (item.palette && item.palette.length > 1)
+        ? item.palette
+        : (window._engine?.palette_mgr?.original ?? []);
+
+    // ── 작업 버퍼(편집 중) 우선 렌더 ────────────────────────
+    if (_apWorkData) {
+        const tmp = document.createElement('canvas');
+        tmp.width = W; tmp.height = H;
+        const tCtx = tmp.getContext('2d');
+        const imgD = tCtx.createImageData(W, H);
+        const buf  = imgD.data;
+        for (let i = 0; i < _apWorkData.length; i++) {
+            const idx = _apWorkData[i];
+            if (!idx) continue;
+            const c = pal[idx];
+            if (!c || c === 'transparent') continue;
+            const r = parseInt(c.slice(1,3),16);
+            const g = parseInt(c.slice(3,5),16);
+            const b = parseInt(c.slice(5,7),16);
+            buf[i*4]=r; buf[i*4+1]=g; buf[i*4+2]=b; buf[i*4+3]=255;
+        }
+        tCtx.putImageData(imgD, 0, 0);
+        ctx.drawImage(tmp, 0, 0, W, H, 0, 0, cw, ch);
+        _apUpdateInfo();
+        return;
+    }
+
+    // ── scanline (배경용 고속 경로) ──────────────────────────
+    if (item.scanline) {
+        const tmp    = document.createElement('canvas');
+        tmp.width    = W; tmp.height = H;
+        const tCtx   = tmp.getContext('2d');
+        const imgD   = tCtx.createImageData(W, H);
+        const buf    = imgD.data;
+        const scan   = item.scanline;
+        for (let i = 0; i < scan.length; i++) {
+            const idx = scan[i];
+            if (!idx) continue;
+            const c = pal[idx];
+            if (!c || c === 'transparent') continue;
+            const r = parseInt(c.slice(1,3),16);
+            const g = parseInt(c.slice(3,5),16);
+            const b = parseInt(c.slice(5,7),16);
+            buf[i*4]=r; buf[i*4+1]=g; buf[i*4+2]=b; buf[i*4+3]=255;
+        }
+        tCtx.putImageData(imgD, 0, 0);
+        ctx.drawImage(tmp, 0, 0, W, H, 0, 0, cw, ch);
+
+    // ── pixels / frames (sparse) ─────────────────────────────
+    } else {
+        const pixels = item.frames?.[0]?.pixels ?? item.pixels ?? [];
+        const isTri  = pixels.length > 0 && Array.isArray(pixels[0]);
+        const pw     = Math.max(1, s);
+
+        if (isTri) {
+            for (const [px, py, ci] of pixels) {
+                const c = pal[ci];
+                if (!c || c === 'transparent') continue;
+                ctx.fillStyle = c;
+                ctx.fillRect(Math.floor(px*s), Math.floor(py*s), Math.ceil(pw), Math.ceil(pw));
+            }
+        } else {
+            for (let i = 0; i + 2 < pixels.length; i += 3) {
+                const c = pal[pixels[i+2]];
+                if (!c || c === 'transparent') continue;
+                ctx.fillStyle = c;
+                ctx.fillRect(Math.floor(pixels[i]*s), Math.floor(pixels[i+1]*s), Math.ceil(pw), Math.ceil(pw));
+            }
+        }
+    }
+
+    const fc = (item.frames ?? []).length;
+    document.getElementById('apInfo').textContent =
+        `${W}×${H}` + (fc > 0 ? ` · ${fc}f` : '') +
+        ` · ${Math.round(s*100)}%` +
+        ` · ${(item.palette??[]).filter(c=>c&&c!=='transparent').length}색`;
+}
+
+function _apUpdateZoom() {
+    document.querySelectorAll('.ap-zoom-btn').forEach(b => {
+        b.classList.toggle('active', parseFloat(b.dataset.scale) === _apScale);
+    });
+}
+
+function _apUpdateInfo() {
+    const item = _apItem;
+    if (!item) return;
+    const W = item.width || 16, H = item.height || 16;
+    const fc = (item.frames ?? []).length;
+    const palCnt = (item.palette ?? []).filter(c => c && c !== 'transparent').length;
+    document.getElementById('apInfo').textContent =
+        `${W}×${H}` + (fc > 0 ? ` · ${fc}f` : '') +
+        ` · ${Math.round(_apScale*100)}%` + ` · ${palCnt}색` +
+        (_apWorkData ? ' · [편집중]' : '');
+}
+
+// ══════════════════════════════════════════════════════════════
+// 투명 마킹 편집
+// ══════════════════════════════════════════════════════════════
+let _apEditMode   = false;
+let _apBrushSize  = 1;
+let _apWorkData   = null;     // Uint16Array (W×H) 작업 버퍼
+let _apUndoStack  = [];       // 최대 20 스냅샷
+let _apDrawing    = false;
+const _AP_RESERVED = new Set([9, 10, 11, 12]);
+
+function _apInitWorkData() {
+    const item = _apItem;
+    if (!item) return;
+    const W = item.width || 16, H = item.height || 16;
+    const buf = new Uint16Array(W * H);
+    if (item.scanline) {
+        const s = item.scanline;
+        for (let i = 0; i < Math.min(s.length, W * H); i++) buf[i] = s[i];
+    } else {
+        const pixels = item.frames?.[0]?.pixels ?? item.pixels ?? [];
+        const isTri = pixels.length > 0 && Array.isArray(pixels[0]);
+        if (isTri) {
+            for (const [px, py, ci] of pixels) {
+                if (px >= 0 && px < W && py >= 0 && py < H) buf[py * W + px] = ci;
+            }
+        } else {
+            for (let i = 0; i + 2 < pixels.length; i += 3) {
+                const px = pixels[i], py = pixels[i+1], ci = pixels[i+2];
+                if (px >= 0 && px < W && py >= 0 && py < H) buf[py * W + px] = ci;
+            }
+        }
+    }
+    _apWorkData = buf;
+}
+
+function _apPushUndo() {
+    if (!_apWorkData) return;
+    if (_apUndoStack.length >= 20) _apUndoStack.shift();
+    _apUndoStack.push(new Uint16Array(_apWorkData));
+    document.getElementById('apUndoBtn').disabled = false;
+}
+
+function _apUndo() {
+    if (!_apUndoStack.length) return;
+    _apWorkData = _apUndoStack.pop();
+    if (!_apUndoStack.length) document.getElementById('apUndoBtn').disabled = true;
+    _apRender();
+}
+
+function _apToggleEdit() {
+    _apEditMode = !_apEditMode;
+    const btn    = document.getElementById('apEditToggle');
+    const bar    = document.getElementById('apEditBar');
+    const canvas = document.getElementById('apCanvas');
+    const cc     = document.getElementById('apCursorCanvas');
+    if (_apEditMode) {
+        if (!_apWorkData) _apInitWorkData();
+        btn.classList.add('active');
+        btn.textContent = '✏ 편집 중';
+        bar.classList.add('visible');
+        canvas.classList.add('edit-mode');
+        cc.style.display = 'block';
+        _apSyncCursorCanvas();
+    } else {
+        btn.classList.remove('active');
+        btn.textContent = '✏ 투명 마킹';
+        bar.classList.remove('visible');
+        canvas.classList.remove('edit-mode');
+        cc.style.display = 'none';
+        _apClearCursor();
+    }
+    _apRender();
+}
+
+// 커서 캔버스를 메인 캔버스와 동일 크기로 동기화
+function _apSyncCursorCanvas() {
+    const mc = document.getElementById('apCanvas');
+    const cc = document.getElementById('apCursorCanvas');
+    if (!mc || !cc) return;
+    cc.width  = mc.width;
+    cc.height = mc.height;
+}
+
+function _apClearCursor() {
+    const cc = document.getElementById('apCursorCanvas');
+    if (!cc) return;
+    cc.getContext('2d').clearRect(0, 0, cc.width, cc.height);
+}
+
+// 브러시 박스 그리기 (커서 오버레이 캔버스)
+function _apDrawCursorBox(px, py) {
+    const cc = document.getElementById('apCursorCanvas');
+    if (!cc || !_apEditMode) return;
+    const s    = _apScale;
+    const half = Math.floor(_apBrushSize / 2);
+    const bx   = (px - half) * s;
+    const by   = (py - half) * s;
+    const bw   = _apBrushSize * s;
+    const bh   = _apBrushSize * s;
+    const ctx  = cc.getContext('2d');
+    ctx.clearRect(0, 0, cc.width, cc.height);
+    // 외곽 어두운 그림자 (가독성)
+    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    ctx.lineWidth   = 2;
+    ctx.strokeRect(bx - 1, by - 1, bw + 2, bh + 2);
+    // 흰색 박스
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth   = 1;
+    ctx.strokeRect(bx, by, bw, bh);
+}
+
+function _apCanvasToPx(e) {
+    const canvas = document.getElementById('apCanvas');
+    const rect = canvas.getBoundingClientRect();
+    return {
+        px: Math.floor((e.clientX - rect.left)  / _apScale),
+        py: Math.floor((e.clientY - rect.top)   / _apScale)
+    };
+}
+
+function _apMarkTransparent(px, py) {
+    const item = _apItem;
+    if (!item || !_apWorkData) return;
+    const W = item.width || 16, H = item.height || 16;
+    const half = Math.floor(_apBrushSize / 2);
+    let hasReserved = false;
+    for (let dy = -half; dy <= half; dy++) {
+        for (let dx = -half; dx <= half; dx++) {
+            const bx = px + dx, by = py + dy;
+            if (bx < 0 || bx >= W || by < 0 || by >= H) continue;
+            const cur = _apWorkData[by * W + bx];
+            if (_AP_RESERVED.has(cur)) { hasReserved = true; continue; }
+            _apWorkData[by * W + bx] = 0;
+        }
+    }
+    if (hasReserved) _apShowWarn('⚠ 예약 인덱스(9~12)는 투명 처리 불가');
+}
+
+function _apShowWarn(msg) {
+    const w = document.getElementById('apWarn');
+    if (!w) return;
+    w.textContent = msg;
+    w.style.opacity = '1';
+    clearTimeout(w._t);
+    w._t = setTimeout(() => { w.style.opacity = '0'; }, 2500);
+}
+
+function _apShowToast(msg, ok = true) {
+    let t = document.getElementById('apToast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'apToast'; t.className = 'ap-toast';
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.background = ok ? '#3A8A3A' : '#8A3A3A';
+    t.classList.add('show');
+    clearTimeout(t._t);
+    t._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+async function _apSave() {
+    const item = _apItem;
+    if (!item || !_apWorkData) return;
+    const W = item.width || 16, H = item.height || 16;
+    const pid = window._assetProject || '1974';
+    const cat = item._category ?? 'objects';
+    const path = `projects/${pid}/pixels/${cat}/${item.name}.json`;
+
+    // 원본 포맷으로 재구성
+    const base = Object.fromEntries(
+        Object.entries(item).filter(([k]) => !k.startsWith('_'))
+    );
+    let saveObj;
+    if (item.scanline) {
+        saveObj = { ...base, scanline: Array.from(_apWorkData) };
+    } else {
+        const sparse = [];
+        for (let y = 0; y < H; y++)
+            for (let x = 0; x < W; x++) {
+                const idx = _apWorkData[y * W + x];
+                if (idx) sparse.push([x, y, idx]);
+            }
+        if (item.frames) {
+            saveObj = { ...base, frames: [{ pixels: sparse }, ...item.frames.slice(1)] };
+        } else {
+            saveObj = { ...base, pixels: sparse };
+        }
+    }
+
+    const btn = document.getElementById('apSaveBtn');
+    btn.disabled = true; btn.textContent = '저장 중...';
+    try {
+        const res = await fetch('/api/save-pixel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path, name: item.name, json: JSON.stringify(saveObj, null, 2) })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        // 메모리 원본 동기화
+        if (item.scanline) item.scanline = saveObj.scanline;
+        else if (item.pixels) item.pixels = saveObj.pixels;
+        _apShowToast('저장됨!');
+    } catch (e) {
+        _apShowToast('저장 실패: ' + e.message, false);
+    } finally {
+        btn.disabled = false; btn.textContent = '💾 저장';
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 복사 팝업 (PixelJSON 파일명 복사)
+// ══════════════════════════════════════════════════════════════
+let _copyPopupName = '';
+
+function _showCopyPopup(item) {
+    _copyPopupName = item.name ?? '';
+    document.getElementById('acpName').textContent = _copyPopupName + '.json';
+    const w = item.width ?? '?', h = item.height ?? '?';
+    const palCnt = (item.palette ?? []).filter(c => c && c !== 'transparent').length;
+    document.getElementById('acpMeta').textContent =
+        `${w}×${h}` + (palCnt ? ` · ${palCnt}색` : '');
+    const btn = document.getElementById('acpCopyBtn');
+    btn.textContent = '⧉  파일명 복사';
+    btn.classList.remove('copied');
+    document.getElementById('acpOverlay').classList.remove('hidden');
+}
+
+function _hideCopyPopup() {
+    document.getElementById('acpOverlay').classList.add('hidden');
+}
+
+// 이벤트 연결 (DOMContentLoaded 후)
+document.addEventListener('DOMContentLoaded', () => {
+    // 복사 팝업
+    document.getElementById('acpClose')?.addEventListener('click', _hideCopyPopup);
+    document.getElementById('acpOverlay')?.addEventListener('click', (e) => {
+        if (e.target === document.getElementById('acpOverlay')) _hideCopyPopup();
+    });
+    document.getElementById('acpCopyBtn')?.addEventListener('click', () => {
+        navigator.clipboard.writeText(_copyPopupName).then(() => {
+            const btn = document.getElementById('acpCopyBtn');
+            btn.textContent = '✓  복사됨!';
+            btn.classList.add('copied');
+            setTimeout(_hideCopyPopup, 1200);
+        });
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') _hideCopyPopup();
+    });
+
+    // 프리뷰 모달 이벤트
+    document.getElementById('apClose')?.addEventListener('click', () => {
+        document.getElementById('apOverlay').classList.add('hidden');
+    });
+    document.getElementById('apCopyBtn')?.addEventListener('click', () => {
+        const name = _apItem?.name ?? '';
+        if (!name) return;
+        navigator.clipboard.writeText(name).then(() => {
+            const btn = document.getElementById('apCopyBtn');
+            const orig = btn.textContent;
+            btn.textContent = '✓ 복사됨!';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+        });
+    });
+    document.getElementById('apOverlay')?.addEventListener('click', (e) => {
+        if (e.target === document.getElementById('apOverlay'))
+            document.getElementById('apOverlay').classList.add('hidden');
+    });
+    document.querySelectorAll('.ap-zoom-btn').forEach(b => {
+        b.addEventListener('click', () => {
+            _apScale = parseFloat(b.dataset.scale);
+            _apUpdateZoom();
+            _apRender();
+        });
+    });
+
+    // ── 투명 마킹 편집 이벤트 ────────────────────────────────
+    document.getElementById('apEditToggle')?.addEventListener('click', _apToggleEdit);
+    document.getElementById('apUndoBtn')?.addEventListener('click', _apUndo);
+    document.getElementById('apSaveBtn')?.addEventListener('click', _apSave);
+    document.getElementById('apConvertBtn')?.addEventListener('click', () => {
+        if (!_apItem || !_apItem._isSample) return;
+        _apWasOpenBeforeImport = true;
+        document.getElementById('apOverlay').classList.add('hidden');
+        _setImportSrc(_apItem.src, _apItem.name);
+        _runPreviewImport();
+    });
+
+    const triggerModalRecalc = () => {
+        const name = document.getElementById('pixelModalNameInput')?.value.trim() || 'imported_sprite';
+        const scale = parseInt(document.getElementById('pixelModalScaleInput')?.value ?? '100');
+        const trimLR = parseInt(document.getElementById('pixelModalTrimLR')?.value ?? '0');
+        const trimTB = parseInt(document.getElementById('pixelModalTrimTB')?.value ?? '0');
+        
+        _runPreviewImport({ name, scale, trimLR, trimTB });
+    };
+    document.getElementById('pixelModalScaleInput')?.addEventListener('input', triggerModalRecalc);
+    document.getElementById('pixelModalTrimLR')?.addEventListener('input', triggerModalRecalc);
+    document.getElementById('pixelModalTrimTB')?.addEventListener('input', triggerModalRecalc);
+    document.getElementById('pixelModalNameInput')?.addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        const mTitle = document.getElementById('pixelModalTitle');
+        if (mTitle) mTitle.textContent = val || 'imported_sprite';
+        const sbName = document.getElementById('importName');
+        if (sbName) sbName.value = val;
+    });
+
+    // 브러시 크기
+    document.querySelectorAll('.ap-brush-btn').forEach(b => {
+        b.addEventListener('click', () => {
+            _apBrushSize = parseInt(b.dataset.brush);
+            document.querySelectorAll('.ap-brush-btn')
+                .forEach(x => x.classList.toggle('active', x === b));
+        });
+    });
+
+    // 캔버스 마우스 이벤트 (편집 모드에서만 동작)
+    const apCanvas = document.getElementById('apCanvas');
+    apCanvas?.addEventListener('mousedown', (e) => {
+        if (!_apEditMode) return;
+        e.preventDefault();
+        _apDrawing = true;
+        _apPushUndo();
+        const { px, py } = _apCanvasToPx(e);
+        _apMarkTransparent(px, py);
+        _apRender();
+        _apSyncCursorCanvas();
+        _apDrawCursorBox(px, py);
+    });
+    apCanvas?.addEventListener('mousemove', (e) => {
+        if (!_apEditMode) return;
+        e.preventDefault();
+        const { px, py } = _apCanvasToPx(e);
+        if (_apDrawing) {
+            _apMarkTransparent(px, py);
+            _apRender();
+            _apSyncCursorCanvas();
+        }
+        _apDrawCursorBox(px, py);
+    });
+    apCanvas?.addEventListener('mouseleave', () => { _apClearCursor(); });
+    document.addEventListener('mouseup', () => { _apDrawing = false; });
+
+    // Ctrl+Z 실행취소 (프리뷰 모달 열린 상태에서)
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z' &&
+            !document.getElementById('apOverlay').classList.contains('hidden')) {
+            e.preventDefault();
+            _apUndo();
+        }
+    });
+});
 
 // PixelJSON sparse 렌더링 (작은 썸네일용)
 // 픽셀 형식 자동 감지: [[x,y,ci],...] or [x,y,ci,x,y,ci,...]
@@ -5455,6 +6755,21 @@ function renderMultiFrame() {
         const ew = en.pw || 32, eh = en.ph || 32;
         const isSel = (en === _selectedEntity);
 
+        // 1. 이미지 그리기
+        if (en._isSample && en._img && en.visible) {
+            ctx.save();
+            ctx.translate(ex + ew / 2, ey + eh / 2);
+            const sx = en.flipX ? -1 : 1;
+            const sy = en.flipY ? -1 : 1;
+            ctx.scale(sx, sy);
+            if (en.rotate) {
+                ctx.rotate((en.rotate * Math.PI) / 180);
+            }
+            ctx.drawImage(en._img, -ew / 2, -eh / 2, ew, eh);
+            ctx.restore();
+        }
+
+        // 2. 가이드라인 및 이름 레이블
         ctx.save();
         ctx.strokeStyle = isSel ? '#C8922A' : '#888';
         ctx.lineWidth   = isSel ? 2 : 1;
@@ -5483,6 +6798,48 @@ function renderMultiFrame() {
             ctx.setLineDash([]);
         }
         ctx.restore();
+
+        // 3. 만약 선택된 엔티티라면 피그마 조절선/핸들/뱃지 그리기 (절대 좌표 기준)
+        if (isSel && en.visible) {
+            const themeColor = '#FF5500';
+            ctx.save();
+            ctx.strokeStyle = themeColor;
+            ctx.lineWidth   = 2;
+            ctx.setLineDash([4, 3]);
+            ctx.strokeRect(ex, ey, ew, eh);
+            ctx.fillStyle = 'rgba(255,85,0,0.06)';
+            ctx.fillRect(ex, ey, ew, eh);
+            ctx.setLineDash([]);
+
+            // 모서리 핸들
+            const hw = 6;
+            ctx.fillStyle = themeColor;
+            [[ex, ey], [ex + ew, ey], [ex, ey + eh], [ex + ew, ey + eh]].forEach(([hx, hy]) => {
+                ctx.fillRect(hx - hw / 2, hy - hw / 2, hw, hw);
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(hx - hw / 2, hy - hw / 2, hw, hw);
+            });
+
+            // 해상도 뱃지
+            ctx.save();
+            const sizeText = `${Math.round(ew)} × ${Math.round(eh)}`;
+            ctx.font = 'bold 9px JetBrains Mono, monospace';
+            const textW = ctx.measureText(sizeText).width + 8;
+            const textH = 14;
+            const labelX = ex + ew / 2;
+            const labelY = ey + eh + 6;
+
+            ctx.fillStyle = themeColor;
+            ctx.fillRect(labelX - textW / 2, labelY, textW, textH);
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(sizeText, labelX, labelY + textH / 2);
+            ctx.restore();
+            ctx.restore();
+        }
     }
 }
 
@@ -5549,18 +6906,49 @@ function _drawSceneFrame(ctx, engine, name, fx, fy, gw, gh) {
             if (e.visible && e.pw && e.ph) {
                 const cameraX = engine.cameraX ?? 0;
                 const ex = (e.layer === 2 ? e.x - cameraX : e.x);
-                ctx.strokeStyle = '#C8922A';
+                const isSample = !!e._isSample;
+                const themeColor = isSample ? '#FF5500' : '#18A0FB';
+
+                ctx.strokeStyle = themeColor;
                 ctx.lineWidth   = 2;
-                ctx.setLineDash([]);
+                if (isSample) ctx.setLineDash([4, 3]);
+                else ctx.setLineDash([]);
+                
                 ctx.strokeRect(fx + ex, fy + e.y, e.pw, e.ph);
-                ctx.fillStyle = 'rgba(200,146,42,0.08)';
+                ctx.fillStyle = isSample ? 'rgba(255,85,0,0.06)' : 'rgba(24,160,251,0.06)';
                 ctx.fillRect(fx + ex, fy + e.y, e.pw, e.ph);
-                const hw = 5;
-                ctx.fillStyle = '#C8922A';
+                ctx.setLineDash([]);
+
+                // 모서리 핸들 그리기 (피그마 스타일로 백색 테두리 추가)
+                const hw = 6;
+                ctx.fillStyle = themeColor;
                 [[fx+ex,fy+e.y],[fx+ex+e.pw,fy+e.y],
                  [fx+ex,fy+e.y+e.ph],[fx+ex+e.pw,fy+e.y+e.ph]].forEach(([hx,hy]) => {
                     ctx.fillRect(hx - hw/2, hy - hw/2, hw, hw);
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(hx - hw/2, hy - hw/2, hw, hw);
                 });
+
+                // 해상도 레이블 (피그마 치수 오버레이 스타일)
+                ctx.save();
+                const sizeText = `${Math.round(e.pw)} × ${Math.round(e.ph)}`;
+                ctx.font = 'bold 9px JetBrains Mono, monospace';
+                const textW = ctx.measureText(sizeText).width + 8;
+                const textH = 14;
+                const labelX = fx + ex + e.pw / 2;
+                const labelY = fy + e.y + e.ph + 6;
+
+                // 해상도 뱃지 배경
+                ctx.fillStyle = themeColor;
+                ctx.fillRect(labelX - textW / 2, labelY, textW, textH);
+
+                // 해상도 뱃지 텍스트
+                ctx.fillStyle = '#FFFFFF';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(sizeText, labelX, labelY + textH / 2);
+                ctx.restore();
             }
         }
     } else {
@@ -5586,6 +6974,8 @@ function _drawSceneFrame(ctx, engine, name, fx, fy, gw, gh) {
         }
     }
     ctx.restore(); // clip 해제
+
+    // 씬 비포함 엔티티 렌더링 삭제됨 (draw 함수 맨 밑에서 통합 렌더링)
 
     // ── 프레임 테두리 ─────────────────────────────────────────
     if (isActive) { ctx.shadowColor = '#C8922A'; ctx.shadowBlur = 14; }
@@ -5933,6 +7323,7 @@ async function saveScene() {
     // ── 씬 JSON 빌드 ──────────────────────────────────────────
     const entities = [];
     for (const [id, e] of engine.entities._entities) {
+        if (e._detached) continue; // 씬 비포함 엔티티 스킵
         const entry = {
             id, type: e.type, layer: e.layer,
             x: Math.round(e.x), y: Math.round(e.y),
@@ -5982,24 +7373,150 @@ async function saveScene() {
 }
 
 // 선택된 엔티티 스프라이트 → PixelJSON 내보내기
+// 선택된 엔티티 스프라이트 → PixelJSON 저장 (원본 덮어쓰기 vs 다른 이름으로 저장)
+let _pendingSaveEntity = null;
+let _pendingSaveData   = null;
+
+function requestAssetSave(entity, data) {
+    _pendingSaveEntity = entity;
+    _pendingSaveData   = data;
+
+    const modal = document.getElementById('assetSaveOptionModal');
+    const desc = document.getElementById('saveModalDesc');
+    const inputWrap = document.getElementById('saveAsInputWrap');
+    const nameInput = document.getElementById('saveAsNameInput');
+    const btnAs = document.getElementById('btnSaveAs');
+
+    if (!modal) return;
+
+    // 초기 상태 리셋
+    const curName = entity._asset || entity.type || entity.id;
+    desc.textContent = `"${curName}" 에셋의 저장 옵션을 선택하세요.`;
+    inputWrap.style.display = 'none';
+    if (nameInput) nameInput.value = curName + '_copy';
+    btnAs.textContent = '다른 이름으로 저장';
+
+    modal.classList.remove('hidden');
+}
+
+async function _executeSaveAsset(name) {
+    if (!_pendingSaveEntity || !_pendingSaveData) return false;
+
+    // 카테고리 결정
+    function _inferCategory(n) {
+        if (/^(L0_|L1_|L3_|.*_L0_|.*_L1_)/i.test(n)) return 'backgrounds';
+        if (/(_char_|^char_)/i.test(n))               return 'characters';
+        if (/^(item_|itm_)/i.test(n))                 return 'items';
+        return 'objects';
+    }
+
+    const pid = _assetProject || '1974';
+    const category = _pendingSaveEntity._assetCategory || _inferCategory(name);
+    const savePath = `projects/${pid}/pixels/${category}/${name}.json`;
+
+    // 저장될 JSON 구조 생성
+    const saveData = {
+        name,
+        width: _pendingSaveData.width,
+        height: _pendingSaveData.height,
+        palette: _pendingSaveData.palette || ['transparent','#ffffff','#aaaaaa','#555555','#000000'],
+        frames: _pendingSaveData.frames,
+    };
+    if (_pendingSaveEntity._isSample) {
+        saveData._isSample = true;
+        saveData._imgSrc = _pendingSaveEntity._imgSrc;
+    }
+
+    try {
+        log('에셋 저장 중...', 'info');
+        const res = await fetch('/api/save-pixel', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+                name,
+                path: savePath,
+                json: JSON.stringify(saveData)
+            })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        
+        log(`✓ 에셋 저장 완료: ${savePath}`, 'ok');
+        window.loadAssets(); // 에셋 목록 갱신
+        return true;
+    } catch (e) {
+        log(`에셋 저장 오류: ${e.message}`, 'err');
+        alert(`저장 실패: ${e.message}`);
+        return false;
+    }
+}
+
+// 모달 이벤트 바인딩 (스크립트 로드 시 1회 실행)
+setTimeout(() => {
+    document.getElementById('btnSaveOverwrite')?.addEventListener('click', async () => {
+        if (!_pendingSaveEntity || !_pendingSaveData) return;
+        const name = _pendingSaveEntity._asset || _pendingSaveEntity.type || _pendingSaveEntity.id;
+        const success = await _executeSaveAsset(name);
+        if (success) {
+            document.getElementById('assetSaveOptionModal').classList.add('hidden');
+        }
+    });
+
+    document.getElementById('btnSaveAs')?.addEventListener('click', async () => {
+        if (!_pendingSaveEntity || !_pendingSaveData) return;
+        const inputWrap = document.getElementById('saveAsInputWrap');
+        const nameInput = document.getElementById('saveAsNameInput');
+        const btnAs = document.getElementById('btnSaveAs');
+
+        if (inputWrap.style.display === 'none') {
+            inputWrap.style.display = 'flex';
+            btnAs.textContent = '이 이름으로 저장';
+            if (nameInput) nameInput.focus();
+        } else {
+            const newName = nameInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+            if (!newName) {
+                alert("올바른 파일 이름을 입력해주세요.");
+                return;
+            }
+            const success = await _executeSaveAsset(newName);
+            if (success) {
+                _pendingSaveEntity.type = newName;
+                _pendingSaveEntity._asset = newName;
+                syncInspectorInputs(_pendingSaveEntity);
+                document.getElementById('assetSaveOptionModal').classList.add('hidden');
+            }
+        }
+    });
+
+    document.getElementById('btnSaveOptionCancel')?.addEventListener('click', () => {
+        document.getElementById('assetSaveOptionModal').classList.add('hidden');
+        _pendingSaveEntity = null;
+        _pendingSaveData = null;
+    });
+}, 500);
+
 function exportCurrentSprite() {
     const e = _selectedEntity;
     if (!e) { log('엔티티를 먼저 선택하세요', 'err'); return; }
 
-    const frames = e._frames ?? (e._pixels ? [{ pixels: e._pixels }] : []);
-    if (!frames.length) { log('스프라이트 데이터 없음', 'err'); return; }
+    let frames;
+    let palette;
+
+    if (e._isSample) {
+        frames = [{ pixels: [] }];
+        palette = ['transparent'];
+    } else {
+        frames = e._frames ?? (e._pixels ? [{ pixels: e._pixels }] : []);
+        palette = e._palette ?? (window._projectPaletteColors ?? window._engine?.palette_mgr?.original ?? []);
+    }
 
     const data = {
-        name:    e.type ?? e.id,
         width:   e.pw,
         height:  e.ph,
-        fps:     8,
-        palette: ['transparent','#ffffff','#aaaaaa','#555555','#000000'],
+        palette,
         frames,
     };
-    const filename = `${e.type ?? e.id}.json`;
-    downloadJSON(data, filename);
-    log(`내보내기: ${filename}  (${frames.length}프레임)`, 'ok');
+
+    requestAssetSave(e, data);
 }
 
 // ── 명령어 처리 ──────────────────────────────────────────────
