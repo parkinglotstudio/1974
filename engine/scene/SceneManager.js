@@ -9,6 +9,9 @@
  *   'palette_flash' — 팔레트 순간 교체 + 화이트 플래시 (Scene 10 네온 폭발)
  *   'slide_left'    — 레이어 왼쪽 슬라이드 (챕터 전환)
  *   'convergence'   — 픽셀 수렴+방산 이펙트 (씬 종료=중앙집결 / 씬 시작=방사)
+ *   'sand_top'      — 위에서부터 모래처럼 흩어지며 생겨남 (로딩/등장)
+ *   'sand_sides'    — 양쪽에서 모래가 안쪽으로 튀며 생겨남
+ *   'wave'          — 파도처럼 울렁이며 생겨남 (진폭 정착)
  *
  * 픽셀 전환 API:
  *   engine.scenes.transitionTo('target_scene', { effect: 'convergence', duration: 800 });
@@ -26,6 +29,7 @@
  *   // scenesJSON 포맷: CLAUDE.md "SceneManager 설계" 참조
  */
 import TriggerSystem from './TriggerSystem.js';
+import { SAND_BASE_RGB } from '../SandPalette.js';
 
 // Bayer 8×8 내장 (dither 전환용)
 const BAYER = [
@@ -38,6 +42,12 @@ const BAYER = [
     [15,47, 7,39,13,45, 5,37],
     [63,31,55,23,61,29,53,21],
 ];
+
+// 모래 전환용 의사난수 0~1 (좌표 기반 결정적)
+function sandNoise(x, y) {
+    const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+    return s - Math.floor(s);
+}
 
 // ── Scene 기본 클래스 ─────────────────────────────────────────────
 export class Scene {
@@ -260,6 +270,61 @@ export default class SceneManager {
 
         if (type === 'convergence') {
             this._drawPxTransition(targetCanvas);
+            return;
+        }
+
+        // ── 모래 생성형 전환 (로딩/등장 연출) ─────────────────────────
+        // shown: 0=완전 숨김(검정) → 1=완성. (out 단계엔 1→0으로 소멸)
+        if (type === 'sand_top' || type === 'sand_sides') {
+            const shown = 1 - t;
+            const BR = SAND_BASE_RGB[0], BG = SAND_BASE_RGB[1], BB = SAND_BASE_RGB[2];
+            const img = ctx.getImageData(0, 0, W, H);
+            const d = img.data;
+            for (let y = 0; y < H; y++) {
+                for (let x = 0; x < W; x++) {
+                    const n = sandNoise(x >> 2, y >> 2);   // 4px 알갱이 노이즈
+                    let thr;
+                    if (type === 'sand_top') {
+                        thr = (y / H) * 0.7 + n * 0.3;     // 위에서부터 생김
+                    } else {
+                        const dc = Math.abs(x - W * 0.5) / (W * 0.5);
+                        thr = (1 - dc) * 0.7 + n * 0.3;    // 양쪽에서 안쪽으로
+                    }
+                    if (shown < thr) {                     // 아직 안 생긴 픽셀 → 모래 바탕색
+                        const i = (y * W + x) << 2;
+                        d[i] = BR; d[i + 1] = BG; d[i + 2] = BB; d[i + 3] = 255;
+                    }
+                }
+            }
+            ctx.putImageData(img, 0, 0);
+            return;
+        }
+
+        if (type === 'wave') {
+            const shown = 1 - t;
+            const amp   = (1 - shown) * 26;                // 진행될수록 진폭 감소(정착)
+            const fade  = shown;                           // 페이드 인
+            const phase = this._tr.t * Math.PI * 6;        // 시간에 따라 울렁
+            const BR = SAND_BASE_RGB[0], BG = SAND_BASE_RGB[1], BB = SAND_BASE_RGB[2];
+            const src = ctx.getImageData(0, 0, W, H);
+            const sd  = src.data;
+            const out = ctx.createImageData(W, H);
+            const od  = out.data;
+            for (let y = 0; y < H; y++) {
+                const dx = Math.round(Math.sin(y * 0.045 + phase) * amp);
+                for (let x = 0; x < W; x++) {
+                    let sxp = x - dx;
+                    if (sxp < 0) sxp = 0; else if (sxp >= W) sxp = W - 1;
+                    const si = (y * W + sxp) << 2;
+                    const oi = (y * W + x) << 2;
+                    // 모래 바탕색 → 그림색 보간 (검정 대신)
+                    od[oi]     = BR + (sd[si]     - BR) * fade;
+                    od[oi + 1] = BG + (sd[si + 1] - BG) * fade;
+                    od[oi + 2] = BB + (sd[si + 2] - BB) * fade;
+                    od[oi + 3] = 255;
+                }
+            }
+            ctx.putImageData(out, 0, 0);
             return;
         }
     }

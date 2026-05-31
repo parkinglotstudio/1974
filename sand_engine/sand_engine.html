@@ -245,6 +245,19 @@
         }
         .pixel-modal-btn.primary:hover { background: #E0A030; }
 
+        .gif-editor-canvas {
+            image-rendering: pixelated; image-rendering: crisp-edges;
+            border: 1px solid #3A3A36;
+            background-image: linear-gradient(45deg, #181816 25%, transparent 25%), 
+                              linear-gradient(-45deg, #181816 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, #181816 75%), 
+                              linear-gradient(-45deg, transparent 75%, #181816 75%);
+            background-size: 8px 8px;
+            background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+            background-color: #0A0A08;
+            max-width: 80vw; max-height: 50vh;
+        }
+
         /* ── 변환 중 로딩 오버레이 ─────────────────────────── */
         .loading-overlay {
             position: fixed; inset: 0; z-index: 4000;
@@ -2000,6 +2013,85 @@
     </div>
 </div>
 
+<!-- ── GIF 이미지 다듬기 에디터 모달 ────────────────────────── -->
+<div class="pixel-modal-overlay hidden" id="gifEditorModal">
+    <div class="pixel-modal" style="width: fit-content; max-width: 95vw; min-width: 440px; padding: 24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+            <div class="pixel-modal-title" id="gifEditorTitle">GIF 이미지 다듬기 에디터</div>
+            <span id="gifEditorZoomText" style="font-size:10px;color:#C8922A;font-family:'JetBrains Mono',monospace;font-weight:bold;letter-spacing:0.05em;background:#1F1F1C;padding:2px 8px;border-radius:4px;border:1px solid #3A3A36;">Zoom: 4x</span>
+        </div>
+        
+        <!-- 실시간 편집 뷰어 -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;margin:10px 0;">
+            <!-- 스크롤 뷰포트 -->
+            <div id="gifEditorViewport" style="width:100%;height:40vh;max-height:420px;min-height:260px;overflow:auto;background-color:#0A0A08;border:1px solid #3A3A36;border-radius:4px;position:relative;box-sizing:border-box;">
+                <!-- 중앙 정렬을 위한 헬퍼 컨테이너 -->
+                <div id="gifEditorViewportInner" style="display:flex;align-items:center;justify-content:center;min-width:100%;min-height:100%;padding:40px;box-sizing:border-box;position:absolute;top:0;left:0;">
+                    <canvas class="gif-editor-canvas" id="gifEditorCanvas" style="display:block;margin:0;flex-shrink:0;"></canvas>
+                </div>
+            </div>
+            <div id="gifEditorFrameBar" style="font-size:9px;color:#C8922A;font-family:'JetBrains Mono',monospace;padding:4px 0 0;letter-spacing:.06em;"></div>
+        </div>
+
+        <!-- 슬라이더 & 게이지 조절 패널 -->
+        <div style="display:flex;flex-direction:column;gap:12px;width:100%;background:#151512;padding:14px;border-radius:6px;border:1px solid #2E2E2A;box-sizing:border-box;">
+            <!-- 배경 빼기 허용 게이지 -->
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <label style="font-size:9px;color:#888;font-family:'JetBrains Mono',monospace;font-weight:bold;flex:1;">배경 제거 임계값 (Tolerance)</label>
+                    <span id="gifEditorToleranceText" style="font-size:10px;color:#C8922A;font-family:'JetBrains Mono',monospace;font-weight:bold;">0</span>
+                </div>
+                <input type="range" id="gifEditorTolerance" value="0" min="0" max="150" step="1" style="width:100%;accent-color:#C8922A;height:4px;background:#3A3A36;border-radius:2px;outline:none;cursor:pointer;margin:4px 0;" />
+            </div>
+
+            <!-- 경계면 부드러움 (Softness) -->
+            <div style="display:flex;flex-direction:column;gap:4px;margin-top:2px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <label style="font-size:9px;color:#888;font-family:'JetBrains Mono',monospace;font-weight:bold;flex:1;">경계면 부드러움 (Softness)</label>
+                    <span id="gifEditorSoftnessText" style="font-size:10px;color:#C8922A;font-family:'JetBrains Mono',monospace;font-weight:bold;">0</span>
+                </div>
+                <input type="range" id="gifEditorSoftness" value="0" min="0" max="50" step="1" style="width:100%;accent-color:#C8922A;height:4px;background:#3A3A36;border-radius:2px;outline:none;cursor:pointer;margin:4px 0;" />
+            </div>
+
+            <!-- 단색 실루엣 채우기 -->
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid #2E2E2A;padding-top:10px;">
+                <div style="display:flex;align-items:center;gap:6px;flex:1;">
+                    <input type="checkbox" id="gifEditorSilhouetteCheck" style="accent-color:#C8922A;cursor:pointer;" />
+                    <label for="gifEditorSilhouetteCheck" style="font-size:9px;color:#EEE;font-family:'JetBrains Mono',monospace;font-weight:bold;cursor:pointer;user-select:none;">단색 실루엣 채우기</label>
+                </div>
+                <div id="gifEditorColorPickerWrap" style="display:none;align-items:center;gap:4px;">
+                    <label style="font-size:9px;color:#888;font-family:'JetBrains Mono',monospace;">색상:</label>
+                    <input type="color" id="gifEditorColor" value="#12080a" style="border:none;background:none;width:24px;height:20px;cursor:pointer;padding:0;" />
+                </div>
+            </div>
+        </div>
+
+        <!-- 저장/파일명 영역 -->
+        <div style="display:flex;flex-direction:column;gap:10px;width:100%;background:#151512;padding:14px;border-radius:6px;border:1px solid #2E2E2A;box-sizing:border-box;">
+            <!-- 저장 모드 선택 -->
+            <div style="display:flex;gap:16px;align-items:center;">
+                <label style="font-size:9px;color:#888;font-family:'JetBrains Mono',monospace;font-weight:bold;">저장 방식:</label>
+                <label style="font-size:10px;color:#EEE;display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
+                    <input type="radio" name="gifSaveMode" id="gifSaveModeOverwrite" value="overwrite" checked style="accent-color:#C8922A;" /> 덮어쓰기
+                </label>
+                <label style="font-size:10px;color:#EEE;display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
+                    <input type="radio" name="gifSaveMode" id="gifSaveModeNew" value="new" style="accent-color:#C8922A;" /> 다른 이름으로 저장
+                </label>
+            </div>
+            <!-- 다른이름저장 파일명 인풋 -->
+            <div id="gifEditorNameInputWrap" style="display:none;flex-direction:column;gap:4px;">
+                <label style="font-size:9px;color:#888;font-family:'JetBrains Mono',monospace;font-weight:bold;">새 파일명</label>
+                <input type="text" id="gifEditorNameInput" placeholder="새 파일명 입력" style="background:#0A0A08;border:1px solid #3A3A36;border-radius:4px;color:#EEE;font-size:10px;padding:4px 8px;font-family:'JetBrains Mono',monospace;width:100%;box-sizing:border-box;" />
+            </div>
+        </div>
+
+        <div class="pixel-modal-actions" style="margin-top:4px;">
+            <button class="pixel-modal-btn" id="gifEditorCancel">취소</button>
+            <button class="pixel-modal-btn primary" id="gifEditorSave">저장 적용</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── 픽셀 임포트 미리보기 모달 ─────────────────────────── -->
 <div class="pixel-modal-overlay hidden" id="pixelImportModal">
     <div class="pixel-modal" style="width: fit-content; max-width: 90vw; min-width: 320px;">
@@ -2075,6 +2167,7 @@
             <span class="ap-info" id="apInfo"></span>
             <button class="ap-edit-toggle" id="apEditToggle">✏ 투명 마킹</button>
             <button class="ap-convert-btn" id="apConvertBtn" style="display:none;">▶ 픽셀 변환</button>
+            <button class="ap-edit-btn" id="apGifTrimBtn" style="display:none;background:#C8922A;color:#fff;border-color:#C8922A;padding:0 12px;font-family:inherit;font-size:10px;border-radius:4px;cursor:pointer;">✂ 다듬기</button>
         </div>
         <div class="ap-edit-bar" id="apEditBar">
             <span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:#555;">브러시</span>
@@ -5428,6 +5521,11 @@ function openAssetPreview(item) {
     if (saveBtn) saveBtn.style.display = item._isSample ? 'none' : 'inline-block';
     const convertBtn = document.getElementById('apConvertBtn');
     if (convertBtn) convertBtn.style.display = item._isSample ? 'inline-block' : 'none';
+    const gifTrimBtn = document.getElementById('apGifTrimBtn');
+    if (gifTrimBtn) {
+        const isGif = item._isSample && item.src && item.src.toLowerCase().endsWith('.gif');
+        gifTrimBtn.style.display = isGif ? 'inline-block' : 'none';
+    }
 
     // 편집 UI 리셋
     document.getElementById('apEditToggle').classList.remove('active');
@@ -5440,6 +5538,410 @@ function openAssetPreview(item) {
     _apUpdateZoom();
     document.getElementById('apOverlay').classList.remove('hidden');
 }
+
+// ── GIF 이미지 다듬기 에디터 (포토샵 모션 편집기) ───────────────────
+let _gifEditorTimer = null;
+let _gifEditorFrameIdx = 0;
+let _gifEditorItem = null;
+let _gifEditorFramesData = []; // [{ img, delay }, ...]
+let _gifEditorWidth = 0;
+let _gifEditorHeight = 0;
+let _gifEditorZoomVal = 4;
+
+// 다듬기 버튼 클릭 시 편집기 오픈
+document.getElementById('apGifTrimBtn')?.addEventListener('click', () => {
+    if (!_apItem) return;
+    openGifEditor(_apItem);
+});
+
+async function openGifEditor(item) {
+    _gifEditorItem = item;
+    _stopGifEditorAnim();
+    _gifEditorFrameIdx = 0;
+    _gifEditorFramesData = [];
+
+    // UI 리셋
+    document.getElementById('gifEditorTolerance').value = 0;
+    document.getElementById('gifEditorToleranceText').textContent = '0';
+    document.getElementById('gifEditorSoftness').value = 0;
+    document.getElementById('gifEditorSoftnessText').textContent = '0';
+    _gifEditorZoomVal = 4;
+    document.getElementById('gifEditorZoomText').textContent = 'Zoom: 4x';
+    document.getElementById('gifEditorSilhouetteCheck').checked = false;
+    document.getElementById('gifEditorColorPickerWrap').style.display = 'none';
+    document.getElementById('gifEditorNameInputWrap').style.display = 'none';
+    document.getElementById('gifSaveModeOverwrite').checked = true;
+    document.getElementById('gifEditorNameInput').value = '';
+
+    showConvertLoading('GIF 프레임 분석 중...');
+
+    try {
+        let requestBody = {};
+        if (item.src.startsWith('data:')) {
+            const parts = item.src.split(',');
+            if (parts.length > 1) {
+                requestBody = { gifBase64: parts[1] };
+            } else {
+                throw new Error('올바르지 않은 Data URI 형식입니다.');
+            }
+        } else if (item.src.startsWith('blob:')) {
+            const blob = await fetch(item.src).then(r => r.blob());
+            const base64Data = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+            requestBody = { gifBase64: base64Data };
+        } else {
+            let safeGifPath = item.src;
+            try {
+                const urlObj = new URL(item.src);
+                safeGifPath = urlObj.pathname;
+            } catch(e) {}
+            safeGifPath = decodeURIComponent(safeGifPath.replace(/^\//, '').replace(/\?.*$/, ''));
+            requestBody = { gifPath: safeGifPath };
+        }
+
+        // 고속 extract-gif-frames API 호출 (픽셀 연산 없이 프레임 쪼개기)
+        const resp = await fetch('/api/extract-gif-frames', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(requestBody)
+        });
+        const data = await resp.json();
+        if (!data.ok) throw new Error(data.error);
+
+        _gifEditorWidth = data.width;
+        _gifEditorHeight = data.height;
+
+        // 프레임 Image 객체 병렬 비동기 로딩
+        _gifEditorFramesData = await Promise.all(data.frames.map(f => {
+            return new Promise((res, rej) => {
+                const img = new Image();
+                img.onload = () => res({ img, delay: f.delay });
+                img.onerror = () => rej(new Error('프레임 로드 실패'));
+                img.src = 'data:image/png;base64,' + f.base64;
+            });
+        }));
+
+        hideConvertLoading();
+
+        // 캔버스 세팅
+        const gc = document.getElementById('gifEditorCanvas');
+        gc.width = _gifEditorWidth;
+        gc.height = _gifEditorHeight;
+        
+        _updateGifEditorCanvasSize(4);
+
+        document.getElementById('gifEditorModal').classList.remove('hidden');
+        document.getElementById('apOverlay').classList.add('hidden'); // 프리뷰 숨김
+
+        _startGifEditorAnim();
+
+    } catch (e) {
+        hideConvertLoading();
+        alert('GIF 로딩 실패: ' + e.message);
+    }
+}
+
+function _startGifEditorAnim() {
+    _stopGifEditorAnim();
+    const frameBar = document.getElementById('gifEditorFrameBar');
+    const gc = document.getElementById('gifEditorCanvas');
+    if (!gc || !_gifEditorFramesData.length) return;
+
+    const gCtx = gc.getContext('2d');
+    
+    function tick() {
+        if (!_gifEditorFramesData[_gifEditorFrameIdx]) return;
+        const fr = _gifEditorFramesData[_gifEditorFrameIdx];
+        
+        gCtx.clearRect(0, 0, gc.width, gc.height);
+        
+        // 1. 원본 그리기
+        gCtx.drawImage(fr.img, 0, 0);
+
+        // 2. 픽셀 데이터 연산
+        const imgData = gCtx.getImageData(0, 0, gc.width, gc.height);
+        const pixels = imgData.data;
+
+        const toleranceVal = parseInt(document.getElementById('gifEditorTolerance').value);
+        const softnessVal = parseInt(document.getElementById('gifEditorSoftness').value);
+        const silCheck = document.getElementById('gifEditorSilhouetteCheck').checked;
+        const silColor = document.getElementById('gifEditorColor').value;
+
+        let silR = 18, silG = 8, silB = 10;
+        if (silCheck && silColor.startsWith('#')) {
+            const hex = silColor.slice(1);
+            if (hex.length === 6) {
+                silR = parseInt(hex.slice(0, 2), 16);
+                silG = parseInt(hex.slice(2, 4), 16);
+                silB = parseInt(hex.slice(4, 6), 16);
+            }
+        }
+
+        // 3. 고속 픽셀 필터링 루프 (매직 툴 & 안티앨리어싱 & 실루엣)
+        for (let i = 0; i < pixels.length; i += 4) {
+            const r = pixels[i];
+            const g = pixels[i+1];
+            const b = pixels[i+2];
+            const a = pixels[i+3];
+
+            if (a === 0) continue;
+
+            const dist = Math.sqrt((253 - r)**2 + (253 - g)**2 + (251 - b)**2);
+            const t_low = toleranceVal;
+            const t_high = toleranceVal + softnessVal;
+
+            let newAlpha = a;
+            if (t_low === 0 && softnessVal === 0) {
+                if (dist === 0) {
+                    pixels[i+3] = 0;
+                    continue;
+                }
+            } else {
+                if (dist <= t_low) {
+                    pixels[i+3] = 0;
+                    continue;
+                } else if (softnessVal > 0 && dist < t_high) {
+                    const ratio = (dist - t_low) / (t_high - t_low);
+                    newAlpha = Math.round(ratio * a);
+                }
+            }
+
+            if (silCheck) {
+                pixels[i] = silR;
+                pixels[i+1] = silG;
+                pixels[i+2] = silB;
+            }
+            pixels[i+3] = newAlpha;
+        }
+
+        // 4. 적용
+        gCtx.putImageData(imgData, 0, 0);
+
+        if (frameBar) {
+            frameBar.textContent = `▶  ${_gifEditorFrameIdx + 1} / ${_gifEditorFramesData.length}  ·  ${fr.delay}ms`;
+        }
+
+        _gifEditorFrameIdx = (_gifEditorFrameIdx + 1) % _gifEditorFramesData.length;
+        _gifEditorTimer = setTimeout(tick, fr.delay);
+    }
+    tick();
+}
+
+function _stopGifEditorAnim() {
+    if (_gifEditorTimer) { clearTimeout(_gifEditorTimer); _gifEditorTimer = null; }
+}
+
+// 다듬기 에디터 이벤트 등록
+document.getElementById('gifEditorCancel')?.addEventListener('click', () => {
+    _stopGifEditorAnim();
+    document.getElementById('gifEditorModal').classList.add('hidden');
+    document.getElementById('apOverlay').classList.remove('hidden');
+});
+
+document.getElementById('gifEditorTolerance')?.addEventListener('input', (e) => {
+    document.getElementById('gifEditorToleranceText').textContent = e.target.value;
+    _gifEditorFrameIdx = Math.max(0, _gifEditorFrameIdx - 1);
+    _startGifEditorAnim();
+});
+
+document.getElementById('gifEditorSoftness')?.addEventListener('input', (e) => {
+    document.getElementById('gifEditorSoftnessText').textContent = e.target.value;
+    _gifEditorFrameIdx = Math.max(0, _gifEditorFrameIdx - 1);
+    _startGifEditorAnim();
+});
+
+document.getElementById('gifEditorZoom')?.remove(); // 중복 방지 대응
+
+// 마우스 휠을 활용한 포인터 중심 스마트 줌 구현
+document.getElementById('gifEditorViewport')?.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    
+    const vp = document.getElementById('gifEditorViewport');
+    const rect = vp.getBoundingClientRect();
+    
+    // 뷰포트 대비 마우스 포인터의 상대 위치
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    // 줌 이전 마우스가 가리키던 캔버스상의 가상 좌표
+    const beforeCanvasX = vp.scrollLeft + mouseX;
+    const beforeCanvasY = vp.scrollTop + mouseY;
+    
+    const oldZoom = _gifEditorZoomVal;
+    if (e.deltaY < 0) {
+        _gifEditorZoomVal = Math.min(15, _gifEditorZoomVal + 1); // 1배씩 증가, 최대 15x
+    } else {
+        _gifEditorZoomVal = Math.max(1, _gifEditorZoomVal - 1);  // 1배씩 감소, 최소 1x
+    }
+    
+    if (oldZoom === _gifEditorZoomVal) return;
+    
+    _updateGifEditorCanvasSize(_gifEditorZoomVal);
+    
+    // 줌 배율 비율
+    const ratio = _gifEditorZoomVal / oldZoom;
+    const afterCanvasX = beforeCanvasX * ratio;
+    const afterCanvasY = beforeCanvasY * ratio;
+    
+    // 마우스 커서 아래 픽셀이 확대 후에도 마우스 아래에 남도록 스크롤 오프셋 역계산 보정
+    vp.scrollLeft = afterCanvasX - mouseX;
+    vp.scrollTop = afterCanvasY - mouseY;
+    
+    const zoomText = document.getElementById('gifEditorZoomText');
+    if (zoomText) zoomText.textContent = `Zoom: ${_gifEditorZoomVal}x`;
+}, { passive: false });
+
+function _updateGifEditorCanvasSize(zoom) {
+    const gc = document.getElementById('gifEditorCanvas');
+    if (!gc || !_gifEditorWidth) return;
+    gc.style.width = (_gifEditorWidth * zoom) + 'px';
+    gc.style.height = (_gifEditorHeight * zoom) + 'px';
+}
+
+document.getElementById('gifEditorSilhouetteCheck')?.addEventListener('change', (e) => {
+    document.getElementById('gifEditorColorPickerWrap').style.display = e.target.checked ? 'flex' : 'none';
+    _gifEditorFrameIdx = Math.max(0, _gifEditorFrameIdx - 1);
+    _startGifEditorAnim();
+});
+
+document.getElementById('gifEditorColor')?.addEventListener('input', () => {
+    _gifEditorFrameIdx = Math.max(0, _gifEditorFrameIdx - 1);
+    _startGifEditorAnim();
+});
+
+document.getElementById('gifSaveModeOverwrite')?.addEventListener('change', () => {
+    document.getElementById('gifEditorNameInputWrap').style.display = 'none';
+});
+
+document.getElementById('gifSaveModeNew')?.addEventListener('change', () => {
+    document.getElementById('gifEditorNameInputWrap').style.display = 'flex';
+    const curName = _gifEditorItem?.name || 'animation';
+    document.getElementById('gifEditorNameInput').value = curName + '_edit';
+});
+
+document.getElementById('gifEditorSave')?.addEventListener('click', async () => {
+    if (!_gifEditorItem || !_gifEditorFramesData.length) return;
+
+    const isNew = document.getElementById('gifSaveModeNew').checked;
+    let saveName = _gifEditorItem.name || 'animation';
+    if (isNew) {
+        saveName = document.getElementById('gifEditorNameInput').value.trim();
+        saveName = saveName.replace(/[^a-zA-Z0-9_-]/g, '_');
+        if (!saveName) {
+            alert('올바른 파일명을 입력해주세요.');
+            return;
+        }
+    }
+
+    if (!confirm(`"${saveName}.gif" 로 저장하시겠습니까?`)) return;
+
+    _stopGifEditorAnim();
+    showConvertLoading('GIF 다듬기 및 업로드 중...');
+
+    const toleranceVal = parseInt(document.getElementById('gifEditorTolerance').value);
+    const softnessVal = parseInt(document.getElementById('gifEditorSoftness').value);
+    const silCheck = document.getElementById('gifEditorSilhouetteCheck').checked;
+    const silColor = document.getElementById('gifEditorColor').value;
+
+    let silR = 18, silG = 8, silB = 10;
+    if (silCheck && silColor.startsWith('#')) {
+        const hex = silColor.slice(1);
+        if (hex.length === 6) {
+            silR = parseInt(hex.slice(0, 2), 16);
+            silG = parseInt(hex.slice(2, 4), 16);
+            silB = parseInt(hex.slice(4, 6), 16);
+        }
+    }
+
+    const exportFrames = [];
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = _gifEditorWidth;
+    tempCanvas.height = _gifEditorHeight;
+    const tCtx = tempCanvas.getContext('2d');
+
+    for (let i = 0; i < _gifEditorFramesData.length; i++) {
+        const fr = _gifEditorFramesData[i];
+        tCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+        tCtx.drawImage(fr.img, 0, 0);
+
+        const imgData = tCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const pixels = imgData.data;
+
+        for (let j = 0; j < pixels.length; j += 4) {
+            const r = pixels[j];
+            const g = pixels[j+1];
+            const b = pixels[j+2];
+            const a = pixels[j+3];
+
+            if (a === 0) continue;
+
+            const dist = Math.sqrt((253 - r)**2 + (253 - g)**2 + (251 - b)**2);
+            const t_low = toleranceVal;
+            const t_high = toleranceVal + softnessVal;
+
+            let newAlpha = a;
+            if (t_low === 0 && softnessVal === 0) {
+                if (dist === 0) {
+                    pixels[j+3] = 0;
+                    continue;
+                }
+            } else {
+                if (dist <= t_low) {
+                    pixels[j+3] = 0;
+                    continue;
+                } else if (softnessVal > 0 && dist < t_high) {
+                    const ratio = (dist - t_low) / (t_high - t_low);
+                    newAlpha = Math.round(ratio * a);
+                }
+            }
+
+            if (silCheck) {
+                pixels[j] = silR;
+                pixels[j+1] = silG;
+                pixels[j+2] = silB;
+            }
+            pixels[j+3] = newAlpha;
+        }
+
+        tCtx.putImageData(imgData, 0, 0);
+
+        const b64 = tempCanvas.toDataURL('image/png').split(',')[1];
+        exportFrames.push({
+            base64: b64,
+            delay: fr.delay
+        });
+    }
+
+    const pid = _assetProject || '1974';
+    const category = _gifEditorItem._file ? _gifEditorItem._file.split('/')[2] : '참고도트이미지';
+
+    try {
+        const res = await fetch('/api/save-gif', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+                project: pid,
+                category,
+                name: saveName,
+                frames: exportFrames
+            })
+        });
+        const ret = await res.json();
+        if (!ret.ok) throw new Error(ret.error);
+
+        hideConvertLoading();
+        document.getElementById('gifEditorModal').classList.add('hidden');
+        window.loadAssets(); // 샘플 탭 목록 리프레시
+    } catch (e) {
+        hideConvertLoading();
+        alert('저장 실패: ' + e.message);
+        _startGifEditorAnim();
+    }
+});
 
 function _apRender() {
     const canvas = document.getElementById('apCanvas');

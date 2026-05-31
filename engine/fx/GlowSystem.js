@@ -34,6 +34,13 @@ export default class GlowSystem {
         this._radius     = 14;    // 발광 반지름 (픽셀)
         this._intensity  = 0.75;  // 발광 강도 (0~1)
 
+        // 배경 레이어 블룸 (밝은 부분=네온/조명 자동 발광). 정적 배경 1회 빌드.
+        this._layerBloom     = true;
+        this._bloomThreshold = 140;   // value(max RGB) 임계 — 색 네온도 통과 (낮춰 더 포함)
+        this._bloomBlur      = 12;    // 번짐 반경(px)
+        this._bloomStrength  = 0.95;  // 블룸 강도 (강하게)
+        this._bloomTmp       = null;
+
         // 발광 인덱스 맵 { paletteIdx → hex color }
         // 기본: 인덱스 10 = 따뜻한 노란 발광
         this._emissiveMap = new Map([
@@ -124,20 +131,16 @@ export default class GlowSystem {
      */
     render(mainCanvas, entities, cameraX = 0) {
         if (!this._enabled) return;
-        if (!this._emissiveMap.size) return;
+        if (this._emissiveMap.size) this._renderL2Glow(mainCanvas, entities, cameraX);   // L2 발광(idx10)
+        if (this._layerBloom)       this._renderLayerBloom(mainCanvas, entities, cameraX); // 배경 밝은부분 블룸
+    }
 
-        const ctx = this._offCtx;
-        const W   = this._vw;
-        const H   = this._vh;
-
-        // 오프스크린 초기화
+    // L2 게임 오브젝트 발광(idx10) — 픽셀별 radial glow
+    _renderL2Glow(mainCanvas, entities, cameraX) {
+        const ctx = this._offCtx, W = this._vw, H = this._vh;
         ctx.clearRect(0, 0, W, H);
-
-        // 발광 픽셀 수집: EntitySystem의 indexMap에서 emissive 인덱스 찾기
         const emissivePixels = this._collectEmissivePixels(entities, cameraX);
         if (!emissivePixels.length) return;
-
-        // 각 픽셀에 radial gradient 그리기
         for (const [sx, sy, idx] of emissivePixels) {
             const color = this._emissiveMap.get(idx) ?? '#ffd044';
             const grad  = this._getGradient(ctx, color);
@@ -148,13 +151,67 @@ export default class GlowSystem {
             ctx.fillRect(-this._radius, -this._radius, this._radius * 2, this._radius * 2);
             ctx.restore();
         }
-
-        // 메인 캔버스에 screen 블렌드로 합성
         const mainCtx = mainCanvas.getContext('2d');
         mainCtx.save();
         mainCtx.globalCompositeOperation = 'screen';
         mainCtx.drawImage(this._offscreen, 0, 0);
         mainCtx.restore();
+    }
+
+    // 배경(정적) 레이어의 밝은 부분 블룸 — 네온/조명. 1회 빌드 후 슬라이스 합성.
+    _renderLayerBloom(mainCanvas, entities, cameraX) {
+        const layers = entities && entities._layers;
+        if (!layers) return;
+        const W = this._vw, H = this._vh;
+        const mainCtx = mainCanvas.getContext('2d');
+        for (const li of [0, 1, 3]) {                 // 배경 레이어만 (L2 제외)
+            const layer = layers.get(li);
+            if (!layer || !layer.static || !layer.visible) continue;
+            if (!layer._bloomReady) { this._buildBloom(layer); layer._bloomReady = true; }
+            if (!layer._bloomBuf) continue;
+            const maxSrcX = Math.max(0, layer._bloomBuf.width - W);
+            const srcX = Math.min(maxSrcX, Math.max(0, Math.floor(cameraX * layer.parallax)));
+            mainCtx.save();
+            mainCtx.globalCompositeOperation = 'lighter';   // 가산 → 밝게 번짐
+            mainCtx.globalAlpha = this._bloomStrength;
+            mainCtx.drawImage(layer._bloomBuf, srcX, 0, W, H, 0, 0, W, H);
+            mainCtx.restore();
+        }
+    }
+
+    // 밝기 임계 통과(bright-pass) + 블러 → 블룸 버퍼 (1회)
+    _buildBloom(layer) {
+        const src = layer.canvas, LW = src.width, LH = src.height;
+        if (!this._bloomTmp) this._bloomTmp = document.createElement('canvas');
+        const tmp = this._bloomTmp; tmp.width = LW; tmp.height = LH;
+        const tctx = tmp.getContext('2d');
+        tctx.clearRect(0, 0, LW, LH);
+        tctx.drawImage(src, 0, 0);
+        const id = tctx.getImageData(0, 0, LW, LH), d = id.data, TH = this._bloomThreshold;
+        for (let i = 0; i < d.length; i += 4) {
+            const r = d[i], g = d[i + 1], b = d[i + 2];
+            // value(밝기 최댓값) 기준 → 채도 높은 빨강/핑크/파랑 네온도 통과
+            const v = r > g ? (r > b ? r : b) : (g > b ? g : b);
+            if (v < TH || d[i + 3] < 10) {
+                d[i] = 0; d[i + 1] = 0; d[i + 2] = 0; d[i + 3] = 0;
+            } else {
+                // 채도 높을수록 더 세게 부스트 → 색 네온도 흰색만큼 빛남
+                const mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+                const sat = v > 0 ? (v - mn) / v : 0;     // 0(무채색)~1(순색)
+                const boost = 1.4 + sat * 1.2;            // 흰색 ×1.4 ~ 순색 네온 ×2.6
+                d[i]     = Math.min(255, r * boost);
+                d[i + 1] = Math.min(255, g * boost);
+                d[i + 2] = Math.min(255, b * boost);
+            }
+        }
+        tctx.putImageData(id, 0, 0);
+        if (!layer._bloomBuf) layer._bloomBuf = document.createElement('canvas');
+        layer._bloomBuf.width = LW; layer._bloomBuf.height = LH;
+        const g = layer._bloomBuf.getContext('2d');
+        g.clearRect(0, 0, LW, LH);
+        g.filter = `blur(${this._bloomBlur}px)`;    // 한 번만 블러 → 매 프레임은 plain draw
+        g.drawImage(tmp, 0, 0);
+        g.filter = 'none';
     }
 
     // ── 내부 ─────────────────────────────────────────────────────────

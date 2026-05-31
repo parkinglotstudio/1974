@@ -11,6 +11,7 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=ROOT, **kwargs)
 
     def do_POST(self):
+        print(f"[REQUEST POST] path={self.path}", flush=True)
         if self.path == '/api/create-project':
             length = int(self.headers.get('Content-Length', 0))
             body   = json.loads(self.rfile.read(length))
@@ -345,8 +346,14 @@ init().catch(e => console.error('[{pid}]', e));
             if 'gifBase64' in body:
                 gif_bytes = base64.b64decode(body['gifBase64'])
             elif 'gifPath' in body:
-                rel = body['gifPath']
-                if '..' in rel or rel.startswith('/'):
+                raw_path = body['gifPath']
+                if '://' in raw_path:
+                    parsed = urlparse(raw_path)
+                    rel = parsed.path.lstrip('/')
+                else:
+                    rel = raw_path.lstrip('/')
+                rel = unquote(rel)
+                if '..' in rel:
                     self.send_response(403); self.end_headers(); return
                 full = os.path.join(ROOT, rel)
                 if not os.path.isfile(full):
@@ -402,12 +409,17 @@ init().catch(e => console.error('[{pid}]', e));
             pal_rgb      = [((k >> 16) & 0xFF, (k >> 8) & 0xFF, k & 0xFF)
                             for k, _ in sorted_colors]
 
+            nearest_cache = {}
             def nearest(r, g, b):
+                color_key = (r, g, b)
+                if color_key in nearest_cache:
+                    return nearest_cache[color_key]
                 best_d, best_i = float('inf'), 1
                 for ci, (cr, cg, cb) in enumerate(pal_rgb):
                     d = (r-cr)**2*0.299 + (g-cg)**2*0.587 + (b-cb)**2*0.114
                     if d < best_d:
                         best_d, best_i = d, ci + 1
+                nearest_cache[color_key] = best_i
                 return best_i
 
             # ── 프레임별 픽셀 인덱스 변환 ─────────────────────────
@@ -439,11 +451,151 @@ init().catch(e => console.error('[{pid}]', e));
             print(f'[API] convert-gif: {name} ({n_frames}f, {tw}×{th})', flush=True)
             return
 
+        elif self.path == '/api/save-gif':
+            # ── 클라이언트에서 가공된 GIF 프레임들을 받아 GIF 파일로 조립 및 저장 ──
+            length = int(self.headers.get('Content-Length', 0))
+            body   = json.loads(self.rfile.read(length))
+            
+            project     = body.get('project', '1974')
+            category    = body.get('category', 'objects')
+            name        = body.get('name', 'edited_animation')
+            frames_data = body.get('frames', []) # [{'base64': '...', 'delay': 100}, ...]
+            
+            if not frames_data or not name:
+                self.send_response(400)
+                self.end_headers()
+                return
+
+            safe_name = name.replace('..', '').replace('/', '').replace('\\', '')
+            safe_cat  = category.replace('..', '').replace('/', '').replace('\\', '')
+            safe_proj = project.replace('..', '').replace('/', '').replace('\\', '')
+
+            # 임시 폴더에 samples 저장
+            dst_dir = os.path.join(ROOT, 'assets', 'samples', safe_cat)
+            os.makedirs(dst_dir, exist_ok=True)
+            dst_path = os.path.join(dst_dir, f"{safe_name}.gif")
+
+            try:
+                from PIL import Image
+                import io, base64
+
+                imgs = []
+                delays = []
+                for f in frames_data:
+                    b64_data = f['base64']
+                    img_bytes = base64.b64decode(b64_data)
+                    img = Image.open(io.BytesIO(img_bytes)).convert('RGBA')
+                    imgs.append(img)
+                    delays.append(f.get('delay', 100))
+
+                # GIF 저장
+                imgs[0].save(
+                    dst_path,
+                    save_all=True,
+                    append_images=imgs[1:],
+                    duration=delays,
+                    loop=0,
+                    transparency=0,
+                    disposal=2
+                )
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(b'{"ok":true}')
+                print(f'[API] save-gif: {dst_path} ({len(imgs)}f)', flush=True)
+
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'ok': False, 'error': str(e)}).encode('utf-8'))
+            return
+
+        elif self.path == '/api/extract-gif-frames':
+            # ── GIF 이미지의 프레임들을 픽셀 연산 없이 PNG 이미지 바이트로 추출해주는 고속 API ──
+            length = int(self.headers.get('Content-Length', 0))
+            body   = json.loads(self.rfile.read(length))
+            
+            gif_bytes = None
+            if 'gifBase64' in body:
+                gif_bytes = base64.b64decode(body['gifBase64'])
+            elif 'gifPath' in body:
+                raw_path = body['gifPath']
+                print(f"[DEBUG] raw_path = {raw_path}", flush=True)
+                if '://' in raw_path:
+                    parsed = urlparse(raw_path)
+                    rel = parsed.path.lstrip('/')
+                else:
+                    rel = raw_path.lstrip('/')
+                rel = unquote(rel)
+                print(f"[DEBUG] rel_path = {rel}", flush=True)
+                if '..' in rel:
+                    print(f"[DEBUG] Forbidden (..) path: {rel}", flush=True)
+                    self.send_response(403); self.end_headers(); return
+                full = os.path.join(ROOT, rel)
+                print(f"[DEBUG] full_path = {full} (exists: {os.path.exists(full)}, isfile: {os.path.isfile(full)})", flush=True)
+                if not os.path.isfile(full):
+                    self.send_response(404); self.end_headers(); return
+                with open(full, 'rb') as f:
+                    gif_bytes = f.read()
+
+            if not gif_bytes:
+                self.send_response(400)
+                self.end_headers()
+                return
+
+            try:
+                from PIL import Image
+                import io, base64
+
+                img = Image.open(io.BytesIO(gif_bytes))
+                n_frames = getattr(img, 'n_frames', 1)
+                width, height = img.size
+
+                frames = []
+                for i in range(n_frames):
+                    img.seek(i)
+                    buf = io.BytesIO()
+                    img.convert('RGBA').save(buf, format='PNG')
+                    b64 = base64.b64encode(buf.getvalue()).decode()
+                    frames.append({
+                        'base64': b64,
+                        'delay': img.info.get('duration', 100)
+                    })
+
+                result = {
+                    'ok': True,
+                    'width': width,
+                    'height': height,
+                    'frameCount': n_frames,
+                    'frames': frames
+                }
+                data = json.dumps(result).encode('utf-8')
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                print(f'[API] extract-gif-frames: {n_frames} frames ({width}x{height})', flush=True)
+
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'ok': False, 'error': str(e)}).encode('utf-8'))
+            return
+
         else:
             self.send_response(404)
             self.end_headers()
 
     def do_GET(self):
+        print(f"[REQUEST GET] path={self.path}", flush=True)
         # ── 프로젝트별 에셋 데이터 ─────────────────────────────────────
         if self.path.startswith('/api/project-data'):
             from urllib.parse import urlparse, parse_qs

@@ -1,32 +1,37 @@
 import { Scene } from '../../../engine/scene/SceneManager.js';
+import { SAND_BASE_RGB, SAND_TONES_RGB } from '../../../engine/SandPalette.js';
 
 const MOVE_SPEED  = 440;   // px/sec
 const WORLD_WIDTH = 2560;
-const GROUND_Y    = 490;
+const GROUND_Y    = 547;   // 발끝 = 547+270 = 817 (2/3 크기 캐릭터 높이 270)
 
 // ── 배경 순환 ───────────────────────────────────────────────────────
 const BG_LIST     = ['bg_1', 'bg_2', 'bg_3', 'bg_4'];
 const BG_PID      = '1974';
 const BG_INTERVAL = 10000;  // 10초마다 다음 배경
 const BG_TRANS_MS = 2000;   // 전환 시간 (2초)
-const CYCLE_ENABLED = false; // 자동 배경 순환 ON/OFF (현재 OFF — 새 효과 개발용)
+const CYCLE_ENABLED = false; // 자동 배경 순환/전환 연출 ON/OFF (확인 완료 → OFF)
+const DIGITAL_ENABLED = false; // 디지털 회로/메시 오버레이 ON/OFF (저장만, 지금은 OFF)
+const FOG_ENABLED = false;     // 안개(절차적 + 드리프트 구름) ON/OFF (지금은 OFF)
 
-// 전환 효과를 차례대로 순환
-const FX_LIST     = ['palette_flash', 'slide_left', 'convergence'];
+// 전환 효과를 차례대로 순환 — 새로 만든 모래 생성형 3종 테스트
+const FX_LIST     = ['sand_top', 'sand_sides', 'wave'];
 
 // ── SandScroll (모래 생성/소멸 스크롤) 프로토타입 파라미터 ───────────
 const SAND_ENABLED   = true;
-const SAND_BAND      = 0.22;  // 가장자리 띠 폭 (화면 비율) — 해상도 단계가 보이게
-const SAND_SETTLE_MS = 280;   // 멈출 때 굳는 시간
+const SAND_BAND_MAX  = 0.065; // 최대 띠 폭 (화면 비율) — 절반으로 축소
+const SAND_GRAIN     = 4;     // 모래 입자 크기 px
+const SAND_SETTLE_MS = 280;   // 멈출 때 굳는(가라앉는) 시간
+const SAND_BUILDUP_MS = 2000; // 걷기 시작 → 최대 크기까지 빌드업 (2초). 달리면 즉시.
 
-// 픽셀화 해상도 단계: 바깥(미완성)=큰 블록 → 안쪽(완성)=실제 그림
-// f(생성 진행도 0~1) → 블록 크기(px)
-function sandBlockSize(f) {
-    if (f >= 0.95) return 1;   // 실제 그림
-    if (f >= 0.72) return 2;
-    if (f >= 0.50) return 4;
-    if (f >= 0.28) return 8;
-    return 16;                 // 가장 큰 픽셀(모자이크)
+// 앰비언트 — 가만히 있어도 픽셀이 톡톡 떨어지는 모래알
+const SAND_FALL_RATE = 55;    // 초당 떨어지는 모래알 수
+const SAND_FALL_G    = 3;     // 떨어지는 입자 크기 px
+
+// 월드 고정 셀 의사난수 0~1 (콘텐츠가 흐르는 동안 입자가 정체성 유지 → 팝인/팝아웃)
+function sandHash(x, y) {
+    const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return s - Math.floor(s);
 }
 
 export default class GolmokGame extends Scene {
@@ -45,21 +50,77 @@ export default class GolmokGame extends Scene {
         this._lastCamX = null;
         this._sandDir  = 1;      // +1: 오른쪽 이동, -1: 왼쪽
         this._sandI    = 0;      // 효과 강도 0~1 (이동 시 1, 멈추면 감쇠)
+        this._sandSpeed = 0;     // 평활된 스크롤 속도 px/sec
+        this._sandRamp  = 0;     // 좌우 효과 빌드업 0~1 (걷기 2초 / 달리기 즉시)
+        this._ambient  = [];     // 앰비언트 모래알 파티클
+        this._ambAcc   = 0;      // 스폰 누적기
+
+        // IDLE(대기) 상태 — 픽셀 낙하 + 발밑 그림자
+        this._idleT         = 0;   // 대기 누적 시간 (그림자 진하기)
+        this._idleParticles = [];
+        this._idleAcc       = 0;
+
+        this._dayT = 0;            // 낮↔밤 60초 사이클 시간
+        this._fxK  = 1;            // 현재 FX 세기 (0~1)
+        this._fog  = [];           // 드리프트 구름-포그 레이어들
+
+        // 디지털 오버레이 — 회로/메시 조각이 불규칙하게 일어났다 사라짐
+        this._digital = [];
+        this._digAcc  = 0;
     }
 
     onEnter(engine) {
         engine.bounds.setSceneBounds(WORLD_WIDTH, engine.gameHeight);
 
-        // 조명/연출 OFF
-        engine.lighting.setAmbient(0);
+        // 엔진 FX 전부 ON (테스트)
+        engine.lighting.setAmbient(0.2, '#0a1428');                  // 살짝만 어둡게 (밝은 쪽)
         engine.lighting.clearLights();
-        engine.glow.disable();
-        engine.rim.disable();
-        engine.fog.disable();
-        engine.vignette.setPreset('none');
+        engine.lighting.addLight({ id: 'key', x: 270, y: 300, radius: 340, color: '#ffd060', intensity: 0.95, fixed: true });
+        engine.glow.enable();                                        // 발광(인덱스10) — 해당 픽셀 있을 때
+        engine.rim.enable();                                         // 캐릭터 가장자리 림라이트
+        if (FOG_ENABLED) {
+            engine.fog.enable();
+            engine.fog.enableLayerFog({ startY: 430, endY: 960, color: '#9fb3cc', maxOpacity: 0.5, direction: 'bottom' });
+        } else {
+            engine.fog.disable();
+        }
+        engine.vignette.setPreset('warm');                           // 가장자리 비네트
 
         this._player = engine.entities.get('player');
         this._preload();
+        if (FOG_ENABLED) this._loadFog();
+    }
+
+    // 구름-포그 텍스쳐 로드 → 캔버스로 1회 래스터 (앞/뒤 2겹)
+    async _loadFog() {
+        const defs = [
+            { file: 'fog_1', y: -20, dh: 540, speed: 5,  baseAlpha: 0.42 },  // 뒤(위), 느림
+            { file: 'fog_2', y: 360, dh: 640, speed: 11, baseAlpha: 0.5  },  // 앞(아래), 빠름
+        ];
+        for (const def of defs) {
+            try {
+                const d = await fetch(`/projects/${BG_PID}/pixels/fog/${def.file}.json`, { cache: 'no-store' }).then(r => r.json());
+                this._fog.push({ canvas: this._rasterFog(d), x: Math.random() * d.width, ...def });
+            } catch (e) { console.warn('[golmok] fog load fail:', def.file, e); }
+        }
+    }
+
+    _rasterFog(d) {
+        const cv = document.createElement('canvas'); cv.width = d.width; cv.height = d.height;
+        const ctx = cv.getContext('2d');
+        const img = ctx.createImageData(d.width, d.height); const od = img.data;
+        const pal = d.palette.map(c => {
+            if (!c || c === 'transparent') return null;
+            const h = c.slice(1);
+            return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16), h.length >= 8 ? parseInt(h.slice(6,8),16) : 255];
+        });
+        const s = d.scanline;
+        for (let i = 0; i < s.length; i++) {
+            const c = pal[s[i]]; if (!c) continue;
+            const o = i << 2; od[o]=c[0]; od[o+1]=c[1]; od[o+2]=c[2]; od[o+3]=c[3];
+        }
+        ctx.putImageData(img, 0, 0);
+        return cv;
     }
 
     async _preload() {
@@ -115,12 +176,48 @@ export default class GolmokGame extends Scene {
         if (this._lastCamX == null) this._lastCamX = cam;
         const camDelta = cam - this._lastCamX;
         this._lastCamX = cam;
+        // 순간 속도(px/sec) → EMA 평활 (가감속 시 띠 폭이 부드럽게 부풀고 가라앉음)
+        const instSpeed = Math.abs(camDelta) / Math.max(dtSec, 0.001);
+        this._sandSpeed = this._sandSpeed * 0.8 + instSpeed * 0.2;
+        const speedNorm = this._sandSpeed / MOVE_SPEED;
         if (Math.abs(camDelta) > 0.05) {
             this._sandDir = camDelta > 0 ? 1 : -1;
             this._sandI   = 1;
+            // 빌드업: 걷기(≈1배속)면 2초에 걸쳐, 달리기(>1.2배속)면 즉시 최대로
+            const rampMs = speedNorm > 1.2 ? 200 : SAND_BUILDUP_MS;
+            this._sandRamp = Math.min(1, this._sandRamp + dt / rampMs);
         } else {
-            this._sandI = Math.max(0, this._sandI - dt / SAND_SETTLE_MS);
+            this._sandI    = Math.max(0, this._sandI    - dt / SAND_SETTLE_MS);
+            this._sandRamp = Math.max(0, this._sandRamp - dt / SAND_SETTLE_MS);
         }
+
+        // ── 낮↔밤 60초 사이클 (값 애니메이션 — 부하 없음) ──────────
+        // 1분 동안 전체 FX 세기 0(raw)↔최대(full) — 효과 차이를 확연히 보이게
+        this._dayT += dtSec;
+        const k = 0.5 - 0.5 * Math.cos(this._dayT * (Math.PI * 2 / 60));  // 0(raw)~1(full)~0
+        this._fxK = k;
+        for (const f of this._fog) f.x += f.speed * dtSec;               // 안개 드리프트
+        if (DIGITAL_ENABLED) this._updateDigital(dt);                    // 디지털 패턴 생성/소멸 (현재 OFF)
+        const hx = n => Math.max(0, Math.min(255, n | 0)).toString(16).padStart(2, '0');
+        engine.lighting.setAmbient(0.5 * k, '#0a1428');                  // 어둠 0↔0.5
+        const lr = 185 + (255 - 185) * k, lg = 215 + (200 - 215) * k, lb = 255 + (95 - 255) * k;
+        engine.lighting.updateLight('key', { color: '#' + hx(lr) + hx(lg) + hx(lb), intensity: 0.95 * k });
+        engine.vignette.setStrength(0.55 * k);                           // 비네트 0↔0.55
+        engine.glow._bloomStrength = 0.95 * k;                           // 글로우 0↔0.95
+        engine.fog._layerFogOpts.maxOpacity = 0.5 * k;                   // 안개 0↔0.5
+        engine.fog._gradCache = null;
+
+        // ── IDLE 효과: 정지 시 캐릭터에서 픽셀 낙하 + 발밑 그림자 누적 ──
+        if (dx === 0) {
+            this._idleT += dtSec;
+            this._spawnIdleParticles(dt);
+        } else {
+            this._idleT = 0;
+        }
+        this._updateIdleParticles(dt);
+
+        // 앰비언트 모래알 (정지/이동 무관 항상)
+        this._updateAmbientSand(dt);
 
         // ── 배경 순환 + 전환 ──────────────────────────────────────
         if (!this._bgReady) return;
@@ -175,68 +272,516 @@ export default class GolmokGame extends Scene {
                     this._drawConvergence(ctx, W, H, t);
                     break;
                 }
+                case 'sand_top':
+                case 'sand_sides': {
+                    // 앞 절반: 구 배경 모래 소멸 / 뒤 절반: 새 배경 모래 생성
+                    const shown = t < 0.5 ? (1 - t / 0.5) : (t - 0.5) / 0.5;
+                    const BR = SAND_BASE_RGB[0], BG = SAND_BASE_RGB[1], BB = SAND_BASE_RGB[2];
+                    const img = ctx.getImageData(0, 0, W, H);
+                    const d = img.data;
+                    for (let y = 0; y < H; y++) {
+                        for (let x = 0; x < W; x++) {
+                            const n = sandHash(x >> 2, y >> 2);
+                            let thr;
+                            if (this._tr.effect === 'sand_top') {
+                                thr = (y / H) * 0.7 + n * 0.3;
+                            } else {
+                                const dc = Math.abs(x - W * 0.5) / (W * 0.5);
+                                thr = (1 - dc) * 0.7 + n * 0.3;
+                            }
+                            if (shown < thr) {                 // 미생성 = 모래 바탕색
+                                const i = (y * W + x) << 2;
+                                d[i] = BR; d[i + 1] = BG; d[i + 2] = BB; d[i + 3] = 255;
+                            }
+                        }
+                    }
+                    ctx.putImageData(img, 0, 0);
+                    break;
+                }
+                case 'wave': {
+                    const shown = t < 0.5 ? (1 - t / 0.5) : (t - 0.5) / 0.5;
+                    const amp = (1 - shown) * 26, fade = shown, phase = t * Math.PI * 8;
+                    const BR = SAND_BASE_RGB[0], BG = SAND_BASE_RGB[1], BB = SAND_BASE_RGB[2];
+                    const src = ctx.getImageData(0, 0, W, H), sd = src.data;
+                    const out = ctx.createImageData(W, H), od = out.data;
+                    for (let y = 0; y < H; y++) {
+                        const dx = Math.round(Math.sin(y * 0.045 + phase) * amp);
+                        for (let x = 0; x < W; x++) {
+                            let sxp = x - dx;
+                            if (sxp < 0) sxp = 0; else if (sxp >= W) sxp = W - 1;
+                            const si = (y * W + sxp) << 2, oi = (y * W + x) << 2;
+                            // 모래 바탕색에서 그림색으로 보간 (검정 대신)
+                            od[oi]     = BR + (sd[si]     - BR) * fade;
+                            od[oi + 1] = BG + (sd[si + 1] - BG) * fade;
+                            od[oi + 2] = BB + (sd[si + 2] - BB) * fade;
+                            od[oi + 3] = 255;
+                        }
+                    }
+                    ctx.putImageData(out, 0, 0);
+                    break;
+                }
             }
             overlay = true;
-        } else if (SAND_ENABLED && this._sandI > 0.01) {
+        } else if (SAND_ENABLED && this._sandRamp > 0.01) {
             this._renderSandScroll(ctx, W, H);
             overlay = true;
         }
 
-        // 캐릭터(L2)는 효과에 안 먹히도록 오버레이 위에 다시 그림 (항상 최상단)
-        if (overlay) {
-            const l2 = this.engine.layers.getCanvas(2);
-            if (l2) ctx.drawImage(l2, 0, 0, W, H, 0, 0, W, H);
+        // 발밑 그림자 (항상, 캐릭터 아래) — 정지=픽셀 깨짐 / 이동=블러 모션
+        this._drawShadow(ctx);
+
+        // 캐릭터 본체 (그림자 위, 항상 재그림)
+        const moving = this._sandI > 0.05;
+        const l2 = this.engine.layers.getCanvas(2);
+        if (l2) {
+            if (moving) this._renderCharTrail(ctx, l2, W, H);
+            ctx.drawImage(l2, 0, 0, W, H, 0, 0, W, H);
         }
+
+        // 캐릭터 외곽 역광 rim — 뒤 배경색을 받아 가장자리에서 페이드 (런타임)
+        this._renderCharRim(ctx, W, H);
+
+        // IDLE 떨어지는 픽셀 (캐릭터 위/주변)
+        if (this._idleParticles.length) this._drawIdleParticles(ctx);
+
+        // 앰비언트 모래알 (항상)
+        this._drawAmbientSand(ctx);
+
+        // 디지털 패턴 오버레이 (회로/메시가 불규칙하게 명멸 — 디지털 세계 느낌)
+        this._drawDigital(ctx);
+
+        // 드리프트 구름-포그 (몽환적 분위기, FX 세기에 연동)
+        this._drawFog(ctx, W, H);
+
+        // 가장자리 픽셀 깨짐 프레임 — 반듯한 사각 테두리를 픽셀아트답게 침식 (이동 시)
+        this._renderEdgeFrame(ctx, W, H);
+    }
+
+    // ── 디지털 오버레이: 회로/메시 조각이 불규칙하게 명멸 ──────────────
+    _updateDigital(dt) {
+        const dtSec = dt / 1000;
+        for (let i = this._digital.length - 1; i >= 0; i--) {
+            const p = this._digital[i]; p.age += dtSec;
+            if (p.age >= p.life) this._digital.splice(i, 1);
+        }
+        this._digAcc += 4 * dtSec;                          // ~초당 4개
+        while (this._digAcc >= 1 && this._digital.length < 16) {
+            this._digAcc -= 1; this._spawnDigital();
+        }
+    }
+
+    _spawnDigital() {
+        const e = this.engine, W = e.gameWidth, H = e.gameHeight;
+        const wx = Math.floor(e.cameraX) + (Math.random() * (W + 100) - 50);
+        const y  = 40 + Math.random() * (H - 220);
+        const scale = 0.8 + Math.random() * 1.0;
+        const pts = [], edges = [];
+        if (Math.random() < 0.5) {
+            // 회로 트레이스 (직각 경로 + 노드)
+            let cx = 0, cy = 0; pts.push([cx, cy]);
+            const segs = 3 + (Math.random() * 4 | 0);
+            for (let i = 0; i < segs; i++) {
+                const len = (18 + Math.random() * 48) * scale;
+                if (i % 2 === 0) cx += (Math.random() < 0.5 ? -1 : 1) * len;
+                else             cy += (Math.random() < 0.5 ? -1 : 1) * len;
+                pts.push([cx, cy]);
+            }
+            for (let i = 0; i < pts.length - 1; i++) edges.push([i, i + 1]);
+        } else {
+            // 와이어프레임 노드망
+            const n = 4 + (Math.random() * 4 | 0);
+            for (let i = 0; i < n; i++) pts.push([(Math.random() - 0.5) * 100 * scale, (Math.random() - 0.5) * 100 * scale]);
+            for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (Math.random() < 0.4) edges.push([i, j]);
+        }
+        this._digital.push({ wx, y, age: 0, life: 0.7 + Math.random() * 1.7, pts, edges });
+    }
+
+    _drawDigital(ctx) {
+        if (!this._digital.length) return;
+        const cam = this.engine.cameraX;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';   // 가산 → 파랑 글로우
+        for (const p of this._digital) {
+            const t = p.age / p.life;
+            const fade = t < 0.25 ? t / 0.25 : (t > 0.6 ? (1 - t) / 0.4 : 1);
+            const a = Math.max(0, fade) * 0.75;
+            if (a <= 0.02) continue;
+            const ox = p.wx - cam, oy = p.y;
+            ctx.globalAlpha = a;
+            ctx.strokeStyle = '#3aa8ff'; ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            for (const [i, j] of p.edges) {
+                ctx.moveTo(ox + p.pts[i][0], oy + p.pts[i][1]);
+                ctx.lineTo(ox + p.pts[j][0], oy + p.pts[j][1]);
+            }
+            ctx.stroke();
+            ctx.fillStyle = '#cfeaff';
+            for (const pt of p.pts) ctx.fillRect((ox + pt[0] - 1) | 0, (oy + pt[1] - 1) | 0, 3, 3);
+        }
+        ctx.restore();
+        ctx.globalAlpha = 1;
+    }
+
+    // 구름-포그 2겹 가로 드리프트 (반투명, FX 세기 k에 연동)
+    _drawFog(ctx, W, H) {
+        const k = this._fxK;
+        if (k <= 0.02 || !this._fog.length) return;
+        for (const f of this._fog) {
+            const cw = f.canvas.width, ch = f.canvas.height;
+            const drift = ((f.x % cw) + cw) % cw;
+            ctx.save();
+            ctx.globalAlpha = Math.min(1, f.baseAlpha * k);
+            ctx.drawImage(f.canvas, 0, 0, cw, ch, -drift,     f.y, W, f.dh);  // 무한 가로 스크롤
+            ctx.drawImage(f.canvas, 0, 0, cw, ch, W - drift,  f.y, W, f.dh);
+            ctx.restore();
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // 가만히 있어도 이미지에서 픽셀이 톡 떨어져 모래알처럼 흘러내림
+    _updateAmbientSand(dt) {
+        const dtSec = dt / 1000;
+        const e = this.engine;
+        const W = e.gameWidth, H = e.gameHeight;
+        const L1 = e.layers.getCanvas(1);
+        const L2 = e.layers.getCanvas(2);
+        const lctx1 = L1 ? L1.getContext('2d') : null;
+        const lctx2 = L2 ? L2.getContext('2d') : null;
+        const player = this._player;
+
+        // 스폰 — 배경 + 캐릭터 픽셀을 샘플 → 위로 피어오르는 모래알
+        this._ambAcc += SAND_FALL_RATE * dtSec;
+        while (this._ambAcc >= 1) {
+            this._ambAcc -= 1;
+            let col, x, y;
+            const fromChar = player && lctx2 && Math.random() < 0.4;   // 40% 캐릭터에서
+            if (fromChar) {
+                const psx = player.x - e.cameraX;
+                x = (psx + Math.random() * player.pw) | 0;
+                y = (player.y + Math.random() * player.ph) | 0;
+                if (x < 0 || x >= W || y < 0 || y >= H) continue;
+                try { col = lctx2.getImageData(x, y, 1, 1).data; } catch (_) { continue; }
+            } else {
+                if (!lctx1) continue;
+                x = (Math.random() * W) | 0;
+                y = (Math.random() * H) | 0;
+                const sx = Math.min(L1.width - 1, Math.max(0, Math.floor(e.cameraX) + x));
+                try { col = lctx1.getImageData(sx, y, 1, 1).data; } catch (_) { break; }
+            }
+            if (col[3] < 16) continue;
+            this._ambient.push({
+                x, y,
+                vy: -(12 + Math.random() * 42),         // 위로 떠오름 (음수)
+                vx: (Math.random() - 0.5) * 14,          // 살짝 좌우 흔들림
+                age: 0, maxlife: 0.7 + Math.random() * 1.3,
+                r: Math.min(255, col[0] + 85), g: Math.min(255, col[1] + 80), b: Math.min(255, col[2] + 65),
+            });
+        }
+
+        // 업데이트 (상승 + 흔들림 + 수명)
+        for (let i = this._ambient.length - 1; i >= 0; i--) {
+            const p = this._ambient[i];
+            p.y  += p.vy * dtSec;
+            p.x  += p.vx * dtSec;
+            p.age += dtSec;
+            if (p.age >= p.maxlife || p.y < -4) this._ambient.splice(i, 1);
+        }
+    }
+
+    _drawAmbientSand(ctx) {
+        const G = SAND_FALL_G;
+        for (const p of this._ambient) {
+            // 등장 직후 빠르게 "톡" 솟았다가 서서히 사라짐 (pop)
+            const t   = p.age / p.maxlife;                 // 0→1
+            const pop = t < 0.12 ? (t / 0.12) : (1 - (t - 0.12) / (1 - 0.12));
+            const a   = Math.max(0, Math.min(1, pop)) * 0.9;
+            if (a <= 0.02) continue;
+            ctx.globalAlpha = a;
+            ctx.fillStyle = `rgb(${p.r},${p.g},${p.b})`;
+            ctx.fillRect(p.x | 0, p.y | 0, G, G);
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // 캐릭터 외곽 역광 rim: 뒤 배경(L1)색을 가져와 가장자리부터 안쪽으로 페이드 + 우상단 광원 방향
+    _renderCharRim(ctx, W, H) {
+        const e = this.engine; const L2 = e.layers.getCanvas(2); const L1 = e.layers.getCanvas(1); const p = this._player;
+        if (!L2 || !L1 || !p) return;
+        const N = 7;                         // rim 폭(px) — 면 크게
+        const PEAK = 1.0;                    // 최대 세기 (또렷)
+        const Lx = 0.7071, Ly = -0.7071;     // 우상단 광원(역광)
+        const psx = (p.x - e.cameraX) | 0;
+        const x0 = Math.max(0, psx - 2), x1 = Math.min(W, psx + p.pw + 2);
+        const y0 = Math.max(0, p.y - 2), y1 = Math.min(H, p.y + p.ph + 2);
+        const rw = x1 - x0, rh = y1 - y0; if (rw <= 0 || rh <= 0) return;
+        const l2d = L2.getContext('2d').getImageData(x0, y0, rw, rh).data;
+        const camX = Math.floor(e.cameraX);
+        let bgsx = camX + x0; if (bgsx < 0) bgsx = 0;
+        const l1d = L1.getContext('2d').getImageData(bgsx, y0, Math.min(rw, L1.width - bgsx), rh).data;
+        const lw = Math.min(rw, L1.width - bgsx);
+        const A = (lx, ly) => (lx < 0 || lx >= rw || ly < 0 || ly >= rh) ? 0 : l2d[((ly * rw + lx) << 2) + 3];
+        for (let ly = 0; ly < rh; ly++) {
+            for (let lx = 0; lx < rw; lx++) {
+                if (A(lx, ly) < 40) continue;
+                if (A(lx - N, ly) >= 40 && A(lx + N, ly) >= 40 && A(lx, ly - N) >= 40 && A(lx, ly + N) >= 40) continue; // 깊은 내부 skip
+                let d = 0;
+                for (let r = 1; r <= N; r++) {
+                    if (A(lx-r,ly)<40||A(lx+r,ly)<40||A(lx,ly-r)<40||A(lx,ly+r)<40||A(lx-r,ly-r)<40||A(lx+r,ly-r)<40||A(lx-r,ly+r)<40||A(lx+r,ly+r)<40) { d = r; break; }
+                }
+                if (!d) continue;
+                const gx = A(lx+2,ly) - A(lx-2,ly), gy = A(lx,ly+2) - A(lx,ly-2);
+                const ox = -gx, oy = -gy; const ln = Math.hypot(ox, oy); let dir = 0;
+                if (ln > 0) dir = Math.max(0, (ox/ln)*Lx + (oy/ln)*Ly);
+                const falloff = 1 - (d - 1) / N;
+                const a = PEAK * (0.4 + 0.6 * falloff) * (0.28 + 0.72 * dir);  // 밴드 더 채우고 또렷
+                if (a <= 0.03) continue;
+                const bi = (ly * lw + Math.min(lx, lw - 1)) << 2;   // 뒤 배경색 샘플
+                const r0 = Math.min(255, l1d[bi]   * 2.3) | 0;       // 배경색 강하게 부스트
+                const g0 = Math.min(255, l1d[bi+1] * 2.3) | 0;
+                const b0 = Math.min(255, l1d[bi+2] * 2.3) | 0;
+                ctx.globalAlpha = a;
+                ctx.fillStyle = `rgb(${r0},${g0},${b0})`;
+                ctx.fillRect(x0 + lx, y0 + ly, 1, 1);
+            }
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // 캐릭터 가장자리를 매 프레임 움직이는 검은 픽셀로 — 디지털 세계 느낌 (현재 미사용)
+    _renderCharEdge(ctx, W, H) {
+        const e = this.engine; const L2 = e.layers.getCanvas(2); const p = this._player;
+        if (!L2 || !p) return;
+        const G = 3;
+        const psx = (p.x - e.cameraX) | 0;
+        const x0 = Math.max(0, psx - G), x1 = Math.min(W, psx + p.pw + G);
+        const y0 = Math.max(0, p.y - G), y1 = Math.min(H, p.y + p.ph + G);
+        const rw = x1 - x0, rh = y1 - y0;
+        if (rw <= 0 || rh <= 0) return;
+        const img = L2.getContext('2d').getImageData(x0, y0, rw, rh).data;
+        const A = (lx, ly) => (lx < 0 || lx >= rw || ly < 0 || ly >= rh) ? 0 : img[((ly * rw + lx) << 2) + 3];
+        const fb = (e._frame || 0) * 0.7;          // 프레임마다 패턴 이동 → 깜빡임
+        ctx.fillStyle = '#000';
+        for (let ly = 0; ly < rh; ly += G) {
+            for (let lx = 0; lx < rw; lx += G) {
+                if (A(lx, ly) < 40) continue;       // 캐릭터 픽셀만
+                // 내부(사방 불투명)는 제외 → 경계만
+                if (A(lx - G, ly) >= 40 && A(lx + G, ly) >= 40 && A(lx, ly - G) >= 40 && A(lx, ly + G) >= 40) continue;
+                if (sandHash(lx / G + fb, ly / G) < 0.45) ctx.fillRect(x0 + lx, y0 + ly, G, G);
+            }
+        }
+    }
+
+    // ── IDLE: 캐릭터에서 픽셀이 아래로 떨어짐 ──────────────────────
+    _spawnIdleParticles(dt) {
+        const e = this.engine; const p = this._player;
+        const L2 = e.layers.getCanvas(2);
+        if (!p || !L2) return;
+        const lctx2 = L2.getContext('2d');
+        const psx = p.x - e.cameraX;
+        this._idleAcc += 48 * (dt / 1000);          // 초당 ~48개
+        while (this._idleAcc >= 1) {
+            this._idleAcc -= 1;
+            const x = (psx + Math.random() * p.pw) | 0;
+            const y = (p.y + Math.random() * p.ph * 0.9) | 0;
+            if (x < 0 || x >= e.gameWidth || y < 0 || y >= e.gameHeight) continue;
+            let col; try { col = lctx2.getImageData(x, y, 1, 1).data; } catch (_) { continue; }
+            if (col[3] < 16) continue;
+            this._idleParticles.push({
+                x, y, vy: 30 + Math.random() * 80,      // 아래로 낙하
+                age: 0, maxlife: 0.5 + Math.random() * 0.9,
+                r: col[0], g: col[1], b: col[2],
+            });
+        }
+    }
+
+    _updateIdleParticles(dt) {
+        const dtSec = dt / 1000;
+        const ground = GROUND_Y + (this._player ? this._player.ph : 490) - 4;  // 발끝 바닥
+        for (let i = this._idleParticles.length - 1; i >= 0; i--) {
+            const q = this._idleParticles[i];
+            q.y += q.vy * dtSec;
+            q.age += dtSec;
+            if (q.age >= q.maxlife || q.y >= ground) this._idleParticles.splice(i, 1);
+        }
+    }
+
+    // 발밑 그림자 — 캐릭터 넓이 기준(작게). 정지=픽셀 깨짐 가장자리 / 이동=블러 모션
+    _drawShadow(ctx) {
+        const e = this.engine; const p = this._player;
+        if (!p) return;
+        const cx = p.x - e.cameraX + p.pw / 2;
+        const cy = GROUND_Y + p.ph - 5;          // 발밑
+        const rx = p.pw * 0.24;                  // 캐릭터 넓이 기준, 작게
+        const ry = 8;
+        const moving = this._sandI > 0.05;
+        if (moving) {
+            // 이동: 블러 모션 그림자 (진행할수록 늘어나고 흐려짐)
+            const sn = Math.min(1, this._sandSpeed / MOVE_SPEED);
+            ctx.save();
+            ctx.globalAlpha = 0.36;
+            ctx.fillStyle = '#000';
+            ctx.filter = `blur(${(3 + 5 * sn) | 0}px)`;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, rx * (1 + 0.7 * sn), ry, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.filter = 'none';
+            ctx.restore();
+        } else {
+            // 정지: 픽셀 그레인 — 중심 진하고 가장자리 깨지며 사라짐
+            const a0 = Math.min(1, this._idleT / 0.5);
+            if (a0 <= 0.02) return;
+            const G = 3;
+            ctx.save();
+            ctx.fillStyle = '#000';
+            for (let dy = -ry; dy <= ry; dy += G) {
+                for (let dx = -Math.ceil(rx); dx <= rx; dx += G) {
+                    const nx = dx / rx, ny = dy / ry;
+                    const dist = nx * nx + ny * ny;
+                    if (dist > 1) continue;
+                    const dens = 1 - dist;                          // 중심 1 ~ 가장자리 0
+                    if (sandHash((dx / G) | 0, (dy / G) | 0) > dens) continue;  // 가장자리 깨짐
+                    ctx.globalAlpha = 0.5 * a0;
+                    ctx.fillRect((cx + dx) | 0, (cy + dy) | 0, G, G);
+                }
+            }
+            ctx.restore();
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    _drawIdleParticles(ctx) {
+        for (const q of this._idleParticles) {
+            const a = Math.max(0, 1 - q.age / q.maxlife) * 0.7;
+            if (a <= 0.02) continue;
+            ctx.globalAlpha = a;
+            ctx.fillStyle = `rgb(${q.r},${q.g},${q.b})`;
+            ctx.fillRect(q.x | 0, q.y | 0, 3, 3);
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // 캐릭터 뒤로 모래 트레일 — 진행 반대 방향으로 옅어지는 입자 (모션블러 + 모래에서 밀려나옴)
+    _renderCharTrail(ctx, l2, W, H) {
+        const speedNorm = Math.min(1, this._sandSpeed / MOVE_SPEED);
+        if (speedNorm < 0.05) return;
+        const dir  = this._sandDir;                  // +1 오른쪽 → 트레일은 왼쪽(-dir)
+        const N    = Math.round(3 + 5 * speedNorm);  // 속도↑ → 트레일 길게
+        const STEP = 4 + 8 * speedNorm;              // 잔상 간격
+        const G    = 3;                              // 모래 입자
+        const img  = l2.getContext('2d').getImageData(0, 0, W, H).data;
+        for (let k = N; k >= 1; k--) {               // 뒤(옅음) → 앞(진함)
+            const ox  = -dir * Math.round(k * STEP);
+            const cov = (1 - k / (N + 1)) * speedNorm; // 뒤로 갈수록 입자 듬성
+            const a   = cov * 0.85;
+            if (a <= 0.02) continue;
+            ctx.globalAlpha = a;
+            for (let y = 0; y < H; y += G) {
+                for (let x = 0; x < W; x += G) {
+                    const i = (y * W + x) << 2;
+                    if (img[i + 3] < 16) continue;             // 캐릭터 픽셀만
+                    if (sandHash(x / G + k * 13, y / G) > cov) continue;
+                    ctx.fillStyle = `rgb(${img[i]},${img[i + 1]},${img[i + 2]})`;
+                    ctx.fillRect(x + ox, y, G, G);
+                }
+            }
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // 그 변에 더 펼쳐질 월드가 있는지 (좌우만 — 위/아래는 월드 없음)
+    _edgeActive(side) {
+        const e = this.engine;
+        const maxCam = Math.max(0, WORLD_WIDTH - e.gameWidth);
+        const cam = e.cameraX;
+        if (side === 'left')  return cam > 1;            // 왼쪽에 더 보여줄 월드 있음
+        if (side === 'right') return cam < maxCam - 1;   // 오른쪽에 더 있음
+        return false;
+    }
+
+    // 좌/우 가장자리만 픽셀 침식 (위·아래 없음). 월드가 더 있는 변에서만.
+    _renderEdgeFrame(ctx, W, H) {
+        const inten   = this._sandI;
+        const FRAME   = Math.round(3 + 3 * inten);   // 절반: 기본 3px, 이동 시 최대 6px
+        const G       = 3;
+        const NT      = SAND_TONES_RGB.length;
+        const leftOn  = this._edgeActive('left');
+        const rightOn = this._edgeActive('right');
+        if (!leftOn && !rightOn) return;
+        ctx.save();
+        for (let y = 0; y < H; y += G) {
+            for (let x = 0; x < W; x += G) {
+                let d, active;
+                if (x < FRAME)            { d = x;          active = leftOn; }
+                else if (x >= W - FRAME)  { d = W - 1 - x;  active = rightOn; }
+                else continue;                           // 중앙·상하 제외
+                if (!active) continue;
+                let t = d / FRAME; t = t * t * (3 - 2 * t);
+                if (sandHash(x / G, y / G) < (1 - t)) {   // 가장자리일수록 잘 깨짐 → 검정
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(x, y, G, G);
+                }
+            }
+        }
+        ctx.restore();
     }
 
     // ── SandScroll: 진행 방향 가장자리에서 배경이 모래로 생성/소멸 ──────
     _renderSandScroll(ctx, W, H) {
         const engine = this.engine;
-        const inten  = this._sandI;
-        const band   = Math.round(W * SAND_BAND * inten);
+        const band = Math.round(W * SAND_BAND_MAX * this._sandRamp);  // 빌드업(걷기2초/달리기즉시)
         if (band < 2) return;
 
         const L1 = engine.layers.getCanvas(1);
         if (!L1) return;
         const lctx = L1.getContext('2d');
-        const cam  = Math.floor(engine.cameraX);   // parallax 1.0 → L1 x = cam + screenX
+        const cam  = Math.floor(engine.cameraX);
 
         ctx.globalAlpha = 1;
-        // 양쪽 가장자리 모두 처리 (둘 다 바깥쪽이 모래, 안쪽이 완성 그림)
-        this._sandBand(ctx, lctx, cam, 0,        band, H, 'left');
-        this._sandBand(ctx, lctx, cam, W - band, band, H, 'right');
+        // 진행 방향 = 선행(생성) / 반대 = 후행(소멸). 단, 그쪽에 월드가 더 있을 때만.
+        const dir = this._sandDir;
+        const leftRole  = dir > 0 ? 'trail' : 'lead';
+        const rightRole = dir > 0 ? 'lead'  : 'trail';
+        if (this._edgeActive('left'))  this._sandBand(ctx, lctx, cam, 0,        band, H, 'left',  leftRole);
+        if (this._edgeActive('right')) this._sandBand(ctx, lctx, cam, W - band, band, H, 'right', rightRole);
     }
 
-    _sandBand(ctx, lctx, cam, x0, bw, H, side) {
+    // 가장자리에서 이미지가 "검은 픽셀"로 갉아먹히며 생성/소멸 (검정만, 모래색 없음)
+    // side: 'left'|'right' / role: 'lead'(생성=빨리 채워짐) | 'trail'(소멸=검정 많이)
+    _sandBand(ctx, lctx, cam, x0, bw, H, side, role) {
         let sx = cam + x0;
         if (sx < 0) sx = 0;
         const src = lctx.getImageData(sx, 0, bw, H);
-        const sd  = src.data;
         const out = ctx.createImageData(bw, H);
         const od  = out.data;
+        od.set(src.data);                                // 이미지 그대로 복사
         const bwm = bw - 1;
+        const G   = SAND_GRAIN;
+        const isLead = role === 'lead';
+        const NT = SAND_TONES_RGB.length;
+        const sandProb = 0.03 * this._sandRamp;           // 최고치(ramp=1)에서 3% 모래
 
-        for (let ly = 0; ly < H; ly++) {
-            for (let lx = 0; lx < bw; lx++) {
-                // 바깥 가장자리 거리 → 생성 진행도 f (0=큰 픽셀, 1=완성 그림)
+        for (let ly = 0; ly < H; ly += G) {
+            for (let lx = 0; lx < bw; lx += G) {
                 const distOuter = (side === 'left') ? lx : (bwm - lx);
                 let f = bwm > 0 ? distOuter / bwm : 1;
-                f = f * f * (3 - 2 * f);            // smoothstep
-                const bs = sandBlockSize(f);        // 블록 크기 16→8→4→2→1
-
-                // 월드 고정 블록 그리드에서 샘플 (스크롤해도 깜빡임 없이 콘텐츠가 통과)
-                const wx = sx + lx;
-                let blx = (Math.floor(wx / bs) * bs) - sx;
-                if (blx < 0) blx = 0; else if (blx >= bw) blx = bw - 1;
-                let bly = Math.floor(ly / bs) * bs;
-                if (bly >= H) bly = H - 1;
-
-                const si = (bly * bw + blx) << 2;
-                const oi = (ly  * bw + lx ) << 2;
-                od[oi]     = sd[si];
-                od[oi + 1] = sd[si + 1];
-                od[oi + 2] = sd[si + 2];
-                od[oi + 3] = sd[si + 3];
+                f = f * f * (3 - 2 * f);                  // 0=바깥, 1=안쪽
+                // 이미지가 남을 확률 (선행=빨리 채워짐 / 후행=더 많이 검정)
+                const keep = isLead ? Math.pow(f, 0.55) : Math.pow(f, 2.2);
+                const wcx = ((sx + lx) / G) | 0, wcy = (ly / G) | 0;
+                if (sandHash(wcx, wcy) < keep) continue;  // 이미지 유지
+                // 갉아먹힘 → 검정 (단, 최고치에선 10%만 모래 톤 랜덤)
+                let cr = 0, cg = 0, cb = 0;
+                if (sandProb > 0 && sandHash(wcx + 41, wcy + 23) < sandProb) {
+                    const tc = SAND_TONES_RGB[(sandHash(wcx + 5, wcy + 9) * NT) | 0];
+                    cr = tc[0]; cg = tc[1]; cb = tc[2];
+                }
+                for (let dy = 0; dy < G && ly + dy < H; dy++) {
+                    const rowBase = (ly + dy) * bw;
+                    for (let dx = 0; dx < G && lx + dx < bw; dx++) {
+                        const oi = (rowBase + lx + dx) << 2;
+                        od[oi] = cr; od[oi + 1] = cg; od[oi + 2] = cb; od[oi + 3] = 255;
+                    }
+                }
             }
         }
         ctx.putImageData(out, x0, 0);

@@ -237,7 +237,10 @@ export default class EntitySystem {
             renderer.flush();
 
             // 정적 레이어는 이번 1회 래스터로 충분 → 다음 프레임부터 skip
-            if (isStatic) this._staticRendered.add(layerIdx);
+            if (isStatic) {
+                this._staticRendered.add(layerIdx);
+                if (layer) layer._bloomReady = false;   // GlowSystem이 블룸 버퍼 재빌드
+            }
         }
     }
 
