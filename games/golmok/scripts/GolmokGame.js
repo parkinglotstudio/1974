@@ -796,28 +796,35 @@ export default class GolmokGame extends Scene {
         const G   = SAND_GRAIN;
         const isLead = role === 'lead';
         const NT = SAND_TONES_RGB.length;
-        const sandProb = 0.03 * this._sandRamp;           // 최고치(ramp=1)에서 3% 모래
+        const sd = src.data;                              // 원본 이미지 픽셀
 
         for (let ly = 0; ly < H; ly += G) {
             for (let lx = 0; lx < bw; lx += G) {
                 const distOuter = (side === 'left') ? lx : (bwm - lx);
                 let f = bwm > 0 ? distOuter / bwm : 1;
-                f = f * f * (3 - 2 * f);                  // 0=바깥, 1=안쪽
-                // 이미지가 남을 확률 (선행=빨리 채워짐 / 후행=더 많이 검정)
-                const keep = isLead ? Math.pow(f, 0.55) : Math.pow(f, 2.2);
+                f = f * f * (3 - 2 * f);                  // 0=바깥(가장자리), 1=안쪽(화면)
                 const wcx = ((sx + lx) / G) | 0, wcy = (ly / G) | 0;
-                if (sandHash(wcx, wcy) < keep) continue;  // 이미지 유지
-                // 갉아먹힘 → 검정 (단, 최고치에선 10%만 모래 톤 랜덤)
-                let cr = 0, cg = 0, cb = 0;
-                if (sandProb > 0 && sandHash(wcx + 41, wcy + 23) < sandProb) {
+                const h   = sandHash(wcx, wcy);
+                // 셀마다 임계가 달라 순차 생성. 선행(생성)=바깥부터 빨리 / 후행(소멸)=늦게까지 모래.
+                // thr 범위 0~0.7 → f=1(안쪽)에서 모든 셀이 완성되어 화면과 이음새 없음.
+                const thr = isLead ? (h * 0.5) : (0.2 + h * 0.5);
+                let rev = (f - thr) / 0.30;               // 모래(0) → 이미지(1) 연속 블렌드
+                rev = rev <= 0 ? 0 : rev >= 1 ? 1 : rev * rev * (3 - 2 * rev);
+                if (rev >= 0.999) continue;               // 완전 이미지 → 원본 그대로
+                // 모래 매질: 어두운 따뜻한 톤 + 14% 밝은 모래알 → 이미지가 모래에서 솟아오름
+                let mr = 14, mg = 12, mb = 9;
+                if (sandHash(wcx + 41, wcy + 23) < 0.14) {
                     const tc = SAND_TONES_RGB[(sandHash(wcx + 5, wcy + 9) * NT) | 0];
-                    cr = tc[0]; cg = tc[1]; cb = tc[2];
+                    mr = (tc[0] * 0.55) | 0; mg = (tc[1] * 0.55) | 0; mb = (tc[2] * 0.55) | 0;
                 }
                 for (let dy = 0; dy < G && ly + dy < H; dy++) {
                     const rowBase = (ly + dy) * bw;
                     for (let dx = 0; dx < G && lx + dx < bw; dx++) {
                         const oi = (rowBase + lx + dx) << 2;
-                        od[oi] = cr; od[oi + 1] = cg; od[oi + 2] = cb; od[oi + 3] = 255;
+                        od[oi]     = (mr + (sd[oi]     - mr) * rev) | 0;
+                        od[oi + 1] = (mg + (sd[oi + 1] - mg) * rev) | 0;
+                        od[oi + 2] = (mb + (sd[oi + 2] - mb) * rev) | 0;
+                        od[oi + 3] = 255;
                     }
                 }
             }
