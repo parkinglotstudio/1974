@@ -1,0 +1,13 @@
+{
+  "note": "게임 레지스트리 — 각 게임은 games/<id>/ 한 폴더에 자급자족. 엔진(engine/)과 분리.",
+  "games": [
+    {
+      "id": "golmok",
+      "name": "골목길의 하루",
+      "icon": "🎮",
+      "chapter": 1,
+      "desc": "540×960 · Ch.1 · 모래엔진 기준 게임",
+      "entry": "games/golmok/index.html"
+    }
+  ]
+}

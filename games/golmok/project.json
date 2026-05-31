@@ -3,7 +3,7 @@
   "name": "골목길의 하루",
   "description": "모래엔진 테스트베드 — 시그니처 FX(SandScroll/역광 rim/낮밤 FX 사이클) 기준 프로젝트",
   "resolution": { "width": 540, "height": 960 },
-  "defaultPalette": "../../content/golmok/palettes/palette_ch01.json",
+  "defaultPalette": "palettes/palette_ch01.json",
   "categories": {
     "pixels": ["backgrounds", "characters", "fog"]
   }

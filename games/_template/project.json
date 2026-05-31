@@ -1,0 +1,10 @@
+{
+  "id": "_template",
+  "name": "신규 프로젝트 템플릿",
+  "description": "신규 프로젝트 생성 시 복사할 표준 한-폴더 견본. games/index.json 에 미등록.",
+  "resolution": { "width": 540, "height": 960 },
+  "defaultPalette": "palettes/palette_default.json",
+  "categories": {
+    "pixels": ["backgrounds", "characters", "objects"]
+  }
+}

@@ -58,7 +58,7 @@ function flatToTriples(flat, width) {
 
 // ── asset 필드 기반 씬 로더 ─────────────────────────────────
 // PrefabSystem.applyScene() 대신 사용 — asset/assetCategory 직접 처리
-async function applyAssetScene(sceneJSON, assetPid) {
+async function applyAssetScene(sceneJSON, assetBase) {
     const engine   = game._engine;
     const CATS     = ['backgrounds', 'characters', 'objects', 'items'];
 
@@ -102,7 +102,7 @@ async function applyAssetScene(sceneJSON, assetPid) {
             if (def.assetCategory) {
                 try {
                     const r = await fetch(
-                        `/projects/${assetPid}/pixels/${def.assetCategory}/${assetName}.json`,
+                        `${assetBase}/${def.assetCategory}/${assetName}.json`,
                         { cache: 'no-store' }
                     );
                     if (r.ok) pixelData = await r.json();
@@ -115,7 +115,7 @@ async function applyAssetScene(sceneJSON, assetPid) {
                     if (cat === def.assetCategory) continue;
                     try {
                         const r = await fetch(
-                            `/projects/${assetPid}/pixels/${cat}/${assetName}.json`,
+                            `${assetBase}/${cat}/${assetName}.json`,
                             { cache: 'no-store' }
                         );
                         if (r.ok) { pixelData = await r.json(); break; }
@@ -202,7 +202,8 @@ async function init() {
     // game.json 로드
     const gj           = await fetch('./game.json', { cache: 'no-store' }).then(r => r.json());
     const { width, height } = gj.resolution;
-    const assetPid     = gj.assetProject ?? gj.id;
+    // 자급자족 폴더: 에셋은 게임 폴더 내부(./pixels). game.json 에서 assetBase 로 재정의 가능.
+    const assetBase    = gj.assetBase ?? './pixels';
 
     game._engine = new SandEngine({ canvas, gameWidth: width, gameHeight: height });
     await game._engine.init();
@@ -221,7 +222,7 @@ async function init() {
         const src       = sceneDef.src.startsWith('/') ? sceneDef.src : './' + sceneDef.src;
         // cache: 'no-store' — 씬 JSON은 항상 최신본 사용 (개발 중 캐싱 방지)
         const sceneJSON = await fetch(src, { cache: 'no-store' }).then(r => r.json());
-        await applyAssetScene(sceneJSON, assetPid);
+        await applyAssetScene(sceneJSON, assetBase);
     }
 
     // 게임 씬 등록 및 활성화

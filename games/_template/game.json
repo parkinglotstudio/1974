@@ -14,5 +14,5 @@
     "main": { "type": "json", "src": "scenes/main.scene.json", "label": "메인" }
   },
   "defaultScene": "main",
-  "assetProject": "_template"
+  "assetBase": "./pixels"
 }

@@ -43,5 +43,5 @@
     }
   },
   "defaultScene": "main",
-  "assetProject": "golmok"
+  "assetBase": "./pixels"
 }

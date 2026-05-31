@@ -1,11 +1,4 @@
 {
-  "projects": [
-    {
-      "id": "golmok",
-      "name": "골목길의 하루",
-      "icon": "🎮",
-      "chapter": 1,
-      "desc": "540×960 · Ch.1 · 모래엔진 기준 프로젝트"
-    }
-  ]
+  "_moved": "게임은 games/<id>/ 한 폴더로 이전됨. 레지스트리는 games/index.json. content/ 는 에디터 재배선(엔진툴) 전까지 레거시.",
+  "projects": []
 }
