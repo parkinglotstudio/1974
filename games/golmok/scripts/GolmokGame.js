@@ -3,7 +3,7 @@ import { SAND_BASE_RGB, SAND_TONES_RGB } from '../../../engine/SandPalette.js';
 
 const MOVE_SPEED  = 220;   // px/sec
 const WORLD_WIDTH = 2560;
-const GROUND_Y    = 547;   // 발끝 = 547+270 = 817 (2/3 크기 캐릭터 높이 270)
+const GROUND_Y    = 574;   // 발끝 = 574+243 = 817 (캐릭터 10% 축소 후 높이 243, 바닥선 817 유지)
 
 // ── 배경 순환 ───────────────────────────────────────────────────────
 const BG_LIST     = ['bg_1', 'bg_2'];
@@ -28,6 +28,7 @@ const SAND_BUILDUP_MS = 2000; // 걷기 시작 → 최대 크기까지 빌드업
 const SAND_FALL_RATE = 70;    // 초당 떨어져 나가는 디지털 픽셀 수
 const SAND_FALL_G    = 4;     // 디지털 블록 크기 px (그리드 정렬)
 const SAND_GRAVITY   = 130;   // 중력 가속 px/s² — 포물선 낙하
+const BG_MOTE_RATE   = 32;    // 배경에서 위로 피어오르는 모래알 수/초
 
 // 월드 고정 셀 의사난수 0~1 (콘텐츠가 흐르는 동안 입자가 정체성 유지 → 팝인/팝아웃)
 function sandHash(x, y) {
@@ -57,6 +58,8 @@ export default class GolmokGame extends Scene {
         this._sandRamp  = 0;     // 좌우 효과 빌드업 0~1 (걷기 2초 / 달리기 즉시)
         this._ambient  = [];     // 앰비언트 모래알 파티클
         this._ambAcc   = 0;      // 스폰 누적기
+        this._bgMotes  = [];     // 배경에서 위로 피어오르는 모래알
+        this._bgMoteAcc = 0;
 
         // IDLE(대기) 상태 — 픽셀 낙하 + 발밑 그림자
         this._idleT         = 0;   // 대기 누적 시간 (그림자 진하기)
@@ -232,17 +235,12 @@ export default class GolmokGame extends Scene {
         engine.fog._layerFogOpts.maxOpacity = 0.5 * k;                   // 안개 0↔0.5
         engine.fog._gradCache = null;
 
-        // ── IDLE 효과: 정지 시 캐릭터에서 픽셀 낙하 + 발밑 그림자 누적 ──
-        if (dx === 0) {
-            this._idleT += dtSec;
-            this._spawnIdleParticles(dt);
-        } else {
-            this._idleT = 0;
-        }
-        this._updateIdleParticles(dt);
+        // ── IDLE: 발밑 그림자 누적용 시간만 추적 (픽셀 낙하 효과는 제거) ──
+        if (dx === 0) this._idleT += dtSec; else this._idleT = 0;
 
-        // 앰비언트 모래알 (정지/이동 무관 항상)
+        // 앰비언트(캐릭터 외곽 디지털 디졸브) + 배경에서 위로 피어오르는 모래알
         this._updateAmbientSand(dt);
+        this._updateBgMotes(dt);
 
         // ── 배경 순환 + 전환 ──────────────────────────────────────
         if (!this._bgReady) return;
@@ -264,9 +262,9 @@ export default class GolmokGame extends Scene {
             return;
         }
 
-        // 맵 오른쪽 끝에 도달하면 파도(wave) 전환으로 다음 배경 생성
+        // 맵 오른쪽 끝에 도달하면 모래폭발(sandburst) 전환으로 다음 배경 생성
         if (player.x >= WORLD_WIDTH - player.pw - 2) {
-            this._tr = { t: 0, effect: 'wave', swapped: false };
+            this._tr = { t: 0, effect: 'sandburst', swapped: false };
         }
     }
 
@@ -326,6 +324,42 @@ export default class GolmokGame extends Scene {
                     ctx.putImageData(img, 0, 0);
                     break;
                 }
+                case 'sandburst': {
+                    // 대각 모래 스윕 + 반짝임 — 그림이 모래알로 흩어졌다 모래에서 재조립 (화려)
+                    const G = 3, shown = t < 0.5 ? (1 - t / 0.5) : (t - 0.5) / 0.5;
+                    const src = ctx.getImageData(0, 0, W, H), sd = src.data;
+                    const out = ctx.createImageData(W, H), od = out.data;
+                    const NT = SAND_TONES_RGB.length, tw = (t * 34) | 0;
+                    for (let y = 0; y < H; y += G) {
+                        for (let x = 0; x < W; x += G) {
+                            const cx = (x / G) | 0, cy = (y / G) | 0;
+                            const n = sandHash(cx, cy);
+                            const sweep = (x + y) / (W + H);          // 대각 스윕 0~1
+                            const thr = sweep * 0.55 + n * 0.45;
+                            let r, g, b;
+                            if (shown > thr) {                         // 그림 유지
+                                const si = (y * W + x) << 2;
+                                r = sd[si]; g = sd[si + 1]; b = sd[si + 2];
+                            } else {                                   // 모래알
+                                const sp = sandHash(cx + tw, cy - tw);
+                                if (sp > 0.93) { r = 255; g = 248; b = 224; }   // 반짝임(화려)
+                                else {
+                                    const tc = SAND_TONES_RGB[(n * NT) | 0], f = 0.65 + sp * 0.55;
+                                    r = Math.min(255, tc[0] * f) | 0; g = Math.min(255, tc[1] * f) | 0; b = Math.min(255, tc[2] * f) | 0;
+                                }
+                            }
+                            for (let dy = 0; dy < G && y + dy < H; dy++) {
+                                const rb = (y + dy) * W;
+                                for (let dx = 0; dx < G && x + dx < W; dx++) {
+                                    const oi = (rb + x + dx) << 2;
+                                    od[oi] = r; od[oi + 1] = g; od[oi + 2] = b; od[oi + 3] = 255;
+                                }
+                            }
+                        }
+                    }
+                    ctx.putImageData(out, 0, 0);
+                    break;
+                }
                 case 'wave': {
                     const shown = t < 0.5 ? (1 - t / 0.5) : (t - 0.5) / 0.5;
                     const amp = (1 - shown) * 26, fade = shown, phase = t * Math.PI * 8;
@@ -355,6 +389,9 @@ export default class GolmokGame extends Scene {
             overlay = true;
         }
 
+        // 배경에서 위로 피어오르는 모래알 (캐릭터 뒤 분위기)
+        this._drawBgMotes(ctx);
+
         // 발밑 그림자 (항상, 캐릭터 아래) — 정지=픽셀 깨짐 / 이동=블러 모션
         this._drawShadow(ctx);
 
@@ -369,10 +406,7 @@ export default class GolmokGame extends Scene {
         // 캐릭터 외곽 역광 rim — 뒤 배경색을 받아 가장자리에서 페이드 (런타임)
         this._renderCharRim(ctx, W, H);
 
-        // IDLE 떨어지는 픽셀 (캐릭터 위/주변)
-        if (this._idleParticles.length) this._drawIdleParticles(ctx);
-
-        // 앰비언트 모래알 (항상)
+        // 앰비언트 모래알 (캐릭터 외곽 디지털 디졸브)
         this._drawAmbientSand(ctx);
 
         // 디지털 패턴 오버레이 (회로/메시가 불규칙하게 명멸 — 디지털 세계 느낌)
@@ -545,6 +579,50 @@ export default class GolmokGame extends Scene {
         ctx.globalAlpha = 1;
     }
 
+    // 배경(L1) 픽셀이 위로 천천히 피어오르는 모래알 — 분위기
+    _updateBgMotes(dt) {
+        const dtSec = dt / 1000;
+        const e = this.engine, W = e.gameWidth, H = e.gameHeight;
+        const L1 = e.layers.getCanvas(1);
+        const lctx1 = L1 ? L1.getContext('2d') : null;
+        if (lctx1) {
+            this._bgMoteAcc += BG_MOTE_RATE * dtSec;
+            let guard = 0;
+            while (this._bgMoteAcc >= 1 && guard++ < 40) {
+                this._bgMoteAcc -= 1;
+                const x = (Math.random() * W) | 0;
+                const y = (H * 0.45 + Math.random() * H * 0.55) | 0;   // 중하단에서 피어오름
+                const sx = Math.min(L1.width - 1, Math.max(0, Math.floor(e.cameraX) + x));
+                let col; try { col = lctx1.getImageData(sx, y, 1, 1).data; } catch (_) { break; }
+                if (col[3] < 16) continue;
+                this._bgMotes.push({
+                    x, y,
+                    vy: -(8 + Math.random() * 22),       // 위로
+                    vx: (Math.random() - 0.5) * 8,
+                    age: 0, maxlife: 1.2 + Math.random() * 1.8,
+                    r: Math.min(255, col[0] + 70), g: Math.min(255, col[1] + 64), b: Math.min(255, col[2] + 54),
+                });
+            }
+        }
+        for (let i = this._bgMotes.length - 1; i >= 0; i--) {
+            const m = this._bgMotes[i];
+            m.y += m.vy * dtSec; m.x += m.vx * dtSec; m.age += dtSec;
+            if (m.age >= m.maxlife || m.y < -4) this._bgMotes.splice(i, 1);
+        }
+    }
+
+    _drawBgMotes(ctx) {
+        for (const m of this._bgMotes) {
+            const t = m.age / m.maxlife;
+            const a = (t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85) * 0.55;   // 은은하게 페이드
+            if (a <= 0.03) continue;
+            ctx.globalAlpha = a;
+            ctx.fillStyle = `rgb(${m.r},${m.g},${m.b})`;
+            ctx.fillRect(m.x | 0, m.y | 0, 2, 2);
+        }
+        ctx.globalAlpha = 1;
+    }
+
     // 캐릭터 외곽 역광 rim: 뒤 배경(L1)색을 가져와 가장자리부터 안쪽으로 페이드 + 우상단 광원 방향
     _renderCharRim(ctx, W, H) {
         const e = this.engine; const L2 = e.layers.getCanvas(2); const L1 = e.layers.getCanvas(1); const p = this._player;
@@ -653,8 +731,8 @@ export default class GolmokGame extends Scene {
         if (!p) return;
         const cx = p.x - e.cameraX + p.pw / 2;
         const cy = GROUND_Y + p.ph - 5;          // 발밑
-        const rx = p.pw * 0.24;                  // 캐릭터 넓이 기준, 작게
-        const ry = 8;
+        const rx = p.pw * 0.36;                  // 캐릭터 넓이 기준 (크게)
+        const ry = 12;
         const moving = this._sandI > 0.05;
         if (moving) {
             // 이동: 블러 모션 그림자 (진행할수록 늘어나고 흐려짐)
@@ -672,7 +750,7 @@ export default class GolmokGame extends Scene {
             // 정지: 픽셀 그레인 — 중심 진하고 가장자리 깨지며 사라짐
             const a0 = Math.min(1, this._idleT / 0.5);
             if (a0 <= 0.02) return;
-            const G = 3;
+            const G = 4;
             ctx.save();
             ctx.fillStyle = '#000';
             for (let dy = -ry; dy <= ry; dy += G) {
