@@ -1,7 +1,7 @@
 import { Scene } from '../../../engine/scene/SceneManager.js';
 import { SAND_BASE_RGB, SAND_TONES_RGB } from '../../../engine/SandPalette.js';
 
-const MOVE_SPEED  = 260;   // px/sec
+const MOVE_SPEED  = 220;   // px/sec
 const WORLD_WIDTH = 2560;
 const GROUND_Y    = 547;   // 발끝 = 547+270 = 817 (2/3 크기 캐릭터 높이 270)
 
@@ -25,9 +25,9 @@ const SAND_SETTLE_MS = 280;   // 멈출 때 굳는(가라앉는) 시간
 const SAND_BUILDUP_MS = 2000; // 걷기 시작 → 최대 크기까지 빌드업 (2초). 달리면 즉시.
 
 // 앰비언트 — 가만히 있어도 픽셀이 톡톡 떨어지는 모래알
-const SAND_FALL_RATE = 55;    // 초당 떨어지는 모래알 수
-const SAND_FALL_G    = 3;     // 떨어지는 입자 크기 px
-const SAND_GRAVITY   = 110;   // 모래알 중력 가속 px/s² — 솟은 입자가 다시 떨어짐
+const SAND_FALL_RATE = 70;    // 초당 떨어져 나가는 디지털 픽셀 수
+const SAND_FALL_G    = 4;     // 디지털 블록 크기 px (그리드 정렬)
+const SAND_GRAVITY   = 130;   // 중력 가속 px/s² — 포물선 낙하
 
 // 월드 고정 셀 의사난수 0~1 (콘텐츠가 흐르는 동안 입자가 정체성 유지 → 팝인/팝아웃)
 function sandHash(x, y) {
@@ -463,71 +463,80 @@ export default class GolmokGame extends Scene {
         ctx.globalAlpha = 1;
     }
 
-    // 가만히 있어도 이미지에서 픽셀이 톡 떨어져 모래알처럼 흘러내림
+    // 캐릭터 외곽이 디지털 픽셀로 부서져 곡선을 그리며 중력 낙하 (이 세계 = 디지털)
     _updateAmbientSand(dt) {
         const dtSec = dt / 1000;
         const e = this.engine;
         const W = e.gameWidth, H = e.gameHeight;
-        const L1 = e.layers.getCanvas(1);
         const L2 = e.layers.getCanvas(2);
-        const lctx1 = L1 ? L1.getContext('2d') : null;
         const lctx2 = L2 ? L2.getContext('2d') : null;
-        const player = this._player;
+        const p = this._player;
 
-        // 스폰 — 배경 + 캐릭터 픽셀을 샘플 → 위로 피어오르는 모래알
-        this._ambAcc += SAND_FALL_RATE * dtSec;
-        while (this._ambAcc >= 1) {
-            this._ambAcc -= 1;
-            let col, x, y;
-            const fromChar = player && lctx2 && Math.random() < 0.4;   // 40% 캐릭터에서
-            if (fromChar) {
-                const psx = player.x - e.cameraX;
-                x = (psx + Math.random() * player.pw) | 0;
-                y = (player.y + Math.random() * player.ph) | 0;
-                if (x < 0 || x >= W || y < 0 || y >= H) continue;
-                try { col = lctx2.getImageData(x, y, 1, 1).data; } catch (_) { continue; }
-            } else {
-                if (!lctx1) continue;
-                x = (Math.random() * W) | 0;
-                y = (Math.random() * H) | 0;
-                const sx = Math.min(L1.width - 1, Math.max(0, Math.floor(e.cameraX) + x));
-                try { col = lctx1.getImageData(sx, y, 1, 1).data; } catch (_) { break; }
+        // ── 스폰: 캐릭터 경계 픽셀만 추려서 디지털 블록으로 떨어뜨림 ──
+        if (p && lctx2) {
+            const psx = (p.x - e.cameraX) | 0;
+            const x0 = Math.max(0, psx - 2), x1 = Math.min(W, psx + p.pw + 2);
+            const y0 = Math.max(0, p.y - 2), y1 = Math.min(H, p.y + p.ph + 2);
+            const rw = x1 - x0, rh = y1 - y0;
+            let img = null;
+            if (rw > 0 && rh > 0) { try { img = lctx2.getImageData(x0, y0, rw, rh).data; } catch (_) {} }
+            if (img) {
+                const A = (lx, ly) => (lx < 0 || lx >= rw || ly < 0 || ly >= rh) ? 0 : img[((ly * rw + lx) << 2) + 3];
+                // 경계 픽셀 수집 (step 2) — 투명 이웃이 있는 캐릭터 픽셀
+                const edges = [];
+                for (let ly = 0; ly < rh; ly += 2) {
+                    for (let lx = 0; lx < rw; lx += 2) {
+                        if (A(lx, ly) < 40) continue;
+                        if (A(lx-2,ly)>=40 && A(lx+2,ly)>=40 && A(lx,ly-2)>=40 && A(lx,ly+2)>=40) continue;
+                        edges.push(lx, ly);
+                    }
+                }
+                if (edges.length) {
+                    const dir = this._sandDir || 1, moving = this._sandI;   // 0~1
+                    this._ambAcc += SAND_FALL_RATE * dtSec;
+                    while (this._ambAcc >= 1) {
+                        this._ambAcc -= 1;
+                        const k = ((Math.random() * (edges.length >> 1)) | 0) << 1;
+                        const lx = edges[k], ly = edges[k + 1];
+                        const o = (ly * rw + lx) << 2;
+                        // 어두운 실루엣 → 차가운 청회색 '데이터' 픽셀로 살짝 들어올림
+                        const r = Math.min(255, img[o]   + 30);
+                        const g = Math.min(255, img[o+1] + 40);
+                        const b = Math.min(255, img[o+2] + 60);
+                        this._ambient.push({
+                            x: x0 + lx, y: y0 + ly,
+                            vx: (Math.random() - 0.5) * 24 - dir * 26 * moving, // 곡선 + 이동 시 뒤로 흩날림
+                            vy: -(Math.random() * 16),                          // 살짝 떠올랐다 중력에 낙하
+                            age: 0, maxlife: 0.7 + Math.random() * 0.9,
+                            r, g, b,
+                        });
+                    }
+                }
             }
-            if (col[3] < 16) continue;
-            // 캐릭터에서 나온 입자는 흘러내리고(아래), 배경 모래알은 살짝 솟았다 중력에 다시 떨어짐(위)
-            const vy0 = fromChar ? (8 + Math.random() * 28)
-                                 : -(10 + Math.random() * 34);
-            this._ambient.push({
-                x, y,
-                vy: vy0,
-                vx: (Math.random() - 0.5) * 14,          // 살짝 좌우 흔들림
-                age: 0, maxlife: 1.0 + Math.random() * 1.6,
-                r: Math.min(255, col[0] + 85), g: Math.min(255, col[1] + 80), b: Math.min(255, col[2] + 65),
-            });
         }
 
-        // 업데이트 (중력 가속 → 솟구쳤다 떨어지는 포물선 + 흔들림 + 수명)
+        // ── 업데이트: 중력 가속 → 포물선 낙하 ──
         for (let i = this._ambient.length - 1; i >= 0; i--) {
-            const p = this._ambient[i];
-            p.vy += SAND_GRAVITY * dtSec;                // 중력
-            p.y  += p.vy * dtSec;
-            p.x  += p.vx * dtSec;
-            p.age += dtSec;
-            if (p.age >= p.maxlife || p.y > H + 6 || p.y < -8) this._ambient.splice(i, 1);
+            const q = this._ambient[i];
+            q.vy += SAND_GRAVITY * dtSec;
+            q.x  += q.vx * dtSec;
+            q.y  += q.vy * dtSec;
+            q.age += dtSec;
+            if (q.age >= q.maxlife || q.y > H + 6) this._ambient.splice(i, 1);
         }
     }
 
     _drawAmbientSand(ctx) {
         const G = SAND_FALL_G;
         for (const p of this._ambient) {
-            // 등장 직후 빠르게 "톡" 솟았다가 서서히 사라짐 (pop)
-            const t   = p.age / p.maxlife;                 // 0→1
-            const pop = t < 0.12 ? (t / 0.12) : (1 - (t - 0.12) / (1 - 0.12));
-            const a   = Math.max(0, Math.min(1, pop)) * 0.9;
-            if (a <= 0.02) continue;
-            ctx.globalAlpha = a;
+            const t = p.age / p.maxlife;                       // 0→1
+            // 디지털: 또렷하게 유지하다 끝에서만 페이드 (소프트 팝 없음)
+            const a = (t > 0.7 ? (1 - (t - 0.7) / 0.3) : 1) * 0.95;
+            if (a <= 0.04) continue;
+            ctx.globalAlpha = Math.max(0, Math.min(1, a));
             ctx.fillStyle = `rgb(${p.r},${p.g},${p.b})`;
-            ctx.fillRect(p.x | 0, p.y | 0, G, G);
+            // 그리드 정렬 → 디지털 블록 느낌
+            ctx.fillRect(((p.x / G) | 0) * G, ((p.y / G) | 0) * G, G, G);
         }
         ctx.globalAlpha = 1;
     }
