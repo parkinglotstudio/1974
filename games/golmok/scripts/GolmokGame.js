@@ -3,7 +3,7 @@ import { SAND_BASE_RGB, SAND_TONES_RGB } from '../../../engine/SandPalette.js';
 
 const MOVE_SPEED  = 220;   // px/sec
 const WORLD_WIDTH = 2560;
-const GROUND_Y    = 547;   // 발끝 = 547+270 = 817 (캐릭터 처음 사이즈 270, 바닥선 817 유지)
+const GROUND_Y    = 412;   // 발끝 = 412+405 = 817 (캐릭터 1.5배 높이 405, 바닥선 817 유지)
 
 // ── 배경 순환 ───────────────────────────────────────────────────────
 const BG_LIST     = ['bg_1', 'bg_2', 'bg_4'];
