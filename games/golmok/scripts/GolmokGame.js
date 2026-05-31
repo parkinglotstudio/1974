@@ -3,10 +3,10 @@ import { SAND_BASE_RGB, SAND_TONES_RGB } from '../../../engine/SandPalette.js';
 
 const MOVE_SPEED  = 220;   // px/sec
 const WORLD_WIDTH = 2560;
-const GROUND_Y    = 574;   // 발끝 = 574+243 = 817 (캐릭터 10% 축소 후 높이 243, 바닥선 817 유지)
+const GROUND_Y    = 497;   // 발끝 = 497+320 = 817 (캐릭터 높이 320, 바닥선 817 유지)
 
 // ── 배경 순환 ───────────────────────────────────────────────────────
-const BG_LIST     = ['bg_1', 'bg_2'];
+const BG_LIST     = ['bg_1', 'bg_2', 'bg_4'];
 const BG_PID      = '1974';
 const BG_INTERVAL = 10000;  // 10초마다 다음 배경
 const BG_TRANS_MS = 2000;   // 전환 시간 (2초)
