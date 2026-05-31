@@ -1828,7 +1828,10 @@
                             <input class="insp-input" id="inspH" type="number" step="1" min="1">
                         </div>
                     </div>
-                    
+
+                    <!-- 3행: 확장 정보 + 효과 (라이브 가능=편집 / 코드값=잠금) -->
+                    <div id="inspExtra" style="width:100%; border-top:1px solid #EAEAE6; padding-top:6px; display:flex; flex-direction:column; gap:7px;"></div>
+
                 </div>
             </div>
 
@@ -4172,6 +4175,7 @@ function selectEntity(entity) {
         wcEmpty.style.display   = '';
         inspector.style.display = 'none';
         selInfo.textContent     = '선택된 에셋 없음';
+        renderInspectorExtra(null);
         refreshLayerChildren();
         return;
     }
@@ -4224,6 +4228,7 @@ function selectEntity(entity) {
     _dragRatio = (entity.pw ?? 16) / ((entity.ph ?? 16) || 1);
 
     syncInspectorInputs(entity);
+    renderInspectorExtra(entity);
     selInfo.textContent = `${name} @ (${Math.round(entity.x)},${Math.round(entity.y)})`;
     log(`선택: ${name}  (${entity.pw}×${entity.ph})`, 'ok');
     
@@ -4242,6 +4247,81 @@ function syncInspectorInputs(entity) {
     document.getElementById('inspY').value = Math.round(entity.y);
     document.getElementById('inspW').value = Math.round(entity.pw ?? 0);
     document.getElementById('inspH').value = Math.round(entity.ph ?? 0);
+}
+
+// 골목 효과 매핑 — 적용(+)/미적용(–), 값은 코드값(잠금)
+function _golmokEffects(entity) {
+    const eng = window._engine || {};
+    const lay = entity.layer;
+    const isChar = lay === 2;
+    const isBg   = lay === 1 && (entity._scanline || (entity._asset||'').startsWith('bg'));
+    // 골목 시그니처 효과는 설계상 항상 적용(코드값). 안개만 OFF.
+    const fogOn = false;
+    const fx = [];
+    if (isChar) {
+        fx.push({ on: true,  name: '역광 Rim',     val: '폭 3px · 우상단 광원' });
+        fx.push({ on: true,  name: '발밑 그림자',   val: '정지=픽셀크럼블 / 이동=블러' });
+        fx.push({ on: true,  name: '디지털 디졸브', val: '이동량 비례 · 블록4px · 곡선낙하' });
+        fx.push({ on: true,  name: '이동속도',      val: '220 px/s' });
+    } else if (isBg) {
+        fx.push({ on: true,    name: '배경 블룸',  val: '채도부스트 · 임계 140' });
+        fx.push({ on: true,    name: 'SandScroll', val: '띠 6.5% · 모래→이미지 블렌드' });
+        fx.push({ on: true,    name: '배경 전환',  val: 'wave · 맵 끝 도달 시 bg_1↔bg_2' });
+    }
+    const glob = [
+        { on: true,  name: '조명',        val: 'ambient + key(우상단)' },
+        { on: true,  name: '비네트',      val: 'warm' },
+        { on: true,  name: '낮밤 사이클', val: '60초 명암 사이클' },
+        { on: fogOn, name: '안개',        val: fogOn ? 'on' : 'off' },
+    ];
+    return { fx, glob };
+}
+
+// 인스펙터 확장: 정보 칩 + 라이브(scale/visible) + 효과(잠금) 목록
+function renderInspectorExtra(entity) {
+    const box = document.getElementById('inspExtra');
+    if (!box) return;
+    if (!entity) { box.innerHTML = ''; return; }
+    const eng = window._engine || {};
+    const pal = entity._palette;
+    const frames = entity._frames?.length ?? entity.frames?.length ?? (entity._scanline ? 0 : 1);
+    let parallax = '—';
+    try { const L = eng.layers?.get?.(entity.layer); if (L && L.parallax != null) parallax = L.parallax; } catch {}
+
+    const infoChips = [
+        ['레이어', `L${entity.layer}`],
+        ['패럴랙스', parallax],
+        ['크기', `${Math.round(entity.pw??0)}×${Math.round(entity.ph??0)}`],
+        ['에셋', entity._asset ?? entity.type ?? '—'],
+        ['팔레트', pal ? `${pal.length}색` : '—'],
+        ['프레임', frames],
+    ].map(([k,v]) => `<span style="background:#F0F0EC;border:1px solid #E0E0DC;border-radius:4px;padding:2px 6px;font-size:9px;color:#555;font-family:'JetBrains Mono',monospace;">${k} <b style="color:#222;">${v}</b></span>`).join('');
+
+    const live = `<div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:10px;color:#18A0FB;font-weight:bold;">● 라이브</span>
+        <label style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;">scale
+          <input id="inspScale" type="number" step="0.05" min="0.1" class="insp-input" style="width:50px;" value="${entity.scale??1}"></label>
+        <label style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;">visible
+          <input id="inspVisible" type="checkbox" ${entity.visible!==false?'checked':''}></label>
+      </div>`;
+
+    const { fx, glob } = _golmokEffects(entity);
+    const chip = (e) => `<div title="코드값 — 변경은 대화로" style="display:flex;align-items:center;gap:6px;opacity:${e.on?1:0.45};">
+        <span style="width:14px;text-align:center;font-weight:bold;color:${e.on?'#2BB673':'#999'};">${e.on?'+':'–'}</span>
+        <span style="font-size:10px;color:#333;min-width:72px;flex-shrink:0;">${e.name}</span>
+        <span style="font-size:9px;color:#888;font-family:'JetBrains Mono',monospace;flex:1;">${e.val}</span>
+        <span style="font-size:9px;color:#bbb;">🔒</span></div>`;
+    const fxHtml = fx.length ? `<div style="font-size:10px;color:#777;font-weight:bold;">효과 (이 객체)</div>${fx.map(chip).join('')}` : '';
+    const globHtml = `<div style="font-size:10px;color:#777;font-weight:bold;margin-top:4px;">씬 · 글로벌</div>${glob.map(chip).join('')}`;
+
+    box.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;">${infoChips}</div>${live}
+      <div style="display:flex;flex-direction:column;gap:4px;border-top:1px dashed #E5E5E1;padding-top:5px;">${fxHtml}${globHtml}</div>
+      <div style="font-size:9px;color:#aaa;">🔒 = 코드값(라이브 불가). 수치 바꾸려면 말해주면 코드에 반영.</div>`;
+
+    const sc = document.getElementById('inspScale');
+    if (sc) sc.addEventListener('input', () => { const v=parseFloat(sc.value); if(_selectedEntity&&!isNaN(v)&&v>0) _selectedEntity.scale=v; });
+    const vis = document.getElementById('inspVisible');
+    if (vis) vis.addEventListener('change', () => { if(_selectedEntity) _selectedEntity.visible = vis.checked; });
 }
 
 // 인스펙터 입력 → 엔티티 실시간 반영
