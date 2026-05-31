@@ -7073,6 +7073,43 @@ async function main() {
 
     // 에셋 브라우저 로드
     window.loadAssets();
+
+    // 레이아웃 재배치: 좌=레이어 / 중앙=에디터 / 우=인스펙터 (폰 미리보기 제거)
+    _relayoutEditor();
+}
+
+function _relayoutEditor() {
+    try {
+        const row   = document.querySelector('.panels-row');
+        if (!row) return;
+        const prev  = document.getElementById('previewPanel');   // 폰 미리보기
+        const layer = document.getElementById('layerPanel');     // 레이어
+        const wc    = document.getElementById('workControl');    // 인스펙터 컨테이너
+        const play  = document.getElementById('btnScenePlay');   // 플레이 버튼
+        const fit   = document.getElementById('btnWorkFit');     // 중앙 툴바 기준점
+
+        if (prev) prev.style.display = 'none';                    // 폰 미리보기 제거
+        document.querySelectorAll('.v-resizer').forEach(r => r.style.display = 'none');
+
+        if (layer) row.insertBefore(layer, row.firstChild);      // 레이어 → 왼쪽
+        if (layer) { layer.style.flex = '0 0 220px'; layer.style.width = '220px'; }
+
+        if (wc) {                                                // 인스펙터 → 오른쪽 패널
+            row.appendChild(wc);
+            Object.assign(wc.style, {
+                flex: '0 0 330px', width: '330px', maxWidth: '360px',
+                height: '100%', overflowY: 'auto',
+                borderLeft: '1px solid #E0E0DC', background: '#FAFAF7',
+                padding: '8px', boxSizing: 'border-box',
+            });
+        }
+        // 플레이 버튼은 폰과 함께 사라지므로 중앙 툴바로 이동
+        if (play && fit && fit.parentElement) {
+            fit.parentElement.appendChild(play);
+            play.style.marginLeft = '6px';
+        }
+        if (typeof fitWorkCanvas === 'function') setTimeout(fitWorkCanvas, 40);
+    } catch (e) { console.warn('relayout fail', e); }
 }
 
 const overlayCtx = overlay.getContext('2d');
