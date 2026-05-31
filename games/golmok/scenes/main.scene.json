@@ -29,7 +29,7 @@
       "id": "player",
       "type": "ch01_char_walk",
       "layer": 2,
-      "x": 179, "y": 497, "pw": 218, "ph": 320,
+      "x": 179, "y": 547, "pw": 184, "ph": 270,
       "visible": true,
       "asset": "ch01_char_walk",
       "assetCategory": "characters"
