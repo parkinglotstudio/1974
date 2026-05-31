@@ -2214,7 +2214,7 @@
         <div class="proj-modal-header">
             <div>
                 <div class="proj-modal-title">Sand Engine · 프로젝트</div>
-                <div class="proj-modal-sub">content/index.json</div>
+                <div class="proj-modal-sub">games/index.json</div>
             </div>
         </div>
 
@@ -2263,7 +2263,7 @@
                     </select>
                 </div>
                 <div class="proj-form-hint">
-                    <span>📁 content/{id}/  +  scenes/ prefabs/ palettes/ scripts/</span><br>
+                    <span>📁 games/{id}/  +  scenes/ prefabs/ palettes/ scripts/</span><br>
                     <span>📄 index.html (채널 API 포함) + scenes/main.scene.json</span>
                 </div>
                 <div class="proj-form-actions">
@@ -2871,7 +2871,7 @@ function zoomToActiveFrame() {
 // ══════════════════════════════════════════════════════════════
 // 프로젝트 피커
 // ══════════════════════════════════════════════════════════════
-let _projList = [];     // content/index.json 에서 로드한 목록
+let _projList = [];     // games/index.json 에서 로드한 목록
 let _newProjRes = { w: 270, h: 480 };  // 새 프로젝트 선택 해상도
 
 window.showProjectPicker = async function() {
@@ -2882,8 +2882,8 @@ window.showProjectPicker = async function() {
     // 목록 로드 (캐시 있으면 재사용)
     if (_projList.length === 0) {
         try {
-            const data = await fetch('/content/index.json').then(r => r.json());
-            _projList = data.projects ?? [];
+            const data = await fetch('/games/index.json').then(r => r.json());
+            _projList = data.projects ?? data.games ?? [];
         } catch {
             _projList = [];
         }
@@ -2961,7 +2961,7 @@ async function _renderProjectList() {
     const conformMap = {};
     await Promise.all(_projList.map(async p => {
         try {
-            const gj = await fetch(`/content/${p.id}/game.json`).then(r => r.json());
+            const gj = await fetch(`/games/${p.id}/game.json`).then(r => r.json());
             conformMap[p.id] = _checkSceneContract(gj);
         } catch { conformMap[p.id] = { ok: false, missing: ['game.json 없음'] }; }
     }));
@@ -2978,7 +2978,7 @@ async function _renderProjectList() {
             <div class="proj-card-info">
                 <div class="proj-card-name">${p.name}</div>
                 <div class="proj-card-desc">${p.desc ?? ''}</div>
-                <div class="proj-card-id">content/${p.id}/game.json</div>
+                <div class="proj-card-id">games/${p.id}/game.json</div>
             </div>
             ${badge}
             <div class="proj-card-arrow">›</div>`;
@@ -3039,7 +3039,7 @@ window.createNewProject = async function() {
                 desc: `${w}×${h}` + (chapter ? ` · Ch.${chapter}` : ''),
             });
             log(`프로젝트 생성: ${name} (${id}) ${result.created?.indexHtml ? '+ index.html ✓' : ''}`, 'ok');
-            log(`content/${id}/scenes/main.scene.json → 빈 씬 생성됨`, 'info');
+            log(`games/${id}/scenes/main.scene.json → 빈 씬 생성됨`, 'info');
             await loadProject(id);
             return;
         }
@@ -3052,7 +3052,7 @@ window.createNewProject = async function() {
     a.download = 'game.json';
     a.click();
     URL.revokeObjectURL(a.href);
-    alert(`content/${id}/ 폴더를 만들고 game.json을 넣으세요.\ncontent/index.json에도 프로젝트를 추가하세요.`);
+    alert(`games/${id}/ 폴더를 만들고 game.json을 넣으세요.\ngames/index.json에도 프로젝트를 추가하세요.`);
     showProjectList();
 };
 
@@ -4347,10 +4347,31 @@ Object.defineProperty(window, '_assetData', {
     configurable: true,
 });
 
-/** 프로젝트 변경 */
+/** 프로젝트 변경 (사용자가 드롭다운에서 다른 프로젝트 지정) */
 window.onAssetProjectChange = function(pid) {
     _assetProject = pid;
     window.loadAssets();
+};
+
+/** 에셋 프로젝트 드롭다운을 games/index.json 으로 채우고 현재 선택 동기화 */
+window.syncAssetProjectSel = async function() {
+    const sel = document.getElementById('assetProjectSel');
+    if (!sel) return;
+    if (!Array.isArray(_projList) || _projList.length === 0) {
+        try {
+            const data = await fetch('/games/index.json', { cache: 'no-store' }).then(r => r.json());
+            _projList = data.projects ?? data.games ?? [];
+        } catch { _projList = []; }
+    }
+    const cur = _assetProject;
+    const opts = (_projList || []).map(p => `<option value="${p.id}">📁 ${p.name || p.id}</option>`);
+    sel.innerHTML = opts.join('') || `<option value="${cur}">📁 ${cur}</option>`;
+    if (![...sel.options].some(o => o.value === cur)) {
+        const o = document.createElement('option');
+        o.value = cur; o.textContent = `📁 ${cur}`;
+        sel.appendChild(o);
+    }
+    sel.value = cur;
 };
 
 /** 카테고리 필터 전환 */
@@ -4463,7 +4484,7 @@ async function loadLocalPixels(projectId) {
             if (allNames.length) {
                 const results = await Promise.allSettled(
                     allNames.map(({ name, cat }) =>
-                        fetch(`/projects/${pid}/pixels/${cat}/${name}.json`, { cache: 'no-store' })
+                        fetch(`/games/${pid}/pixels/${cat}/${name}.json`, { cache: 'no-store' })
                             .then(r => r.json())
                             .then(data => ({ ...data, name: data.name ?? name, _category: cat }))
                     )
@@ -5202,7 +5223,7 @@ async function _runSavePixel() {
     }
     const pid      = _assetProject || '1974';
     const category = _inferCategory(name);
-    const savePath = `projects/${pid}/pixels/${category}/${name}.json`;
+    const savePath = `games/${pid}/pixels/${category}/${name}.json`;
 
     // 중복 파일명 경고 — 프로젝트 목록 확인
     try {
@@ -6267,7 +6288,7 @@ async function _apSave() {
     const W = item.width || 16, H = item.height || 16;
     const pid = window._assetProject || '1974';
     const cat = item._category ?? 'objects';
-    const path = `projects/${pid}/pixels/${cat}/${item.name}.json`;
+    const path = `games/${pid}/pixels/${cat}/${item.name}.json`;
 
     // 원본 포맷으로 재구성
     const base = Object.fromEntries(
@@ -6627,7 +6648,7 @@ async function main() {
         // 1. game.json 로드
         let gameJson;
         try {
-            gameJson = await fetch(`/content/${projectId}/game.json`).then(r => {
+            gameJson = await fetch(`/games/${projectId}/game.json`).then(r => {
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 return r.json();
             });
@@ -6636,6 +6657,11 @@ async function main() {
             return;
         }
         window._currentProject = gameJson;
+
+        // 에셋 브라우저 기본을 현재 프로젝트로 (지정 시 드롭다운에서 다른 프로젝트 선택 가능)
+        _assetProject = projectId;
+        window.syncAssetProjectSel();
+        window.loadAssets();
 
         // 2. 프로젝트 버튼 활성화
         document.querySelectorAll('.proj-btn').forEach(b =>
@@ -6663,11 +6689,11 @@ async function main() {
         engine.layers.clearAll();
         engine.scenes._stack.length = 0;
 
-        // 5. 팔레트 로드 (상대경로 → content/{id}/ 기준 절대경로 변환)
+        // 5. 팔레트 로드 (상대경로 → games/{id}/ 기준 절대경로 변환)
         if (gameJson.palette) {
             const palPath = gameJson.palette.startsWith('/')
                 ? gameJson.palette
-                : `/content/${projectId}/${gameJson.palette}`;
+                : `/games/${projectId}/${gameJson.palette}`;
             await engine.loadPalette(palPath).catch(() => {
                 // 폴백: assets/palettes/ 공용 팔레트
                 const pal2 = `/assets/palettes/${gameJson.palette.split('/').pop()}`;
@@ -6857,11 +6883,11 @@ async function main() {
             // JSON 씬: 저장 복원 or 파일 로드
             if (!_restoreSceneState(sceneName)) {
                 try {
-                    // 상대경로 → content/{id}/ 기준 절대경로 변환
+                    // 상대경로 → games/{id}/ 기준 절대경로 변환
                     const pid = window._currentProject?.id;
                     const src = scDef.src.startsWith('/')
                         ? scDef.src
-                        : `/content/${pid}/${scDef.src}`;
+                        : `/games/${pid}/${scDef.src}`;
                     const sceneJSON = await engine.assets.load(src);
                     await _loadEditorSceneJSON(sceneJSON, pid);
                 } catch (e) {
@@ -6940,12 +6966,19 @@ async function main() {
     document.getElementById('btnUndo').addEventListener('click', () => historyUndo());
     document.getElementById('btnRedo').addEventListener('click', () => historyRedo());
 
-    // 시작 시: 마지막 프로젝트 있으면 바로 복원, 없으면 피커 표시
-    const _lastProj = localStorage.getItem('se_last_project');
-    if (_lastProj) {
-        await loadProject(_lastProj).catch(() => showProjectPicker());
+    // 시작 시: 쿼리 파라미터에 project 가 있으면 강제 로드, 없으면 마지막 프로젝트 복원
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryProj = urlParams.get('project');
+    if (queryProj) {
+        localStorage.setItem('se_last_project', queryProj);
+        await loadProject(queryProj).catch(() => showProjectPicker());
     } else {
-        await showProjectPicker();
+        const _lastProj = localStorage.getItem('se_last_project');
+        if (_lastProj) {
+            await loadProject(_lastProj).catch(() => showProjectPicker());
+        } else {
+            await showProjectPicker();
+        }
     }
 
     // 초기 진입: 플로우 모드
@@ -7693,7 +7726,7 @@ async function _loadEditorSceneJSON(sceneJSON, pid) {
     for (const def of entities) {
         // prefab 필드가 있으면 PrefabSystem으로 처리 (런타임 게임 호환)
         if (def.prefab) {
-            try { await engine.prefabs.loadScene({ entities: [def] }, `/content/${pid}/`, engine.entities); loaded++; }
+            try { await engine.prefabs.loadScene({ entities: [def] }, `/games/${pid}/`, engine.entities); loaded++; }
             catch (e) { console.warn('[Editor] prefab load failed:', def.id, e); }
             continue;
         }
@@ -7711,7 +7744,7 @@ async function _loadEditorSceneJSON(sceneJSON, pid) {
             // 2. 저장된 카테고리 힌트가 있으면 직접 로드
             if (!pixelData && def.assetCategory) {
                 try {
-                    const r = await fetch(`/projects/${pid}/pixels/${def.assetCategory}/${assetName}.json`, { cache: 'no-store' });
+                    const r = await fetch(`/games/${pid}/pixels/${def.assetCategory}/${assetName}.json`, { cache: 'no-store' });
                     if (r.ok) { pixelData = await r.json(); pixelData._category = def.assetCategory; }
                 } catch {}
             }
@@ -7721,7 +7754,7 @@ async function _loadEditorSceneJSON(sceneJSON, pid) {
                 for (const cat of CATS) {
                     if (cat === def.assetCategory) continue; // 이미 시도함
                     try {
-                        const r = await fetch(`/projects/${pid}/pixels/${cat}/${assetName}.json`, { cache: 'no-store' });
+                        const r = await fetch(`/games/${pid}/pixels/${cat}/${assetName}.json`, { cache: 'no-store' });
                         if (r.ok) { pixelData = await r.json(); pixelData._category = cat; break; }
                     } catch {}
                 }
@@ -7856,7 +7889,7 @@ async function saveScene() {
 
     // ── 저장 경로 결정 ─────────────────────────────────────────
     const src = sceneDef.src ?? `scenes/${sceneName}.scene.json`;
-    const relPath = src.startsWith('/') ? src.slice(1) : `content/${proj.id}/${src}`;
+    const relPath = src.startsWith('/') ? src.slice(1) : `games/${proj.id}/${src}`;
     const content = JSON.stringify(sceneJSON, null, 2);
 
     try {
@@ -7914,7 +7947,7 @@ async function _executeSaveAsset(name) {
 
     const pid = _assetProject || '1974';
     const category = _pendingSaveEntity._assetCategory || _inferCategory(name);
-    const savePath = `projects/${pid}/pixels/${category}/${name}.json`;
+    const savePath = `games/${pid}/pixels/${category}/${name}.json`;
 
     // 저장될 JSON 구조 생성
     const saveData = {
@@ -8068,7 +8101,7 @@ window.addEventListener('message', (e) => {
     try {
         const target = new URL(url, window.location.origin);
         if (target.origin !== window.location.origin) return;
-        if (!target.pathname.startsWith('/content/')) return;
+        if (!target.pathname.startsWith('/games/') && !target.pathname.startsWith('/content/')) return;
     } catch { return; }
 
     const iframe = document.getElementById('livePreviewIframe');
@@ -8175,7 +8208,7 @@ window.renderArtboardLayers = async function(sceneName) {
             const CATS = ['backgrounds','characters','objects','items'];
             for (const cat of CATS) {
                 try {
-                    const r = await fetch(`/projects/${pid}/pixels/${cat}/${lconf.asset}.json`, { cache: 'no-store' });
+                    const r = await fetch(`/games/${pid}/pixels/${cat}/${lconf.asset}.json`, { cache: 'no-store' });
                     if (r.ok) { assetData = await r.json(); break; }
                 } catch {}
             }
