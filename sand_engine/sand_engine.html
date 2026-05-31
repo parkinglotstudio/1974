@@ -6659,64 +6659,22 @@ async function main() {
     });
 
     // 씬뷰 플레이/정지 토글 — live 씬(iframe)과 json 씬(engine) 분리
-    window.scenePlay = async function() {
-        const btn               = document.getElementById('btnScenePlay');
-        const panel             = document.getElementById('previewPanel');
-        const frozen            = document.getElementById('editorFrozen');
-        const runnerIframe      = document.getElementById('runnerIframe');       // 중간 영역 (미사용)
-        const livePreviewIframe = document.getElementById('livePreviewIframe'); // 씬뷰 폰 목업 내부
-        const livePlaceholder   = document.getElementById('livePlaceholder');
+    // 씬 플레이 — 게임을 새 브라우저 탭에서 실행 (엔진은 에디터에서 안 띄움 = 가벼움)
+    window.scenePlay = function() {
+        const proj = window._currentProject;
+        if (!proj) { log('프로젝트를 먼저 여세요', 'err'); return; }
+        const scene = window._curEditorScene || proj.defaultScene || 'main';
+        const url   = `/games/${proj.id}/index.html?scene=${encodeURIComponent(scene)}`;
+        window.open(url, '_blank', 'noopener');
+        log(`씬 플레이(새 탭): ${scene}`, 'ok');
+    };
 
-        // 현재 씬 타입 파악
-        const proj      = window._currentProject;
-        const sceneName = window._curEditorScene;
-        const sceneDef  = proj?.scenes?.[sceneName];
-        const isLive    = sceneDef?.type === 'live';
-
-        const liveToolbar = document.getElementById('liveToolbar');
-
-        if (_sceneIsPlaying) {
-            // ── 정지 ─────────────────────────────────────────
-            _sceneIsPlaying = false;
-            btn.textContent       = '▶ 플레이';
-            btn.style.background  = '#1A4A1A';
-            btn.style.borderColor = '#3A8A3A';
-            btn.style.color       = '#7FE07F';
-            panel.classList.remove('playing');
-            if (frozen) frozen.style.display = 'none';
-
-            if (liveToolbar) liveToolbar.style.display = 'none';
-
-            if (isLive) {
-                window.artboardStop(sceneName);
-            } else {
-                // json 씬: 엔진 정지 후 에디터 상태 복원
-                engine.stop();
-                if (window._curEditorScene) await switchEditorScene(window._curEditorScene);
-                log('씬 정지', 'info');
-            }
-        } else {
-            // ── 플레이 ───────────────────────────────────────
-            _sceneIsPlaying = true;
-            btn.textContent       = '⏹ 정지';
-            btn.style.background  = '#4A1A1A';
-            btn.style.borderColor = '#8A3A3A';
-            btn.style.color       = '#FF8A80';
-            panel.classList.add('playing');
-
-            if (isLive) {
-                if (frozen) frozen.style.display = 'none';
-                // artboardPlay가 _sceneIsPlaying + 버튼 UI도 직접 관리
-                _sceneIsPlaying = false; // 중복 방지 리셋 후 artboardPlay에서 다시 설정
-                btn.textContent = '▶ 플레이'; // artboardPlay가 덮어씀
-                window.artboardPlay(sceneName);
-            } else {
-                // json 씬: 엔진 그대로 실행 (에디터 씬 내용 렌더)
-                if (!engine._running) engine.start();
-                if (frozen) frozen.style.display = 'block';
-                log('씬 플레이 (intro →)', 'ok');
-            }
-        }
+    // 프로젝트 전체 플레이 — 새 탭에서 처음부터
+    window.projectPlay = function() {
+        const proj = window._currentProject;
+        if (!proj) { log('프로젝트를 먼저 여세요', 'err'); return; }
+        window.open(`/games/${proj.id}/index.html`, '_blank', 'noopener');
+        log(`프로젝트 플레이(새 탭): ${proj.id}`, 'ok');
     };
 
     // ── 프로젝트 전환 ──────────────────────────────────────────────────
@@ -7103,10 +7061,22 @@ function _relayoutEditor() {
                 padding: '8px', boxSizing: 'border-box',
             });
         }
-        // 플레이 버튼은 폰과 함께 사라지므로 중앙 툴바로 이동
-        if (play && fit && fit.parentElement) {
-            fit.parentElement.appendChild(play);
-            play.style.marginLeft = '6px';
+        // 플레이 버튼을 상단 헤더(씬 저장 옆)로 — 새 탭 실행(씬/프로젝트)
+        const actions = document.querySelector('.header-actions');
+        if (play && actions) {
+            play.textContent = '▶ 씬';
+            play.onclick = () => window.scenePlay();
+            play.style.cssText = 'background:#1A4A1A;border:1px solid #3A8A3A;color:#7FE07F;font-size:10px;font-family:JetBrains Mono,monospace;padding:3px 10px;border-radius:3px;cursor:pointer;white-space:nowrap;';
+            actions.insertBefore(play, actions.firstChild);
+            if (!document.getElementById('btnProjectPlay')) {
+                const pb = document.createElement('button');
+                pb.id = 'btnProjectPlay';
+                pb.textContent = '▶ 프로젝트';
+                pb.title = '전체 프로젝트를 새 탭에서 실행';
+                pb.style.cssText = 'background:#1A2A4A;border:1px solid #3A5A9A;color:#9FB8FF;font-size:10px;font-family:JetBrains Mono,monospace;padding:3px 10px;border-radius:3px;cursor:pointer;white-space:nowrap;';
+                pb.onclick = () => window.projectPlay();
+                actions.insertBefore(pb, actions.firstChild);
+            }
         }
         if (typeof fitWorkCanvas === 'function') setTimeout(fitWorkCanvas, 40);
     } catch (e) { console.warn('relayout fail', e); }

@@ -215,8 +215,9 @@ async function init() {
         );
     }
 
-    // 기본 씬 로드
-    const defaultScene = gj.defaultScene ?? 'main';
+    // 기본 씬 로드 (?scene= 파라미터로 특정 씬 지정 가능 — 에디터 씬 플레이용)
+    const urlScene     = new URLSearchParams(location.search).get('scene');
+    const defaultScene = urlScene || gj.defaultScene || 'main';
     const sceneDef     = gj.scenes?.[defaultScene];
     if (sceneDef?.type === 'json' && sceneDef.src) {
         const src       = sceneDef.src.startsWith('/') ? sceneDef.src : './' + sceneDef.src;
