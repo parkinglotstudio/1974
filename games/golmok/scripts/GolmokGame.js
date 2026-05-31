@@ -493,7 +493,8 @@ export default class GolmokGame extends Scene {
                 }
                 if (edges.length) {
                     const dir = this._sandDir || 1, moving = this._sandI;   // 0~1
-                    this._ambAcc += SAND_FALL_RATE * dtSec;
+                    // idle엔 소량, 이동할수록 많이 부서짐
+                    this._ambAcc += SAND_FALL_RATE * (0.1 + 0.9 * moving) * dtSec;
                     while (this._ambAcc >= 1) {
                         this._ambAcc -= 1;
                         const k = ((Math.random() * (edges.length >> 1)) | 0) << 1;
@@ -505,8 +506,8 @@ export default class GolmokGame extends Scene {
                         const b = Math.min(255, img[o+2] + 60);
                         this._ambient.push({
                             x: x0 + lx, y: y0 + ly,
-                            vx: (Math.random() - 0.5) * 24 - dir * 26 * moving, // 곡선 + 이동 시 뒤로 흩날림
-                            vy: -(Math.random() * 16),                          // 살짝 떠올랐다 중력에 낙하
+                            vx: (Math.random() - 0.5) * 16 - dir * 28 * moving, // 이동 시 뒤로 흩날림
+                            vy: (Math.random() * 4 - 2),                        // 제자리 높이 유지하다 중력에 낙하
                             age: 0, maxlife: 0.7 + Math.random() * 0.9,
                             r, g, b,
                         });
@@ -616,7 +617,7 @@ export default class GolmokGame extends Scene {
         if (!p || !L2) return;
         const lctx2 = L2.getContext('2d');
         const psx = p.x - e.cameraX;
-        this._idleAcc += 48 * (dt / 1000);          // 초당 ~48개
+        this._idleAcc += 14 * (dt / 1000);          // idle은 소량만 (초당 ~14개)
         while (this._idleAcc >= 1) {
             this._idleAcc -= 1;
             const x = (psx + Math.random() * p.pw) | 0;
