@@ -1,0 +1,18 @@
+{
+  "id": "_template",
+  "name": "신규 프로젝트 템플릿",
+  "version": "0.1",
+  "resolution": { "width": 540, "height": 960 },
+  "palette": "palettes/palette_default.json",
+  "layers": {
+    "0": { "name": "원경", "parallax": 0.15 },
+    "1": { "name": "근경", "parallax": 1.0 },
+    "2": { "name": "게임", "parallax": 1.0 },
+    "3": { "name": "전경", "parallax": 1.4 }
+  },
+  "scenes": {
+    "main": { "type": "json", "src": "scenes/main.scene.json", "label": "메인" }
+  },
+  "defaultScene": "main",
+  "assetProject": "_template"
+}

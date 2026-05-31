@@ -1,0 +1,22 @@
+{
+  "schema": "SandEngine.Scene.v1",
+  "name": "main",
+  "resolution": { "width": 540, "height": 960 },
+  "bounds": { "worldWidth": 2560, "worldHeight": 960 },
+  "layers": [
+    { "id": "L0", "parallax": 0.15, "children": [] },
+    { "id": "L1", "parallax": 1.00, "children": [] },
+    { "id": "L2", "parallax": 1.00, "children": [] },
+    { "id": "L3", "parallax": 1.40, "children": [] }
+  ],
+  "entities": [
+    {
+      "id": "_placeholder",
+      "type": "note",
+      "layer": 1,
+      "x": 0, "y": 0, "pw": 0, "ph": 0,
+      "visible": false,
+      "note": "여기에 이 프로젝트 전용 에셋(projects/_template/pixels/...)을 배치합니다."
+    }
+  ]
+}

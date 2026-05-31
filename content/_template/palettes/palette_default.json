@@ -1,0 +1,19 @@
+{
+  "name": "palette_default",
+  "note": "예약 인덱스 — 0:투명 9:충돌 10:발광 11:위험 12:안개",
+  "colors": [
+    "transparent",
+    "#1a1a22",
+    "#3a3a48",
+    "#6a6a80",
+    "#a0a0b8",
+    "#d8d8e8",
+    "#c2b280",
+    "#8a7a4a",
+    "#ffffff",
+    "#ff00ff",
+    "#ffd044",
+    "#ff3344",
+    "#c8c0b0"
+  ]
+}

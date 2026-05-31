@@ -1,29 +1,11 @@
 {
   "projects": [
     {
-      "id": "1974",
-      "name": "1974",
-      "icon": "🕹️",
-      "desc": "180×320"
-    },
-    {
-      "id": "speedrun",
-      "name": "네모세모동그라미(네세동)",
-      "icon": "🎮",
-      "desc": "480×270"
-    },
-    {
-      "id": "avatarrun",
-      "name": "아바타 런 (Avatar Run)",
-      "icon": "🦊",
-      "desc": "480×270"
-    },
-    {
       "id": "golmok",
       "name": "골목길의 하루",
       "icon": "🎮",
       "chapter": 1,
-      "desc": "540×960 · Ch.1"
+      "desc": "540×960 · Ch.1 · 모래엔진 기준 프로젝트"
     }
   ]
 }
