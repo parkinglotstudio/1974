@@ -7058,6 +7058,13 @@ function _relayoutEditor() {
             if (po) { po.style.border = 'none'; po.style.borderRadius = '0'; po.style.background = '#000'; po.style.boxShadow = 'none'; }
             const lt = document.getElementById('liveToolbar');
             if (lt) lt.style.display = 'none';
+            // 씬 탭(메인/타이틀/결과)을 씬 뷰 맨 위로 — 씬 전환을 명확하게
+            const tabbar = document.getElementById('sceneTabBar');
+            if (tabbar) {
+                prev.insertBefore(tabbar, prev.firstChild);
+                tabbar.style.flexShrink = '0';
+                tabbar.style.borderBottom = '1px solid #3A3A36';
+            }
         }
 
         if (layer) row.insertBefore(layer, row.firstChild);      // 레이어 → 왼쪽
