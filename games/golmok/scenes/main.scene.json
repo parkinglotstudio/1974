@@ -18,11 +18,11 @@
   "entities": [
     {
       "id": "bg_alley",
-      "type": "bg_3",
+      "type": "bg_1",
       "layer": 1,
       "x": 0, "y": 0, "pw": 2560, "ph": 960,
       "visible": true,
-      "asset": "bg_3",
+      "asset": "bg_1",
       "assetCategory": "backgrounds"
     },
     {

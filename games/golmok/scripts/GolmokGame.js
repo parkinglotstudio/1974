@@ -6,7 +6,7 @@ const WORLD_WIDTH = 2560;
 const GROUND_Y    = 547;   // 발끝 = 547+270 = 817 (2/3 크기 캐릭터 높이 270)
 
 // ── 배경 순환 ───────────────────────────────────────────────────────
-const BG_LIST     = ['bg_1', 'bg_2', 'bg_3', 'bg_4'];
+const BG_LIST     = ['bg_1', 'bg_2'];
 const BG_PID      = '1974';
 const BG_INTERVAL = 10000;  // 10초마다 다음 배경
 const BG_TRANS_MS = 2000;   // 전환 시간 (2초)
@@ -249,21 +249,24 @@ export default class GolmokGame extends Scene {
 
         if (this._tr) {
             this._tr.t += dt / BG_TRANS_MS;
-            // 화면이 가려진 중간 지점(t≥0.5)에서 배경 교체 → 전환에 가려져 자연스러움
+            // 화면이 모래색으로 덮인 중간 지점(t≥0.5)에서 배경 교체 + 새 맵 시작점으로 순간이동
             if (!this._tr.swapped && this._tr.t >= 0.5) {
                 this._tr.swapped = true;
                 this._bgIdx = (this._bgIdx + 1) % BG_LIST.length;
                 this._swapBg(engine, BG_LIST[this._bgIdx]);
+                player.x = 0;                 // 다음 맵 왼쪽 끝에서 시작
+                this._targetX = null;
+                const camX2 = engine.bounds.clampCameraX(player.x + player.pw / 2 - engine.gameWidth / 2);
+                engine.cameraX = camX2;
+                this._lastCamX = camX2;        // 카메라 점프로 인한 모래 스파이크 방지
             }
             if (this._tr.t >= 1) { this._tr = null; this._timer = 0; }
             return;
         }
 
-        if (!CYCLE_ENABLED) return;   // 자동 순환 OFF
-        this._timer += dt;
-        if (this._timer >= BG_INTERVAL) {
-            this._tr = { t: 0, effect: FX_LIST[this._fxIdx], swapped: false };
-            this._fxIdx = (this._fxIdx + 1) % FX_LIST.length;
+        // 맵 오른쪽 끝에 도달하면 파도(wave) 전환으로 다음 배경 생성
+        if (player.x >= WORLD_WIDTH - player.pw - 2) {
+            this._tr = { t: 0, effect: 'wave', swapped: false };
         }
     }
 
