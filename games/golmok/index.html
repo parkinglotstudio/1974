@@ -16,6 +16,8 @@
 <script type="module">
 import SandEngine   from '../../engine/SandEngine.js';
 import GolmokGame   from './scripts/GolmokGame.js';
+import TitleScene   from './scripts/TitleScene.js';
+import ResultScene  from './scripts/ResultScene.js';
 
 // ── 채널 API ────────────────────────────────────────────────
 const isEmbed = window !== window.top;
@@ -218,20 +220,51 @@ async function init() {
     // 기본 씬 로드 (?scene= 파라미터로 특정 씬 지정 가능 — 에디터 씬 플레이용)
     const urlScene     = new URLSearchParams(location.search).get('scene');
     const defaultScene = urlScene || gj.defaultScene || 'main';
-    const sceneDef     = gj.scenes?.[defaultScene];
-    if (sceneDef?.type === 'json' && sceneDef.src) {
-        const src       = sceneDef.src.startsWith('/') ? sceneDef.src : './' + sceneDef.src;
-        // cache: 'no-store' — 씬 JSON은 항상 최신본 사용 (개발 중 캐싱 방지)
-        const sceneJSON = await fetch(src, { cache: 'no-store' }).then(r => r.json());
-        await applyAssetScene(sceneJSON, assetBase);
+    const E = game._engine;
+
+    // ── 씬 흐름: 타이틀 → 메인 → 결과 ─────────────────────────────
+    // 메인 씬 엔티티(배경+캐릭터)는 메인 진입 시 로드
+    let _mainSceneJSON = null;
+    async function _loadMainEntities() {
+        const sd = gj.scenes?.main;
+        if (!_mainSceneJSON && sd?.src) {
+            const src = sd.src.startsWith('/') ? sd.src : './' + sd.src;
+            _mainSceneJSON = await fetch(src, { cache: 'no-store' }).then(r => r.json());
+        }
+        if (_mainSceneJSON) await applyAssetScene(_mainSceneJSON, assetBase);
     }
 
-    // 게임 씬 등록 및 활성화
-    const golmokGame = new GolmokGame();
-    game._engine.scenes.register('golmok_main', golmokGame);
-    game._engine.scenes.change('golmok_main');
+    E.scenes.register('golmok_title',  new TitleScene());
+    E.scenes.register('golmok_main',   new GolmokGame());
+    E.scenes.register('golmok_result', new ResultScene());
 
-    game._engine.start();
+    let _cur = 'golmok_title';
+    async function goScene(id) {
+        if (id === 'golmok_main') await _loadMainEntities();
+        else E.entities._entities.clear();
+        E.scenes.change(id);
+        _cur = id;
+    }
+
+    // 시작 씬: ?scene= (main|golmok_title|golmok_result), 기본 = 타이틀
+    const _map = {
+        main: 'golmok_main', golmok_main: 'golmok_main',
+        title: 'golmok_title', golmok_title: 'golmok_title',
+        result: 'golmok_result', golmok_result: 'golmok_result',
+    };
+    await goScene(_map[defaultScene] || 'golmok_title');
+
+    E.start();
+
+    // 클릭/터치 → 씬 전환 (타이틀→메인, 결과→타이틀). 메인 클릭은 GolmokGame이 처리.
+    canvas.addEventListener('pointerdown', () => {
+        if (_cur === 'golmok_title')       goScene('golmok_main');
+        else if (_cur === 'golmok_result') goScene('golmok_title');
+    });
+    // 메인에서 Enter → 결과
+    window.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' && _cur === 'golmok_main') goScene('golmok_result');
+    });
 
     // 준비 완료 알림
     if (isEmbed) window.parent.postMessage({ type: 'ready' }, '*');

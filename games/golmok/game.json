@@ -34,14 +34,16 @@
       "label": "메인"
     },
     "golmok_title": {
-      "type": "empty",
+      "type": "script",
+      "script": "scripts/TitleScene.js",
       "label": "타이틀"
     },
     "golmok_result": {
-      "type": "empty",
+      "type": "script",
+      "script": "scripts/ResultScene.js",
       "label": "결과"
     }
   },
-  "defaultScene": "main",
+  "defaultScene": "golmok_title",
   "assetBase": "./pixels"
 }
