@@ -7046,8 +7046,19 @@ function _relayoutEditor() {
         const play  = document.getElementById('btnScenePlay');   // 플레이 버튼
         const fit   = document.getElementById('btnWorkFit');     // 중앙 툴바 기준점
 
-        if (prev) prev.style.display = 'none';                    // 폰 미리보기 제거
+        const canvasP = document.getElementById('canvasPanel');   // 중앙 스키매틱 에디터
         document.querySelectorAll('.v-resizer').forEach(r => r.style.display = 'none');
+        if (canvasP) canvasP.style.display = 'none';              // 스키매틱(흰 영역/박스) 숨김 — 불필요·느림 제거
+        if (prev) {                                               // 폰 → 라이브 씬 렌더를 중앙으로
+            prev.style.display = '';
+            prev.style.flex = '1 1 auto';
+            prev.style.minWidth = '0';
+            prev.querySelectorAll('.phone-notch,.phone-statusbar,.phone-homebar').forEach(e => e.style.display = 'none');
+            const po = document.getElementById('phoneOuter');
+            if (po) { po.style.border = 'none'; po.style.borderRadius = '0'; po.style.background = '#000'; po.style.boxShadow = 'none'; }
+            const lt = document.getElementById('liveToolbar');
+            if (lt) lt.style.display = 'none';
+        }
 
         if (layer) row.insertBefore(layer, row.firstChild);      // 레이어 → 왼쪽
         if (layer) { layer.style.flex = '0 0 220px'; layer.style.width = '220px'; }
@@ -7078,7 +7089,9 @@ function _relayoutEditor() {
                 actions.insertBefore(pb, actions.firstChild);
             }
         }
-        if (typeof fitWorkCanvas === 'function') setTimeout(fitWorkCanvas, 40);
+        setTimeout(() => {
+            try { if (typeof fitToView === 'function') fitToView(); else if (typeof fitCanvas === 'function') fitCanvas(); } catch {}
+        }, 80);
     } catch (e) { console.warn('relayout fail', e); }
 }
 
