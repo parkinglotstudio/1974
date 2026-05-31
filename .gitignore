@@ -13,3 +13,7 @@ backup/
 # 개발 서버 캐시
 __pycache__/
 *.pyc
+
+# build / deps
+node_modules/
+dist/
