@@ -1,7 +1,7 @@
 import { Scene } from '../../../engine/scene/SceneManager.js';
 import { SAND_BASE_RGB, SAND_TONES_RGB } from '../../../engine/SandPalette.js';
 
-const MOVE_SPEED  = 440;   // px/sec
+const MOVE_SPEED  = 260;   // px/sec
 const WORLD_WIDTH = 2560;
 const GROUND_Y    = 547;   // 발끝 = 547+270 = 817 (2/3 크기 캐릭터 높이 270)
 
@@ -27,6 +27,7 @@ const SAND_BUILDUP_MS = 2000; // 걷기 시작 → 최대 크기까지 빌드업
 // 앰비언트 — 가만히 있어도 픽셀이 톡톡 떨어지는 모래알
 const SAND_FALL_RATE = 55;    // 초당 떨어지는 모래알 수
 const SAND_FALL_G    = 3;     // 떨어지는 입자 크기 px
+const SAND_GRAVITY   = 110;   // 모래알 중력 가속 px/s² — 솟은 입자가 다시 떨어짐
 
 // 월드 고정 셀 의사난수 0~1 (콘텐츠가 흐르는 동안 입자가 정체성 유지 → 팝인/팝아웃)
 function sandHash(x, y) {
@@ -38,6 +39,8 @@ export default class GolmokGame extends Scene {
     constructor() {
         super('golmok_main');
         this._player  = null;
+        this._targetX = null;    // 클릭 이동 목표 X (월드 좌표, player.x 기준)
+        this._clickBound = false;
 
         this._bgIdx   = 0;
         this._fxIdx   = 0;
@@ -89,6 +92,22 @@ export default class GolmokGame extends Scene {
         this._player = engine.entities.get('player');
         this._preload();
         if (FOG_ENABLED) this._loadFog();
+
+        // ── 화면 클릭/터치 → 그 지점으로 걸어가기 ──────────────────
+        const canvas = engine.canvas;
+        if (canvas && !this._clickBound) {
+            this._clickBound = true;
+            canvas.style.cursor = 'pointer';
+            const onPoint = (clientX) => {
+                const p = this._player; if (!p) return;
+                const rect = canvas.getBoundingClientRect();
+                if (rect.width <= 0) return;
+                const gx     = (clientX - rect.left) / rect.width * engine.gameWidth; // 화면→논리 X
+                const worldX = engine.cameraX + gx;                                   // →월드 X
+                this._targetX = Math.max(0, Math.min(WORLD_WIDTH - p.pw, worldX - p.pw / 2));
+            };
+            canvas.addEventListener('pointerdown', (ev) => onPoint(ev.clientX));
+        }
     }
 
     // 구름-포그 텍스쳐 로드 → 캔버스로 1회 래스터 (앞/뒤 2겹)
@@ -99,7 +118,7 @@ export default class GolmokGame extends Scene {
         ];
         for (const def of defs) {
             try {
-                const d = await fetch(`/projects/${BG_PID}/pixels/fog/${def.file}.json`, { cache: 'no-store' }).then(r => r.json());
+                const d = await fetch(`./pixels/fog/${def.file}.json`, { cache: 'no-store' }).then(r => r.json());
                 this._fog.push({ canvas: this._rasterFog(d), x: Math.random() * d.width, ...def });
             } catch (e) { console.warn('[golmok] fog load fail:', def.file, e); }
         }
@@ -126,7 +145,7 @@ export default class GolmokGame extends Scene {
     async _preload() {
         for (const name of BG_LIST) {
             try {
-                const r = await fetch(`/projects/${BG_PID}/pixels/backgrounds/${name}.json`, { cache: 'no-store' });
+                const r = await fetch(`./pixels/backgrounds/${name}.json`, { cache: 'no-store' });
                 if (r.ok) this._bgCache[name] = await r.json();
             } catch (e) { console.warn('[golmok] bg preload fail:', name, e); }
         }
@@ -153,10 +172,16 @@ export default class GolmokGame extends Scene {
 
         const dtSec = dt / 1000;
 
-        // 이동
+        // 이동 — 키보드 우선, 없으면 클릭 목표로 이동
         let dx = 0;
-        if (input.isDown('left'))  dx = -MOVE_SPEED;
-        if (input.isDown('right')) dx =  MOVE_SPEED;
+        if (input.isDown('left'))  { dx = -MOVE_SPEED; this._targetX = null; }
+        if (input.isDown('right')) { dx =  MOVE_SPEED; this._targetX = null; }
+        if (dx === 0 && this._targetX != null) {
+            const diff = this._targetX - player.x;
+            const step = MOVE_SPEED * dtSec;
+            if (Math.abs(diff) <= step) { player.x = this._targetX; this._targetX = null; }
+            else dx = diff > 0 ? MOVE_SPEED : -MOVE_SPEED;
+        }
         if (dx !== 0) {
             player.x += dx * dtSec;
             player.flipX = dx < 0;
@@ -469,22 +494,26 @@ export default class GolmokGame extends Scene {
                 try { col = lctx1.getImageData(sx, y, 1, 1).data; } catch (_) { break; }
             }
             if (col[3] < 16) continue;
+            // 캐릭터에서 나온 입자는 흘러내리고(아래), 배경 모래알은 살짝 솟았다 중력에 다시 떨어짐(위)
+            const vy0 = fromChar ? (8 + Math.random() * 28)
+                                 : -(10 + Math.random() * 34);
             this._ambient.push({
                 x, y,
-                vy: -(12 + Math.random() * 42),         // 위로 떠오름 (음수)
+                vy: vy0,
                 vx: (Math.random() - 0.5) * 14,          // 살짝 좌우 흔들림
-                age: 0, maxlife: 0.7 + Math.random() * 1.3,
+                age: 0, maxlife: 1.0 + Math.random() * 1.6,
                 r: Math.min(255, col[0] + 85), g: Math.min(255, col[1] + 80), b: Math.min(255, col[2] + 65),
             });
         }
 
-        // 업데이트 (상승 + 흔들림 + 수명)
+        // 업데이트 (중력 가속 → 솟구쳤다 떨어지는 포물선 + 흔들림 + 수명)
         for (let i = this._ambient.length - 1; i >= 0; i--) {
             const p = this._ambient[i];
+            p.vy += SAND_GRAVITY * dtSec;                // 중력
             p.y  += p.vy * dtSec;
             p.x  += p.vx * dtSec;
             p.age += dtSec;
-            if (p.age >= p.maxlife || p.y < -4) this._ambient.splice(i, 1);
+            if (p.age >= p.maxlife || p.y > H + 6 || p.y < -8) this._ambient.splice(i, 1);
         }
     }
 
@@ -507,8 +536,8 @@ export default class GolmokGame extends Scene {
     _renderCharRim(ctx, W, H) {
         const e = this.engine; const L2 = e.layers.getCanvas(2); const L1 = e.layers.getCanvas(1); const p = this._player;
         if (!L2 || !L1 || !p) return;
-        const N = 7;                         // rim 폭(px) — 면 크게
-        const PEAK = 1.0;                    // 최대 세기 (또렷)
+        const N = 3;                         // rim 폭(px) — 얇게
+        const PEAK = 0.9;                    // 최대 세기
         const Lx = 0.7071, Ly = -0.7071;     // 우상단 광원(역광)
         const psx = (p.x - e.cameraX) | 0;
         const x0 = Math.max(0, psx - 2), x1 = Math.min(W, psx + p.pw + 2);
