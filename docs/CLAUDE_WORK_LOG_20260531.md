@@ -48,6 +48,23 @@
 - **(보류) FX 공용화**: 골목 FX를 `engine/fx/` 모듈로 승격 → 신규 게임 자동 상속.
 - 신규 프로젝트는 골목 완성까지 보류.
 
-## 5. 미해결/주의
+## 5. 실행 방법 (각 프로젝트)
+**① 개발 서버 띄우기** (정적 파일 서버, 캐시 no-store)
+- 표준: `python dev_server.py 9191`  → `http://localhost:9191/`
+  - dev_server.py 포트 = argv[1], 미지정 시 기본 9193.
+  - Claude preview 설정 이름 `1974-dev` (`.claude/launch.json`) = 위와 동일(9191).
+- `start.bat` 도 있으나 포트 9292 사용(불일치, 정리 대상).
+
+**② 엔진툴(에디터) 실행**
+- `http://localhost:9191/sand_engine/sand_engine.html`
+- 프로젝트 로드/프리뷰. ※ 하단 에셋 브라우저는 아직 옛 글로벌 `assets/`·`projects/1974` 참조(5번에서 `games/` 재배선).
+
+**③ 게임 단독 실행** (에디터 불필요, 권장)
+- 형식: `http://localhost:9191/games/<id>/index.html`
+- 골목: `http://localhost:9191/games/golmok/index.html`
+- 각 게임은 자기 폴더만으로 동작(엔진은 `/engine/`에서 로드). 신규 게임도 `games/<id>/index.html`.
+
+**④ 조작**: ←/→ 또는 화면 클릭 이동. 맵 오른쪽 끝 도달 시 파도 전환으로 다음 배경.
+
+## 6. 미해결/주의
 - 골목 디졸브 "블러 형태로" 추가 요청 — 현재 디지털 블록 형태. 더 부드럽게 갈지 사용자 확인 대기.
-- 실행/미리보기: dev_server 9191, preview 설정 `1974-dev`, URL `/games/golmok/index.html`.
