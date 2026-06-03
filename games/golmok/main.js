@@ -2,6 +2,7 @@ import SandEngine   from '../../engine/SandEngine.js';
 import GolmokGame   from './scripts/GolmokGame.js';   // 메인 씬 컨트롤러(이동 + 시그니처 FX)
 import TitleScene   from './scripts/TitleScene.js';
 import ResultScene  from './scripts/ResultScene.js';
+import { loadCsvTable, loadParamTable } from '../../engine/data/Csv.js';  // 게임 데이터(CSV) 로더
 
 // ── 채널 API ────────────────────────────────────────────────
 const isEmbed = window !== window.top;
@@ -193,6 +194,25 @@ async function init() {
 
     game._engine = new SandEngine({ canvas, gameWidth: width, gameHeight: height });
     await game._engine.init();
+
+    // ── 게임 데이터 테이블(CSV) 로드 → engine.data ───────────────
+    // 엔진=로직, 게임 데이터=CSV. 씬/게임 코드는 상수 대신 이 테이블에서 값을 읽는다.
+    // (실패해도 게임은 코드 내 fallback 기본값으로 동작)
+    try {
+        const [maps, characters, animations, fx] = await Promise.all([
+            loadCsvTable('./data/maps.csv'),
+            loadCsvTable('./data/characters.csv'),
+            loadCsvTable('./data/animations.csv'),
+            loadParamTable('./data/fx_params.csv'),
+        ]);
+        game._engine.data = { maps, characters, animations, fx };
+        console.log('[golmok] data tables loaded:',
+            maps.all().length, 'maps,', characters.all().length, 'chars,',
+            animations.all().length, 'anims,', fx.keys().length, 'fx params');
+    } catch (e) {
+        console.warn('[golmok] data table load failed — using code defaults:', e);
+        game._engine.data = null;
+    }
 
     // 팔레트
     if (gj.palette) {

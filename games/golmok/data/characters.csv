@@ -1,0 +1,5 @@
+# golmok 캐릭터 테이블 — 캐릭터 1명 = 1행
+# pw,ph: 스프라이트 크기. spawn_x,spawn_y: 기본 배치 좌표(씬에서 override 가능). move_speed: px/sec.
+# 좌표·크기는 씬(scene.json) 배치가 우선이며, 여기 값은 기본/스탯.
+id,asset,category,pw,ph,spawn_x,spawn_y,move_speed,layer,notes
+ch01_player,ch01_player,characters,149,259,196,660,207,2,플레이어 (idle+walk)

@@ -28,7 +28,7 @@ writeFileSync(`${OUT}/index.html`, html);
 
 // 3) 런타임 데이터(JSON)만 복사 (로직은 app.min.js 안)
 cpSync(`${SRC}/game.json`, `${OUT}/game.json`);
-for (const d of ['scenes', 'pixels', 'palettes']) {
+for (const d of ['scenes', 'pixels', 'palettes', 'data']) {
   if (existsSync(`${SRC}/${d}`)) cpSync(`${SRC}/${d}`, `${OUT}/${d}`, { recursive: true });
 }
 

@@ -1,15 +1,17 @@
 import { Scene } from '../../../engine/scene/SceneManager.js';
 import { SAND_BASE_RGB, SAND_TONES_RGB } from '../../../engine/SandPalette.js';
 
-const MOVE_SPEED  = 180;   // px/sec (1.5배↑ — walk fps도 12→18 동기화)
+// ⚠ 아래 let 값들은 코드 기본값(fallback)일 뿐 — 실제 값은 data/*.csv 테이블에서 로드해
+//   _loadConfig()가 덮어쓴다. (엔진=로직, 게임 데이터=CSV 원칙)
+let   MOVE_SPEED  = 207;   // ← characters.csv move_speed
 const WORLD_WIDTH = 2560;
 const GROUND_Y    = 412;   // 발끝 = 412+405 = 817 (캐릭터 1.5배 높이 405, 바닥선 817 유지)
 
 // ── 배경 순환 ───────────────────────────────────────────────────────
-const BG_LIST     = ['1960_1', '1970_1', '1980_1', '2020_1']; // 세로 4장 (pixels/objects, 1706×960)
+let   BG_LIST     = ['1960_1', '2020_1']; // ← maps.csv cycle_order (현재 2장만 순환)
 const BG_PID      = '1974';
 const BG_INTERVAL = 10000;  // 10초마다 다음 배경
-const BG_TRANS_MS = 2000;   // 전환 시간 (2초)
+let   BG_TRANS_MS = 2000;   // ← fx_params.csv bg.trans_ms
 const CYCLE_ENABLED = true;  // 화면 끝 도달 시 다음 배경으로 sandburst 전환 ON
 const DIGITAL_ENABLED = false; // 디지털 회로/메시 오버레이 ON/OFF (저장만, 지금은 OFF)
 const FOG_ENABLED = false;     // 안개(절차적 + 드리프트 구름) ON/OFF (지금은 OFF)
@@ -20,17 +22,18 @@ const FX_LIST     = ['sand_top', 'sand_sides', 'wave'];
 // ── SandScroll (모래 생성/소멸 스크롤) 프로토타입 파라미터 ───────────
 const SAND_ENABLED   = true;
 const CHAR_DISSOLVE_ENABLED = false; // 캐릭터 외곽 모래 중력낙하 디졸브 (요청: 가림)
-const INTRO_MS       = 2200;  // 게임 진입 인트로: 배경 모래-로딩 + 캐릭터(모래 모양→실제색) 2단계 연출 시간
-const SAND_BAND_MAX  = 0.022; // 최대 띠 폭 (화면 비율) — 1/3로 축소 (오빠의 튜닝 사양)
-const SAND_GRAIN     = 4;     // 모래 입자 크기 px
-const SAND_SETTLE_MS = 280;   // 멈출 때 굳는(가라앉는) 시간
-const SAND_BUILDUP_MS = 2000; // 걷기 시작 → 최대 크기까지 빌드업 (2초). 달리면 즉시.
+// ↓ let = CSV(fx_params.csv) 로드값으로 _loadConfig가 덮어씀. 숫자는 fallback 기본값.
+let   INTRO_MS       = 2200;  // ← intro.ms
+let   SAND_BAND_MAX  = 0.022; // ← sand.band_max
+let   SAND_GRAIN     = 4;     // ← sand.grain
+let   SAND_SETTLE_MS = 280;   // ← sand.settle_ms
+let   SAND_BUILDUP_MS = 2000; // ← sand.buildup_ms
 
 // 앰비언트 — 가만히 있어도 픽셀이 톡톡 떨어지는 모래알
-const SAND_FALL_RATE = 70;    // 초당 떨어져 나가는 디지털 픽셀 수
+let   SAND_FALL_RATE = 70;    // ← sand.fall_rate
 const SAND_FALL_G    = 4;     // 디지털 블록 크기 px (그리드 정렬)
-const SAND_GRAVITY   = 130;   // 중력 가속 px/s² — 포물선 낙하
-const BG_MOTE_RATE   = 32;    // 배경에서 위로 피어오르는 모래알 수/초
+let   SAND_GRAVITY   = 130;   // ← sand.gravity
+let   BG_MOTE_RATE   = 32;    // ← bg.mote_rate
 
 // 월드 고정 셀 의사난수 0~1 (콘텐츠가 흐르는 동안 입자가 정체성 유지 → 팝인/팝아웃)
 function sandHash(x, y) {
@@ -76,6 +79,13 @@ export default class GolmokGame extends Scene {
         this._bgTone  = null;      // 배경(L1) 대표색 {r,g,b} — FX 톤(림 floor·key광)을 배경마다 자동 매칭
         this._intro   = null;      // 게임 진입 인트로 연출 상태 { t: 0~1 }
 
+        // FX 인라인 수치 — _loadConfig(engine)가 fx_params.csv 값으로 덮어씀. 아래는 fallback 기본값.
+        this._p = {
+            dayPeriod: 60, charMin: 0.20, rimThresh: 0.85, rimPeak: 0.7, rimFloorMul: 0.9,
+            rimWidth: 3, rimDirBase: 0.3, revBase: 0.20, revLumScale: 0.15, revBlend: 0.15,
+            ambMax: 0.5, keyMax: 0.95, vigMax: 0.55, glowMax: 0.95, fogMax: 0.5,
+        };
+
         // 디지털 오버레이 — 회로/메시 조각이 불규칙하게 일어났다 사라짐
         this._digital = [];
         this._digAcc  = 0;
@@ -105,6 +115,7 @@ export default class GolmokGame extends Scene {
         if (this._player) {
             this._groundY = this._player.y;                          // 씬 설정에 지정된 초기 y좌표(세로 690, 가로 412 등)를 바닥으로 채택
         }
+        this._loadConfig(engine);    // 게임 데이터 테이블(CSV)에서 값 로드 (상수 덮어쓰기)
         this._preload();
         if (FOG_ENABLED) this._loadFog();
 
@@ -125,6 +136,71 @@ export default class GolmokGame extends Scene {
             };
             canvas.addEventListener('pointerdown', (ev) => onPoint(ev.clientX));
         }
+    }
+
+    // ── 게임 데이터 테이블(CSV)에서 값 로드 ──────────────────────────
+    // engine.data = { maps, characters, animations, fx } (main.js가 CSV에서 채움).
+    // 모듈 상수(let)는 fallback이고, 여기서 테이블 값으로 덮어쓴다. 인라인 수치는 this._p에.
+    _loadConfig(engine) {
+        const D  = engine.data;
+        const fx = D?.fx;
+        const N  = (k, def) => (fx ? fx.num(k, def) : def);   // 숫자 읽기(없으면 fallback)
+
+        // 1) 모듈 let 상수 덮어쓰기 (사용처 수정 없이 데이터 주도)
+        BG_TRANS_MS   = N('bg.trans_ms',     BG_TRANS_MS);
+        BG_MOTE_RATE  = N('bg.mote_rate',    BG_MOTE_RATE);
+        INTRO_MS      = N('intro.ms',        INTRO_MS);
+        SAND_BAND_MAX = N('sand.band_max',   SAND_BAND_MAX);
+        SAND_GRAIN    = N('sand.grain',      SAND_GRAIN);
+        SAND_SETTLE_MS= N('sand.settle_ms',  SAND_SETTLE_MS);
+        SAND_BUILDUP_MS=N('sand.buildup_ms', SAND_BUILDUP_MS);
+        SAND_FALL_RATE= N('sand.fall_rate',  SAND_FALL_RATE);
+        SAND_GRAVITY  = N('sand.gravity',    SAND_GRAVITY);
+
+        // 2) 배경 순환 = maps.csv cycle_order >= 0 정렬
+        if (D?.maps) {
+            const cyc = D.maps.all()
+                .filter(r => Number(r.cycle_order) >= 0)
+                .sort((a, b) => Number(a.cycle_order) - Number(b.cycle_order))
+                .map(r => r.id);
+            if (cyc.length) BG_LIST = cyc;
+        }
+
+        // 3) 캐릭터 스탯 = characters.csv (이동 속도)
+        const charId = this._player?.type || 'ch01_player';
+        const chRow  = D?.characters?.byId('id', charId);
+        if (chRow && Number.isFinite(Number(chRow.move_speed))) {
+            MOVE_SPEED = Number(chRow.move_speed);
+        }
+
+        // 4) 애니 타이밍 = animations.csv → 상태머신 fps/loop override
+        if (D?.animations && this._player?.asm?.states) {
+            for (const a of D.animations.filter('char_id', charId)) {
+                const st = this._player.asm.states[a.state];
+                if (!st) continue;
+                if (Number.isFinite(Number(a.fps))) st.fps = Number(a.fps);
+                if (a.loop !== '' && a.loop != null) st.loop = /^(1|true|on|yes)$/i.test(a.loop);
+            }
+        }
+
+        // 5) 인라인 수치 → this._p (사용처에서 this._p.* 로 읽음)
+        this._p = {
+            dayPeriod:  N('daynight.period_s',        60),
+            charMin:    N('daynight.char_bright_min', 0.20),
+            rimThresh:  N('rim.fade_threshold',       0.85),
+            rimPeak:    N('rim.peak',                 0.7),
+            rimFloorMul:N('rim.floor_mult',           0.9),
+            rimWidth:   N('rim.width_base',           3),
+            rimDirBase: N('rim.dir_base',             0.3),
+            revBase:    N('reveal.night_base',        0.20),
+            revLumScale:N('reveal.night_lum_scale',   0.15),
+            revBlend:   N('reveal.blend',             0.15),
+            ambMax:     N('light.ambient_max',        0.5),
+            keyMax:     N('light.key_intensity_max',  0.95),
+            vigMax:     N('light.vignette_max',       0.55),
+            glowMax:    N('light.glow_max',           0.95),
+            fogMax:     N('light.fog_max',            0.5),
+        };
     }
 
     // 구름-포그 텍스쳐 로드 → 캔버스로 1회 래스터 (앞/뒤 2겹)
@@ -167,17 +243,21 @@ export default class GolmokGame extends Scene {
         this._bgReady = true;
     }
 
-    // 배경 1장 비동기 로드 (이미 있거나 로딩 중이면 skip)
-    async _ensureBg(name) {
-        if (this._bgCache[name]) return;
+    // 배경 1세트(근경+원경) 비동기 로드 (이미 있거나 로딩 중이면 skip)
+    // 캐시 값 = { near, far } (각 {era}_near.json / {era}_far.json)
+    async _ensureBg(era) {
+        if (this._bgCache[era]) return;
         if (!this._bgLoading) this._bgLoading = {};
-        if (this._bgLoading[name]) return;
-        this._bgLoading[name] = true;
+        if (this._bgLoading[era]) return;
+        this._bgLoading[era] = true;
         try {
-            const r = await fetch(`./pixels/objects/${name}.json`, { cache: 'no-store' });
-            if (r.ok) this._bgCache[name] = await r.json();
-        } catch (e) { console.warn('[golmok] bg load fail:', name, e); }
-        delete this._bgLoading[name];
+            const [near, far] = await Promise.all([
+                fetch(`./pixels/objects/${era}_near.json`, { cache: 'no-store' }).then(r => r.ok ? r.json() : null),
+                fetch(`./pixels/objects/${era}_far.json`,  { cache: 'no-store' }).then(r => r.ok ? r.json() : null),
+            ]);
+            if (near && far) this._bgCache[era] = { near, far };
+        } catch (e) { console.warn('[golmok] bg load fail:', era, e); }
+        delete this._bgLoading[era];
     }
 
     // 현재+다음만 캐시에 유지하고 나머지(이전 등) 해제. 다음은 미리 로드.
@@ -190,33 +270,41 @@ export default class GolmokGame extends Scene {
         this._ensureBg(BG_LIST[(curIdx + 1) % n]);             // 다음 배경 미리 로드
     }
 
-    _swapBg(engine, name) {
-        const d = this._bgCache[name];
+    _swapBg(engine, era) {
+        const d = this._bgCache[era];
         if (!d) return;
-        // 이전 배경의 오브젝트 전부 해제 (bg_main, player 제외) — 메모리 정리
+        // 이전 배경 오브젝트 해제 (근경 bg_main, 원경 bg_far, player 제외)
         for (const id of [...engine.entities._entities.keys()]) {
-            if (id !== 'bg_main' && id !== 'player') engine.entities.remove(id);
+            if (id !== 'bg_main' && id !== 'bg_far' && id !== 'player') engine.entities.remove(id);
         }
+        // 근경(near) → L1 bg_main
         engine.entities.remove('bg_main');
-        const ent = engine.entities.add('bg_main', {
-            x: 0, y: 0, pw: d.width, ph: d.height,
-            layer: 1, visible: true,
-            _scanline: d.scanline, _palette: d.palette,
+        const near = engine.entities.add('bg_main', {
+            x: 0, y: 0, pw: d.near.width, ph: d.near.height,
+            layer: 1, visible: true, _scanline: d.near.scanline, _palette: d.near.palette,
         });
-        if (ent) { ent.type = name; ent._asset = name; ent._assetCategory = 'objects'; }
+        if (near) { near.type = `${era}_near`; near._asset = `${era}_near`; near._assetCategory = 'objects'; }
+        // 원경(far) → L0 bg_far
+        engine.entities.remove('bg_far');
+        const far = engine.entities.add('bg_far', {
+            x: 0, y: 0, pw: d.far.width, ph: d.far.height,
+            layer: 0, visible: true, _scanline: d.far.scanline, _palette: d.far.palette,
+        });
+        if (far) { far.type = `${era}_far`; far._asset = `${era}_far`; far._assetCategory = 'objects'; }
         this._bgTone = null;   // 배경 바뀌면 톤 재샘플 → 림/조명 자동 매칭
     }
 
-    // 배경(L1)의 밝은 영역 평균색 = 대표 톤. FX 톤(림 floor·key광)을 배경마다 자동 매칭하는 기준.
+    // 원경(L0)의 밝은 영역 평균색 = 대표 톤. FX 톤(림 floor·key광)을 배경마다 자동 매칭하는 기준.
+    // (근경 L1은 검은 실루엣이라 톤 샘플에 부적합 → 색이 있는 원경 L0을 샘플)
     _sampleBgTone(engine) {
-        const L1 = engine.layers.getCanvas(1);
-        if (!L1 || !L1.width) return;
+        const L0 = engine.layers.getCanvas(0);
+        if (!L0 || !L0.width) return;
         try {
-            // 전체 레이어(4320×960)를 읽으면 readback 11ms+ → 배경 전환 시 프레임 드랍.
+            // 전체 레이어를 읽으면 readback 비용↑ → 배경 전환 시 프레임 드랍.
             // 대표 영역만 읽는다: 폭은 뷰포트 2배까지, 높이는 상단 65%(조명 받는 하늘/건물).
-            const sw = Math.min(L1.width, (engine.gameWidth || 540) * 2);
-            const sh = Math.min(L1.height, Math.round(L1.height * 0.65));
-            const d = L1.getContext('2d').getImageData(0, 0, sw, sh).data;
+            const sw = Math.min(L0.width, (engine.gameWidth || 540) * 2);
+            const sh = Math.min(L0.height, Math.round(L0.height * 0.65));
+            const d = L0.getContext('2d').getImageData(0, 0, sw, sh).data;
             let r = 0, g = 0, b = 0, n = 0;
             for (let i = 0; i < d.length; i += 64) {     // 듬성 샘플(16px 간격)
                 if (d[i + 3] < 16) continue;
@@ -291,12 +379,12 @@ export default class GolmokGame extends Scene {
         // ── 낮↔밤 60초 사이클 ──────────────────────────────────────
         // 60초 주기로 낮(k=0)↔밤(k=1) 부드럽게 순환 (cosine ease). 시작=낮 → 30s 밤 → 60s 낮
         this._dayT += dtSec;
-        const k = 0.5 - 0.5 * Math.cos(this._dayT * (Math.PI * 2 / 60));
+        const k = 0.5 - 0.5 * Math.cos(this._dayT * (Math.PI * 2 / this._p.dayPeriod));
         this._fxK = k;
 
-        // 림 = 캐릭터 색상 곡선과 분리. 캐릭터 밝기 85%부터 약하게 페이드인(더 빨리), 어두울수록 강해짐.
-        const charBright = 1 - (1 - 0.20) * k;                          // 낮 1.0 → 밤 0.20
-        let rimF = (0.85 - charBright) / (0.85 - 0.20);                  // 밝기 85%부터 페이드인 (해질녘 k≈0.19부터)
+        // 림 = 캐릭터 색상 곡선과 분리. 캐릭터 밝기 rimThresh부터 약하게 페이드인, 어두울수록 강해짐. (값: fx_params.csv)
+        const charBright = 1 - (1 - this._p.charMin) * k;               // 낮 1.0 → 밤 charMin
+        let rimF = (this._p.rimThresh - charBright) / (this._p.rimThresh - this._p.charMin);
         rimF = rimF < 0 ? 0 : rimF > 1 ? 1 : rimF;
         this._rimF = rimF;   // 게임측 _renderCharRim 두께/세기에 사용 (엔진 rim은 비활성)
         for (const f of this._fog) f.x += f.speed * dtSec;               // 안개 드리프트
@@ -308,12 +396,12 @@ export default class GolmokGame extends Scene {
         const mx = Math.max(bt.r, bt.g, bt.b, 1);
         const ntr = bt.r / mx * 235, ntg = bt.g / mx * 235, ntb = bt.b / mx * 235;  // 밤 key광 = 배경색(밝게 정규화)
         // 어둠색 = 배경색의 어두운 버전(그림자도 배경 톤 띰)
-        engine.lighting.setAmbient(0.5 * k, '#' + hx(bt.r * 0.12 + 6) + hx(bt.g * 0.13 + 8) + hx(bt.b * 0.16 + 16));
+        engine.lighting.setAmbient(this._p.ambMax * k, '#' + hx(bt.r * 0.12 + 6) + hx(bt.g * 0.13 + 8) + hx(bt.b * 0.16 + 16));
         const lr = 185 + (ntr - 185) * k, lg = 215 + (ntg - 215) * k, lb = 255 + (ntb - 255) * k;  // 낮 쿨 → 밤 배경색
-        engine.lighting.updateLight('key', { color: '#' + hx(lr) + hx(lg) + hx(lb), intensity: 0.95 * k });
-        engine.vignette.setStrength(0.55 * k);                           // 비네트 0↔0.55
-        engine.glow._bloomStrength = 0.95 * k;                           // 글로우 0↔0.95
-        engine.fog._layerFogOpts.maxOpacity = 0.5 * k;                   // 안개 0↔0.5
+        engine.lighting.updateLight('key', { color: '#' + hx(lr) + hx(lg) + hx(lb), intensity: this._p.keyMax * k });
+        engine.vignette.setStrength(this._p.vigMax * k);                 // 비네트 0↔max
+        engine.glow._bloomStrength = this._p.glowMax * k;                // 글로우 0↔max
+        engine.fog._layerFogOpts.maxOpacity = this._p.fogMax * k;        // 안개 0↔max
         engine.fog._gradCache = null;
 
         // ── IDLE: 발밑 그림자 누적용 시간만 추적 (픽셀 낙하 효과는 제거) ──
@@ -745,9 +833,9 @@ export default class GolmokGame extends Scene {
         if (count > 0) { bgR /= count; bgG /= count; bgB /= count; avgLum /= count; }
         const cd = l2img.data;
         const k = this._fxK ?? 1.0;
-        const nightReveal = 0.20 + 0.15 * Math.min(1, avgLum * 1.6);   // 밤 20%(어두운배경)~35%(밝은배경)
+        const nightReveal = this._p.revBase + this._p.revLumScale * Math.min(1, avgLum * 1.6);  // 밤 리빌(배경 밝기 비례) — fx_params.csv
         const reveal = 1 - (1 - nightReveal) * k;                       // 낮→1.0, 밤→nightReveal
-        const blendFactor = 0.15 * k;                                   // 밤에 배경색 15% 융합
+        const blendFactor = this._p.revBlend * k;                       // 밤에 배경색 융합 비율
         for (let ly = 0; ly < rh; ly++) {
             for (let lx = 0; lx < rw; lx++) {
                 const ci = (ly * rw + lx) << 2;
@@ -769,12 +857,13 @@ export default class GolmokGame extends Scene {
     // (reveal이 l2img RGB를 수정하지만 rim은 알파만 읽으므로 공유 안전)
     _renderCharRim(ctx, reg) {
         if (!reg) return;
-        const N = 3 + Math.round(this._rimF ?? 0);   // rim 폭 낮3 → 밤4
-        const PEAK = 0.7 * (this._rimF ?? 0);         // 캐릭터 밝기<60%부터 페이드인 (가시성↑)
+        const p = this._p;                            // 림 수치 = fx_params.csv
+        const N = (p.rimWidth | 0) + Math.round(this._rimF ?? 0);   // rim 폭 (밤일수록 +1)
+        const PEAK = p.rimPeak * (this._rimF ?? 0);   // 림 최대 세기
         if (PEAK <= 0.02) return;
         const Lx = 0.7071, Ly = -0.7071;              // 우상단 광원(역광)
         const bt = this._bgTone || { r: 164, g: 127, b: 91 };
-        const flR = bt.r * 0.9, flG = bt.g * 0.9, flB = bt.b * 0.9;      // floor = 배경톤 (어두운 배경 앞에서도 림 보이게)
+        const flR = bt.r * p.rimFloorMul, flG = bt.g * p.rimFloorMul, flB = bt.b * p.rimFloorMul;  // floor = 배경톤 (어두운 배경 앞에서도 보이게)
         const { x0, y0, rw, rh, lw, l1d, l2img } = reg;
         const l2d = l2img.data;
         const A = (lx, ly) => (lx < 0 || lx >= rw || ly < 0 || ly >= rh) ? 0 : l2d[((ly * rw + lx) << 2) + 3];
@@ -791,7 +880,7 @@ export default class GolmokGame extends Scene {
                 const ox = -gx, oy = -gy; const ln = Math.hypot(ox, oy); let dir = 0;
                 if (ln > 0) dir = Math.max(0, (ox/ln)*Lx + (oy/ln)*Ly);
                 const falloff = 1 - (d - 1) / N;
-                const a = PEAK * (0.35 + 0.65 * falloff) * (0.3 + 0.7 * dir); // 빛 방향(우상단) 가중 (완화 — 가시성↑)
+                const a = PEAK * (0.35 + 0.65 * falloff) * (p.rimDirBase + (1 - p.rimDirBase) * dir); // 빛 방향(우상단) 가중
                 if (a <= 0.03) continue;
                 const bi = (ly * lw + Math.min(lx, lw - 1)) << 2;
                 const r0 = Math.min(255, Math.max(l1d[bi]   * 1.8, flR)) | 0;   // env(배경색×1.8) + floor

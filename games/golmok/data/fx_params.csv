@@ -1,0 +1,43 @@
+# golmok 시그니처 FX 튜닝 테이블 — 파라미터 1개 = 1행
+# key,value,min,max,desc.  min/max 는 에디터 슬라이더 범위용(코드는 value만 읽음).
+# 엔진은 로직, 이 표는 값. 툴에서 이 표만 바꾸면 시그니처 룩이 바뀜.
+key,value,min,max,desc
+
+# ── 낮↔밤 사이클 ──
+daynight.period_s,60,10,300,낮↔밤 한 주기 시간(초)
+daynight.char_bright_min,0.20,0,1,밤 최저 캐릭터 밝기(0=완전어둠)
+
+# ── 림 라이트 (게임측 _renderCharRim) ──
+rim.fade_threshold,0.85,0.2,1,캐릭터 밝기 이 값 이하부터 림 페이드인 시작
+rim.peak,0.7,0,1.5,림 최대 세기
+rim.floor_mult,0.9,0.3,1.2,어두운 배경 앞 최소 림색 = 배경톤 x 이값
+rim.width_base,3,1,6,림 두께 기본 px(밤에 +1)
+rim.dir_base,0.3,0,1,방향 무관 기본 세기(0=방향에만, 1=전방향 균일)
+
+# ── 캐릭터 색 리빌 (_renderCharReveal) ──
+reveal.night_base,0.20,0,1,밤 어두운배경 기준 리빌 하한
+reveal.night_lum_scale,0.15,0,0.5,밝은배경일수록 리빌 상향폭
+reveal.blend,0.15,0,0.6,밤에 캐릭터에 배경색 융합 비율
+
+# ── 전역 조명 최대치 (낮0 ↔ 밤 최대) ──
+light.ambient_max,0.5,0,1,어둠(ambient) 최대
+light.key_intensity_max,0.95,0,1.5,key광 최대 세기
+light.vignette_max,0.55,0,1,비네트 최대
+light.glow_max,0.95,0,2,글로우 블룸 최대
+light.fog_max,0.5,0,1,안개 최대 불투명
+
+# ── 배경 순환/전환 ──
+bg.interval_ms,10000,1000,60000,배경 자동 전환 간격(ms, 현재 끝-도달 방식)
+bg.trans_ms,2000,300,5000,sandburst 전환 시간(ms)
+bg.mote_rate,32,0,200,배경에서 피어오르는 모래알/초
+
+# ── 게임 진입 인트로 ──
+intro.ms,2200,500,6000,진입 연출(배경 모래로딩+캐릭터 모이기) 시간
+
+# ── 모래 스크롤(좌우 이동 FX) ──
+sand.band_max,0.022,0,0.1,화면 끝 모래 띠 최대 폭(화면비)
+sand.grain,4,1,12,모래 입자 크기 px
+sand.settle_ms,280,50,1000,멈출 때 굳는 시간
+sand.buildup_ms,2000,200,5000,걷기 시작→최대 띠까지 빌드업
+sand.fall_rate,70,0,300,초당 떨어지는 디지털 픽셀 수
+sand.gravity,130,0,500,모래 낙하 중력 px/s^2
