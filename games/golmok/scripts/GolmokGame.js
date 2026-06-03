@@ -766,11 +766,11 @@ export default class GolmokGame extends Scene {
     _renderCharRim(ctx, reg) {
         if (!reg) return;
         const N = 3 + Math.round(this._rimF ?? 0);   // rim 폭 낮3 → 밤4
-        const PEAK = 0.55 * (this._rimF ?? 0);        // 캐릭터 밝기<60%부터 페이드인
+        const PEAK = 0.7 * (this._rimF ?? 0);         // 캐릭터 밝기<60%부터 페이드인 (가시성↑)
         if (PEAK <= 0.02) return;
         const Lx = 0.7071, Ly = -0.7071;              // 우상단 광원(역광)
         const bt = this._bgTone || { r: 164, g: 127, b: 91 };
-        const flR = bt.r * 0.55, flG = bt.g * 0.55, flB = bt.b * 0.55;   // floor = 배경톤 어두운 버전
+        const flR = bt.r * 0.9, flG = bt.g * 0.9, flB = bt.b * 0.9;      // floor = 배경톤 (어두운 배경 앞에서도 림 보이게)
         const { x0, y0, rw, rh, lw, l1d, l2img } = reg;
         const l2d = l2img.data;
         const A = (lx, ly) => (lx < 0 || lx >= rw || ly < 0 || ly >= rh) ? 0 : l2d[((ly * rw + lx) << 2) + 3];
@@ -787,7 +787,7 @@ export default class GolmokGame extends Scene {
                 const ox = -gx, oy = -gy; const ln = Math.hypot(ox, oy); let dir = 0;
                 if (ln > 0) dir = Math.max(0, (ox/ln)*Lx + (oy/ln)*Ly);
                 const falloff = 1 - (d - 1) / N;
-                const a = PEAK * (0.35 + 0.65 * falloff) * (0.08 + 0.92 * dir * dir); // 빛 방향 강조
+                const a = PEAK * (0.35 + 0.65 * falloff) * (0.3 + 0.7 * dir); // 빛 방향(우상단) 가중 (완화 — 가시성↑)
                 if (a <= 0.03) continue;
                 const bi = (ly * lw + Math.min(lx, lw - 1)) << 2;
                 const r0 = Math.min(255, Math.max(l1d[bi]   * 1.8, flR)) | 0;   // env(배경색×1.8) + floor
