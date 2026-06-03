@@ -80,11 +80,52 @@
 ---
 
 ## 캐릭터 / 이동 / 씬 (참고)
-- 캐릭터: `ch01_player_black.json` (**원본 색 ×20% 밝기** — 고유색이 은은히 비치는 어두운 톤), idle 48@5fps + walk 16@12fps, 149×259
-  - 팔레트 = `ch01_player.json` 팔레트 × 0.20 (재생성 시 동일 방식)
-  - 컬러 원본 보존: `ch01_player.json` (낮용, 100%)
-- 이동: `MOVE_SPEED = 180` px/s (1.5배↑), walk **18fps**(속도 동기화)/idle 5fps, `flipX = dx > 0`
-- 씬: `main_portrait` 540×960, world 1706×960, 배경 `1960_1`(1706×960, 4장 cycle 후보 1960/1970/1980/2020)
+- 캐릭터: 씬은 **풀컬러 `ch01_player.json`** 사용 (어둡게는 런타임 `_renderCharReveal`이 처리). idle 48@5fps + walk 16@18fps, 149×259
+  - `ch01_player_black.json`(원본×20%)은 현재 미사용(보관용).
+- 이동: `MOVE_SPEED = 180` px/s, walk **18fps**(속도 동기화)/idle 5fps, `flipX = dx > 0`
+- 씬: `main_portrait` 540×960, world 1706×960, 배경 4장 순환 `1960/1970/1980/2020`(1706×960)
 
 ## 렌더 순서 (engine/SandEngine.js)
 Glow → Fog → Lighting → **Rim(백라이트)** → Vignette → 씬 오버레이 → 씬 postRender(모래) → FX
+
+## 최적화 완료 (2026-06-03)
+- `_readCharRegion()`: 캐릭터 영역 L1+L2를 **1회만** getImageData → `_renderCharTrail`·`_renderCharReveal`·`_renderCharRim`이 **공유** (호출 4~5회 → 2회).
+- 트레일: 전체화면 → **캐릭터 bbox만** 읽음.
+- 죽은 코드 제거: `_renderCharEdge`, `_spawnIdleParticles`, `_updateIdleParticles`, 비활성 엔진 rim의 no-op 호출.
+
+## 캐시 관리 (2026-06-03)
+- 배경 **[현재+다음]만 캐시 보유** (`_manageCache`) — 4장 전부 X. 배경 전환 시 이전 캐시 해제 + 다음 미리 로드(`_ensureBg`).
+- 배경 전환 시 **오브젝트 전부 해제**(`_swapBg`, bg_main·player 제외).
+
+## 게임 진입 인트로 연출 (2026-06-03)
+- `onEnter`에서 `this._intro={t:0}`, `INTRO_MS=1500`. 진행 중 이동 정지.
+- `_renderIntro`: **배경 = 시그니처 모래-로딩 픽셀**(위→아래 생성, 0~0.7) + **캐릭터 = 픽셀이 사방에서 모여 형성**(`_renderCharGather`, 0.4~1.0, 모이는 동안 신비로운 푸른빛 → 정착 시 실제색).
+
+---
+
+# 🔜 나중에 작업 (문서화만 — 구현 보류)
+
+## TODO-A. 하드코딩 값 → 파라미터화 (조절 가능하게)
+목표: 아래 흩어진 튜닝값을 **`GolmokGame.js` 상단 `FX` 설정 객체 하나**로 모으고, 최종적으로 **에디터 인스펙터 "효과" 패널에 스크롤 + 라이브 슬라이더**로 노출. (게임이 에디터 iframe에서 돌아 game↔editor 값 연결 필요 → 작업량 큼)
+
+현재 하드코딩 위치/값 (engine은 게임이 호출만):
+| 분류 | 값 | 위치 |
+|---|---|---|
+| 이동속도 | `MOVE_SPEED=180` | 상수 |
+| 낮밤 주기 | `60`초 (`cos(dayT*2π/60)`) | onUpdate |
+| 캐릭터 reveal | 밤 `0.20 + 0.15*avgLum*1.6`, 배경융합 `0.15*k` | `_renderCharReveal` |
+| rim 임계 | `charBright=1-0.8k`, 시작 `0.60`, 최대 `0.20` | onUpdate rimF |
+| rim | PEAK `0.55*rimF`, 두께 `3+round(rimF)`(3~4), env boost `1.8`, floor `bgTone*0.55`, 방향 `0.08+0.92*dir²`, 광원 `top_right` | `_renderCharRim` |
+| 라이팅 | ambient `0.5*k`, key radius `340`/intensity `0.95*k`, 밤톤 정규화 `235` | onUpdate |
+| 글로우 | `bloomStrength=0.95*k` | onUpdate |
+| 비네트 | `0.55*k` | onUpdate |
+| 배경톤 샘플 | lum임계 `90`, ambient계수 `0.12/0.13/0.16`, floor `0.55` | `_sampleBgTone`/onUpdate |
+| SandScroll 띠 | `SAND_BAND_MAX=0.022`, 검정 침식 | 상수/`_sandBand` |
+| 트레일 | 가산, `v=14+lum*0.16` | `_renderCharTrail` |
+| 배경순환 | `BG_LIST`, `BG_TRANS_MS=2000`, sandburst | 상수/onUpdate |
+
+## TODO-B. 스케일 최적화 — 엔진 FX 패스 (애니 5배·오브젝트 10마리 대비)
+- **병목**: 프레임 수(5배)는 메모리/로딩만 → 압축·프레임 공유로 대응. **렌더 병목은 오브젝트별 매 프레임 `getImageData`**(GPU 스톨) → 10마리에서 불가.
+- **방향**: 시그니처 FX(reveal·rim·env매칭)를 **엔진 시스템**으로 옮겨, layer-2 렌더러의 **CPU 버퍼(`imageData.data`, 읽기비용 0)**를 **레이어 전체 1회 패스**로 처리 → 오브젝트 수와 무관(N마리 ~동일 비용). (엔진 `RimLightSystem`이 이미 버퍼 방식 = 모델)
+- 트레일은 주요 오브젝트만, 같은 종류 오브젝트는 프레임 데이터 1벌 공유.
+- 이 작업과 **TODO-A(값을 엔진 config로)**를 같이 하면 파라미터화+스케일+시그니처 엔진화가 한 번에 정리됨.
