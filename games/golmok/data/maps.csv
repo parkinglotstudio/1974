@@ -1,7 +1,8 @@
 # golmok 맵 테이블 — 배경 1장 = 1행 (근경 {id}_near + 원경 {id}_far 자동 사용)
 # cycle_order: 화면 끝 도달 시 순환 순서 (0부터, -1=순환 제외). rim_color: 비우면 배경색에서 자동 추출.
 # tool: 에디터에서 이 표를 편집하면 맵 구성/순환이 바뀜.
-id,asset,category,world_w,world_h,cycle_order,rim_color,notes
-1960_1,1960_1,objects,1706,960,0,,1960년대 골목
-2020_1,2020_1,objects,1706,960,1,,2020년대 골목
-19870_2,19870_2,objects,941,1672,-1,,가로 모드용 (순환 제외 cycle_order=-1)
+# near_rim: 맵별 근경 역광 림 배율 (원경이 밝은 맵은 낮게 — 네온 윤곽 방지)
+id,asset,category,world_w,world_h,cycle_order,near_rim,notes
+1960_1,1960_1,objects,1706,960,0,1.0,1960년대 골목 (어두운 원경 → 림 강)
+2020_1,2020_1,objects,1706,960,1,0.2,2020년대 골목 (밝은 야경 → 림 약)
+19870_2,19870_2,objects,941,1672,-1,1.0,가로 모드용 (순환 제외)

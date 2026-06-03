@@ -169,36 +169,42 @@ export default class GlowSystem {
             if (!layer || !layer.static || !layer.visible) continue;
             if (!layer._bloomReady) { this._buildBloom(layer); layer._bloomReady = true; }
             if (!layer._bloomBuf) continue;
-            const maxSrcX = Math.max(0, layer._bloomBuf.width - W);
-            const srcX = Math.min(maxSrcX, Math.max(0, Math.floor(cameraX * layer.parallax)));
+            // 블룸 버퍼는 1/DS 저해상도 → 슬라이스 좌표·폭도 1/DS, 화면(W×H)으로 업스케일
+            const DS = layer._bloomDS || 1;
+            const sliceW = W / DS, sliceH = H / DS;
+            const maxSrcX = Math.max(0, layer._bloomBuf.width - sliceW);
+            const srcX = Math.min(maxSrcX, Math.max(0, Math.floor(cameraX * layer.parallax / DS)));
             mainCtx.save();
             mainCtx.globalCompositeOperation = 'lighter';   // 가산 → 밝게 번짐
             mainCtx.globalAlpha = this._bloomStrength;
-            mainCtx.drawImage(layer._bloomBuf, srcX, 0, W, H, 0, 0, W, H);
+            mainCtx.drawImage(layer._bloomBuf, srcX, 0, sliceW, sliceH, 0, 0, W, H);
             mainCtx.restore();
         }
     }
 
-    // 밝기 임계 통과(bright-pass) + 블러 → 블룸 버퍼 (1회)
+    // 밝기 임계 통과(bright-pass) + 블러 → 블룸 버퍼 (1회).
+    // 저해상도(1/DS)로 빌드 — 블룸은 흐려서 화질 영향 없고 빌드 비용 ~DS² 배 절감
+    // (큰 배경 레이어 2160~4320폭에서 ~700ms → ~80ms, 맵 전환 프리징 해소).
     _buildBloom(layer) {
         const src = layer.canvas, LW = src.width, LH = src.height;
+        const DS = 3;
+        const sw = Math.max(1, Math.ceil(LW / DS)), sh = Math.max(1, Math.ceil(LH / DS));
         if (!this._bloomTmp) this._bloomTmp = document.createElement('canvas');
-        const tmp = this._bloomTmp; tmp.width = LW; tmp.height = LH;
+        const tmp = this._bloomTmp; tmp.width = sw; tmp.height = sh;
         const tctx = tmp.getContext('2d');
-        tctx.clearRect(0, 0, LW, LH);
-        tctx.drawImage(src, 0, 0);
-        const id = tctx.getImageData(0, 0, LW, LH), d = id.data, TH = this._bloomThreshold;
+        tctx.clearRect(0, 0, sw, sh);
+        tctx.drawImage(src, 0, 0, LW, LH, 0, 0, sw, sh);   // 다운스케일
+        const id = tctx.getImageData(0, 0, sw, sh), d = id.data, TH = this._bloomThreshold;
         for (let i = 0; i < d.length; i += 4) {
             const r = d[i], g = d[i + 1], b = d[i + 2];
-            // value(밝기 최댓값) 기준 → 채도 높은 빨강/핑크/파랑 네온도 통과
+            // value(brightest channel) 기준
             const v = r > g ? (r > b ? r : b) : (g > b ? g : b);
             if (v < TH || d[i + 3] < 10) {
                 d[i] = 0; d[i + 1] = 0; d[i + 2] = 0; d[i + 3] = 0;
             } else {
-                // 채도 높을수록 더 세게 부스트 → 색 네온도 흰색만큼 빛남
                 const mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
-                const sat = v > 0 ? (v - mn) / v : 0;     // 0(무채색)~1(순색)
-                const boost = 1.4 + sat * 1.2;            // 흰색 ×1.4 ~ 순색 네온 ×2.6
+                const sat = v > 0 ? (v - mn) / v : 0;
+                const boost = 1.4 + sat * 1.2;
                 d[i]     = Math.min(255, r * boost);
                 d[i + 1] = Math.min(255, g * boost);
                 d[i + 2] = Math.min(255, b * boost);
@@ -206,26 +212,21 @@ export default class GlowSystem {
         }
         tctx.putImageData(id, 0, 0);
         if (!layer._bloomBuf) layer._bloomBuf = document.createElement('canvas');
-        layer._bloomBuf.width = LW; layer._bloomBuf.height = LH;
+        layer._bloomBuf.width = sw; layer._bloomBuf.height = sh;
         const g = layer._bloomBuf.getContext('2d');
-        g.clearRect(0, 0, LW, LH);
-        g.filter = `blur(${this._bloomBlur}px)`;    // 한 번만 블러 → 매 프레임은 plain draw
+        g.clearRect(0, 0, sw, sh);
+        g.filter = `blur(${Math.max(1, this._bloomBlur / DS)}px)`;
         g.drawImage(tmp, 0, 0);
         g.filter = 'none';
+        layer._bloomDS = DS;   // 렌더 시 업스케일 배율
     }
 
     // ── 내부 ─────────────────────────────────────────────────────────
 
-    /**
-     * EntitySystem의 모든 Layer 2 렌더러에서 emissive 픽셀 좌표 수집.
-     * PixelRenderer.indexMap 을 통해 팔레트 인덱스를 읽음.
-     * @returns {Array<[screenX, screenY, paletteIdx]>}
-     */
     _collectEmissivePixels(entities, cameraX) {
         const result = [];
         const emissiveIndices = new Set(this._emissiveMap.keys());
 
-        // EntitySystem에서 Layer 2 렌더러의 인덱스맵 접근
         if (!entities) return result;
 
         const renderer = entities.getRenderer(2);
@@ -246,16 +247,15 @@ export default class GlowSystem {
         return result;
     }
 
-    /** radial gradient 캐시 (translate 기준 중심 (0,0)) */
     _getGradient(ctx, color) {
         const key = `${this._radius}_${color}`;
         if (this._gradientCache.has(key)) return this._gradientCache.get(key);
 
         const r    = this._radius;
         const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-        grad.addColorStop(0,   color + 'ff');   // 중심: 불투명
+        grad.addColorStop(0,   color + 'ff');
         grad.addColorStop(0.4, color + 'aa');
-        grad.addColorStop(1,   color + '00');   // 가장자리: 투명
+        grad.addColorStop(1,   color + '00');
         this._gradientCache.set(key, grad);
         return grad;
     }

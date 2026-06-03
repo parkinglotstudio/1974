@@ -14,6 +14,7 @@ const BG_INTERVAL = 10000;  // 10초마다 다음 배경
 let   BG_TRANS_MS = 2000;   // ← fx_params.csv bg.trans_ms
 const CYCLE_ENABLED = true;  // 화면 끝 도달 시 다음 배경으로 sandburst 전환 ON
 const DIGITAL_ENABLED = false; // 디지털 회로/메시 오버레이 ON/OFF (저장만, 지금은 OFF)
+const SHOW_FPS = true;         // 우상단 FPS 표시 (디버그 — 배경 전환 프레임 드랍 확인용)
 const FOG_ENABLED = false;     // 안개(절차적 + 드리프트 구름) ON/OFF (지금은 OFF)
 
 // 전환 효과를 차례대로 순환 — 새로 만든 모래 생성형 3종 테스트
@@ -83,7 +84,8 @@ export default class GolmokGame extends Scene {
         this._p = {
             dayPeriod: 60, charMin: 0.20, rimThresh: 0.85, rimPeak: 0.7, rimFloorMul: 0.9,
             rimWidth: 3, rimDirBase: 0.3, revBase: 0.20, revLumScale: 0.15, revBlend: 0.15,
-            ambMax: 0.5, keyMax: 0.95, vigMax: 0.55, glowMax: 0.95, fogMax: 0.5,
+            ambMax: 0.5, keyMax: 0.95, vigMax: 0.55, glowMax: 0.5, fogMax: 0.5,
+            bloomThreshold: 205, nearRimBase: 0.6, nearRimNight: 2.0,
         };
 
         // 디지털 오버레이 — 회로/메시 조각이 불규칙하게 일어났다 사라짐
@@ -96,10 +98,12 @@ export default class GolmokGame extends Scene {
         this._worldW = engine.bounds.worldWidth || WORLD_WIDTH;
 
         // 엔진 FX 전부 ON (테스트)
-        engine.lighting.setAmbient(0.2, '#0a1428');                  // 살짝만 어둡게 (밝은 쪽)
-        engine.lighting.clearLights();
-        engine.lighting.addLight({ id: 'key', x: 270, y: 300, radius: 340, color: '#ffd060', intensity: 0.95, fixed: true });
-        engine.glow.enable();                                        // 발광(인덱스10) — 해당 픽셀 있을 때
+        engine.lighting.setAmbient(0.0);                             // 시작=낮(어둠 없음). onUpdate가 k로 조절
+        engine.lighting.clearLights();                               // key 라이트 없음 — 밤은 ambient(어둠)+glow(불빛)의 콘트라스트로 표현
+        engine.glow.enable();                                        // 배경 밝은 픽셀(도시 불빛) 블룸용
+        // ⚠ 캐릭터(L2) 발광 OFF: ch01_player 팔레트 idx10(#3c3d40 옷색)이 엔진 예약 발광 인덱스와
+        //   충돌해 밤에 노란 halo가 생김. 캐릭터엔 발광 픽셀이 없으니 idx10 발광을 제거한다.
+        engine.glow.removeEmissiveIndex(10);
         // 캐릭터 rim은 게임측 _renderCharRim 단일 사용 (방향 명확 + 픽셀별 배경색 env + floor).
         // 엔진 rim은 lightDir 반대쪽 엣지에도 그려 게임 rim과 합쳐지면 방향이 뭉개지므로 OFF.
         engine.rim.disable();
@@ -198,9 +202,20 @@ export default class GolmokGame extends Scene {
             ambMax:     N('light.ambient_max',        0.5),
             keyMax:     N('light.key_intensity_max',  0.95),
             vigMax:     N('light.vignette_max',       0.55),
-            glowMax:    N('light.glow_max',           0.95),
+            glowMax:    N('light.glow_max',           0.5),
             fogMax:     N('light.fog_max',            0.5),
+            bloomThreshold: N('light.bloom_threshold', 205),
+            nearRimBase:  N('nearrim.base',           0.6),
+            nearRimNight: N('nearrim.night',          2.0),
         };
+        // 블룸 임계 적용 (밝은 불빛만 번지게 → 밝은 원경서 과블룸 방지). 캐시 재빌드 필요.
+        engine.glow._bloomThreshold = this._p.bloomThreshold;
+        for (const L of engine.layers.layers) L._bloomReady = false;
+
+        // 6) 맵별 근경 역광 림 배율 = maps.csv near_rim (밝은 맵은 낮게)
+        this._mapRim = {};
+        if (D?.maps) for (const r of D.maps.all()) this._mapRim[r.id] = (r.near_rim === '' || r.near_rim == null) ? 1 : Number(r.near_rim);
+        this._curRimMul = this._mapRim[BG_LIST[this._bgIdx]] ?? 1;
     }
 
     // 구름-포그 텍스쳐 로드 → 캔버스로 1회 래스터 (앞/뒤 2겹)
@@ -292,6 +307,9 @@ export default class GolmokGame extends Scene {
         });
         if (far) { far.type = `${era}_far`; far._asset = `${era}_far`; far._assetCategory = 'objects'; }
         this._bgTone = null;   // 배경 바뀌면 톤 재샘플 → 림/조명 자동 매칭
+        this._curRimMul = this._mapRim?.[era] ?? 1;   // 맵별 근경 림 배율
+        // 원경(L0)만 블룸 재빌드 — 근경(L1)은 검은 실루엣이라 블룸 불필요(4320폭 재빌드 낭비 방지)
+        if (engine.layers.layers[0]) engine.layers.layers[0]._bloomReady = false;
     }
 
     // 원경(L0)의 밝은 영역 평균색 = 대표 톤. FX 톤(림 floor·key광)을 배경마다 자동 매칭하는 기준.
@@ -390,15 +408,12 @@ export default class GolmokGame extends Scene {
         for (const f of this._fog) f.x += f.speed * dtSec;               // 안개 드리프트
         if (DIGITAL_ENABLED) this._updateDigital(dt);                    // 디지털 패턴 생성/소멸 (현재 OFF)
         const hx = n => Math.max(0, Math.min(255, n | 0)).toString(16).padStart(2, '0');
-        // ── 배경마다 FX 톤 자동 매칭: 배경 대표색에서 밤 key광·어둠색 도출 ──
+        // ── 밤 콘트라스트: 어두운 데 더 어둡게(ambient multiply) + 밝은 데 더 밝게(glow) ──
+        // 배경 대표색에서 '깊은 어둠색' 도출(그림자가 배경 톤을 띰). key 라이트는 제거(중앙 wash 방지).
         if (!this._bgTone) this._sampleBgTone(engine);
         const bt = this._bgTone || { r: 255, g: 200, b: 95 };
-        const mx = Math.max(bt.r, bt.g, bt.b, 1);
-        const ntr = bt.r / mx * 235, ntg = bt.g / mx * 235, ntb = bt.b / mx * 235;  // 밤 key광 = 배경색(밝게 정규화)
-        // 어둠색 = 배경색의 어두운 버전(그림자도 배경 톤 띰)
+        // 어둠색 = 배경색의 어두운 버전 → multiply로 어두운 영역을 더 가라앉힘
         engine.lighting.setAmbient(this._p.ambMax * k, '#' + hx(bt.r * 0.12 + 6) + hx(bt.g * 0.13 + 8) + hx(bt.b * 0.16 + 16));
-        const lr = 185 + (ntr - 185) * k, lg = 215 + (ntg - 215) * k, lb = 255 + (ntb - 255) * k;  // 낮 쿨 → 밤 배경색
-        engine.lighting.updateLight('key', { color: '#' + hx(lr) + hx(lg) + hx(lb), intensity: this._p.keyMax * k });
         engine.vignette.setStrength(this._p.vigMax * k);                 // 비네트 0↔max
         engine.glow._bloomStrength = this._p.glowMax * k;                // 글로우 0↔max
         engine.fog._layerFogOpts.maxOpacity = this._p.fogMax * k;        // 안개 0↔max
@@ -497,9 +512,11 @@ export default class GolmokGame extends Scene {
                 }
                 case 'sandburst': {
                     // 대각 모래 스윕 + 반짝임 — 그림이 모래알로 흩어졌다 모래에서 재조립 (화려)
-                    const G = 3, shown = t < 0.5 ? (1 - t / 0.5) : (t - 0.5) / 0.5;
+                    const G = 4, shown = t < 0.5 ? (1 - t / 0.5) : (t - 0.5) / 0.5;
                     const src = ctx.getImageData(0, 0, W, H), sd = src.data;
-                    const out = ctx.createImageData(W, H), od = out.data;
+                    if (!this._burstOut || this._burstOut.width !== W || this._burstOut.height !== H)
+                        this._burstOut = ctx.createImageData(W, H);   // 버퍼 재사용(매 프레임 2MB 할당 방지)
+                    const out = this._burstOut, od = out.data;
                     const NT = SAND_TONES_RGB.length, tw = (t * 34) | 0;
                     for (let y = 0; y < H; y += G) {
                         for (let x = 0; x < W; x += G) {
@@ -555,6 +572,8 @@ export default class GolmokGame extends Scene {
                 }
             }
             overlay = true;
+            if (SHOW_FPS) this._drawFps(ctx, W);
+            return;   // 전환 중엔 캐릭터 FX·근경림·모래알 스킵 (모래 스윕이 화면을 덮음 → 안 보이고 비용만 큼)
         } else if (SAND_ENABLED && this._sandRamp > 0.01) {
             this._renderSandScroll(ctx, W, H);
             overlay = true;
@@ -565,6 +584,9 @@ export default class GolmokGame extends Scene {
             this._renderIntro(ctx, W, H, this._intro.t);
             return;   // 인트로 중엔 일반 캐릭터/모래알/디지털/포그 스킵
         }
+
+        // 근경 역광 림 — 원경(뒤) 빛이 근경 실루엣 가장자리를 감싸 입체감/공간감 부여
+        this._renderNearRim(ctx, W, H);
 
         // 배경에서 위로 피어오르는 모래알 (캐릭터 뒤 분위기)
         this._drawBgMotes(ctx);
@@ -593,6 +615,31 @@ export default class GolmokGame extends Scene {
 
         // 가장자리 픽셀 깨짐 프레임 — 반듯한 사각 테두리를 픽셀아트답게 침식 (이동 시)
         this._renderEdgeFrame(ctx, W, H);
+
+        // FPS 표시 (우상단, 디버그) — 배경 전환 시 프레임 드랍 확인용
+        if (SHOW_FPS) this._drawFps(ctx, W);
+    }
+
+    // 우상단 작은 FPS 카운터 (EMA 평활)
+    _drawFps(ctx, W) {
+        const now = performance.now();
+        if (this._fpsLast) {
+            const fps = 1000 / Math.max(1, now - this._fpsLast);
+            this._fpsEma = this._fpsEma ? this._fpsEma * 0.85 + fps * 0.15 : fps;
+        }
+        this._fpsLast = now;
+        const v = Math.round(this._fpsEma || 0);
+        ctx.save();
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        const txt = v + ' fps';
+        const tw = ctx.measureText(txt).width;
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(W - tw - 8, 2, tw + 6, 14);
+        ctx.fillStyle = v < 30 ? '#ff6666' : (v < 50 ? '#ffd060' : '#9effa0');   // 낮으면 빨강
+        ctx.fillText(txt, W - 3, 4);
+        ctx.restore();
     }
 
 
@@ -803,21 +850,79 @@ export default class GolmokGame extends Scene {
     // 캐릭터 영역의 L1(배경)·L2(캐릭터) 픽셀을 1회만 읽어 reveal·rim·trail이 공유 (getImageData 호출 절반)
     _readCharRegion(W, H) {
         const e = this.engine; const p = this._player;
-        const L1 = e.layers.getCanvas(1), L2 = e.layers.getCanvas(2);
-        if (!p || !L1 || !L2) return null;
+        // env(림/리빌의 배경색) = 원경(L0). 근경(L1)은 검은 실루엣이라 색이 없음.
+        // → 캐릭터 뒤에 실제로 보이는 색(원경: 노을·도시 불빛)을 픽셀별로 받는다.
+        const Lbg = e.layers.getCanvas(0), L2 = e.layers.getCanvas(2);
+        if (!p || !Lbg || !L2) return null;
         const psx = (p.x - e.cameraX) | 0;
         const x0 = Math.max(0, psx - 2), x1 = Math.min(W, psx + p.pw + 2);
         const y0 = Math.max(0, p.y - 2), y1 = Math.min(H, p.y + p.ph + 2);
         const rw = x1 - x0, rh = y1 - y0;
         if (rw <= 0 || rh <= 0) return null;
-        const parallax = e.layers.get(1)?.parallax ?? 1;
+        const parallax = e.layers.get(0)?.parallax ?? 0.3;   // 원경 패럴랙스
         let bgsx = Math.floor(e.cameraX * parallax) + x0; if (bgsx < 0) bgsx = 0;
-        const lw = Math.max(1, Math.min(rw, L1.width - bgsx));
+        const lw = Math.max(1, Math.min(rw, Lbg.width - bgsx));
         try {
-            const l1d   = L1.getContext('2d').getImageData(bgsx, y0, lw, rh).data;
+            const l1d   = Lbg.getContext('2d').getImageData(bgsx, y0, lw, rh).data;
             const l2img = L2.getContext('2d').getImageData(x0, y0, rw, rh);
             return { x0, y0, rw, rh, lw, l1d, l2img };
         } catch (_) { return null; }
+    }
+
+    // 근경(L1 검은 실루엣) 가장자리에 원경(L0) 빛을 역광으로 입힘 → 평평한 실루엣에 입체감/공간감.
+    // env(뒤 색) = 원경, 대상 = 근경 엣지. 뒤가 밝을수록(불빛·노을) 강하게 빛나고 어두우면 안 빛남.
+    _renderNearRim(ctx, W, H) {
+        const e = this.engine;
+        const L0 = e.layers.getCanvas(0), L1 = e.layers.getCanvas(1);
+        if (!L0 || !L1) return;
+        const p = this._p;
+        const mul = this._curRimMul ?? 1;   // 맵별 배율 (밝은 원경 맵은 낮게)
+        const STR = (p.nearRimBase + (p.nearRimNight - p.nearRimBase) * (this._fxK ?? 0)) * mul; // 낮 약, 밤 강
+        if (STR <= 0.02) return;
+        const px1 = e.layers.get(1)?.parallax ?? 1;
+        const px0 = e.layers.get(0)?.parallax ?? 0.3;
+        const sx1 = Math.min(Math.max(0, Math.floor(e.cameraX * px1)), Math.max(0, L1.width - W));
+        const sx0 = Math.min(Math.max(0, Math.floor(e.cameraX * px0)), Math.max(0, L0.width - W));
+        // ── 절반 해상도로 처리 (getImageData readback 비용 1/4, 부드러운 글로우라 화질 영향 없음) ──
+        const hw = W >> 1, hh = H >> 1;
+        const s1 = this._nrS1 || (this._nrS1 = document.createElement('canvas'));
+        const s0 = this._nrS0 || (this._nrS0 = document.createElement('canvas'));
+        const cv = this._nrCanvas || (this._nrCanvas = document.createElement('canvas'));
+        s1.width = hw; s1.height = hh; s0.width = hw; s0.height = hh; cv.width = hw; cv.height = hh;
+        const c1 = s1.getContext('2d'), c0 = s0.getContext('2d'), nctx = cv.getContext('2d');
+        let nA, fC;
+        try {
+            c1.clearRect(0, 0, hw, hh); c1.drawImage(L1, sx1, 0, W, H, 0, 0, hw, hh);   // 근경 축소
+            c0.clearRect(0, 0, hw, hh); c0.drawImage(L0, sx0, 0, W, H, 0, 0, hw, hh);   // 원경 축소
+            nA = c1.getImageData(0, 0, hw, hh).data;
+            fC = c0.getImageData(0, 0, hw, hh).data;
+        } catch (_) { return; }
+        const out = nctx.createImageData(hw, hh);
+        const od = out.data;
+        const rowB = hw << 2;   // 반해상도에서 R=1 ≈ 풀해상도 R=2
+        for (let y = 0; y < hh; y++) {
+            for (let x = 0; x < hw; x++) {
+                const i = (y * hw + x) << 2;
+                if (nA[i + 3] < 40) continue;                             // 근경 불투명만
+                const l = x > 0 ? nA[i - 4 + 3] : 0;
+                const r = x < hw - 1 ? nA[i + 4 + 3] : 0;
+                const u = y > 0 ? nA[i - rowB + 3] : 0;
+                const dn = y < hh - 1 ? nA[i + rowB + 3] : 0;
+                if (l >= 40 && r >= 40 && u >= 40 && dn >= 40) continue;   // 엣지만
+                const fr = fC[i], fg = fC[i + 1], fb = fC[i + 2];
+                const lum = fr * 0.299 + fg * 0.587 + fb * 0.114;
+                if (lum < 24) continue;                                   // 뒤 어두우면 역광 없음
+                let a = STR * (lum < 200 ? lum / 200 : 1) * 0.6;
+                if (a <= 0.02) continue; if (a > 1) a = 1;
+                od[i] = fr; od[i + 1] = fg; od[i + 2] = fb; od[i + 3] = (a * 255) | 0;
+            }
+        }
+        nctx.putImageData(out, 0, 0);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';   // 가산 → 빛이 더해짐
+        ctx.imageSmoothingEnabled = true;            // 부드럽게 업스케일
+        ctx.drawImage(cv, 0, 0, hw, hh, 0, 0, W, H);
+        ctx.restore();
     }
 
     // 캐릭터 본체 색상 조절 + 배경색 흡수 (비침 방지). reg = _readCharRegion() 공유 데이터.
