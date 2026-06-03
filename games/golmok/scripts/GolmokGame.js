@@ -20,7 +20,7 @@ const FX_LIST     = ['sand_top', 'sand_sides', 'wave'];
 // ── SandScroll (모래 생성/소멸 스크롤) 프로토타입 파라미터 ───────────
 const SAND_ENABLED   = true;
 const CHAR_DISSOLVE_ENABLED = false; // 캐릭터 외곽 모래 중력낙하 디졸브 (요청: 가림)
-const INTRO_MS       = 1500;  // 게임 진입 인트로: 배경 모래-로딩 + 캐릭터 픽셀 모이기 연출 시간
+const INTRO_MS       = 2200;  // 게임 진입 인트로: 배경 모래-로딩 + 캐릭터(모래 모양→실제색) 2단계 연출 시간
 const SAND_BAND_MAX  = 0.022; // 최대 띠 폭 (화면 비율) — 1/3로 축소 (오빠의 튜닝 사양)
 const SAND_GRAIN     = 4;     // 모래 입자 크기 px
 const SAND_SETTLE_MS = 280;   // 멈출 때 굳는(가라앉는) 시간
@@ -818,19 +818,23 @@ export default class GolmokGame extends Scene {
             }
             ctx.putImageData(img, 0, 0);
         }
-        // 2) 캐릭터 픽셀 모이기 (0.4~1.0 구간, 배경 생성과 살짝 겹침)
-        const chT = (t - 0.4) / 0.6;
+        // 2) 캐릭터: 모래가 모여 모양 형성 → 실제색 (0.3~1.0 구간, 배경 생성과 겹침)
+        const chT = (t - 0.3) / 0.7;
         if (chT > 0) {
             const reg = this._readCharRegion(W, H);
             if (reg) this._renderCharGather(ctx, reg, Math.min(1, chT));
         }
     }
 
-    // 넓게 퍼진 모래가 쌓여 캐릭터 형성 — 모래알이 좌우로 흩날리다 아래→위로 쌓이며 모래색→실제색
+    // 2단계 형성: (A) 넓게 퍼진 모래가 아래→위로 쌓여 '사람 모양(모래색 실루엣)' 완성
+    //            (B) 모양 완성 후 실제 캐릭터 색으로 드러남
     _renderCharGather(ctx, reg, t) {
         const { x0, y0, rw, rh, l2img } = reg;
         const d = l2img.data;
         const NT = SAND_TONES_RGB.length;
+        const SHAPE = 0.58;                                   // 0~SHAPE: 모양형성 / SHAPE~1: 색 전환
+        const posPhase = Math.min(1, t / SHAPE);             // 모래 모여 모양 만드는 진행
+        const colPhase = Math.max(0, (t - SHAPE) / (1 - SHAPE)); // 모래색→실제색 진행
         ctx.save();
         for (let ly = 0; ly < rh; ly++) {
             for (let lx = 0; lx < rw; lx++) {
@@ -838,20 +842,21 @@ export default class GolmokGame extends Scene {
                 if (d[ci + 3] < 8) continue;
                 const h  = sandHash(lx * 1.7, ly * 1.3);
                 const h2 = sandHash(lx * 3.1 + 5, ly * 2.3 + 9);
-                // 아래쪽 픽셀부터 쌓임(bottom-up) → "쌓여서" 누적감. 위로 갈수록 늦게 정착.
-                const delay = (1 - ly / rh) * 0.55 + h * 0.12;
-                let lt = (t - delay) / (1 - delay); lt = lt < 0 ? 0 : lt > 1 ? 1 : lt;
-                lt = lt * lt * (3 - 2 * lt);                        // ease
-                const s = 1 - lt;                                  // 1=완전 흩어짐 → 0=정착
-                // 넓게 퍼진 모래: 좌우로 크게 펼쳐졌다 모이고, 위에서 흩날려 내려와 쌓임
+                // 아래쪽부터 쌓임(bottom-up). 위로 갈수록 늦게 정착.
+                const delay = (1 - ly / rh) * 0.5 + h * 0.12;
+                let lt = (posPhase - delay) / (1 - delay); lt = lt < 0 ? 0 : lt > 1 ? 1 : lt;
+                lt = lt * lt * (3 - 2 * lt);                  // ease
+                const s = 1 - lt;                            // 1=흩어짐 → 0=정착
+                // 넓게 퍼진 모래 위치
                 const spread = rw * 0.8 + 100;
                 const fx = x0 + lx + (h - 0.5) * spread * s + Math.sin(h2 * 25 + s * 8) * 14 * s;
                 const fy = y0 + ly - s * (rh * 0.55) + Math.cos(h * 19) * 8 * s;
-                // 모래색(흩날릴 때) → 실제 캐릭터색(정착)
+                // 색: (A) 모래색으로 모양 형성 → (B) colPhase로 실제색 드러남 (정착된 픽셀만)
                 const tc = SAND_TONES_RGB[(h2 * NT) | 0];
-                const r = d[ci]     * lt + tc[0] * s;
-                const g = d[ci + 1] * lt + tc[1] * s;
-                const b = d[ci + 2] * lt + tc[2] * s;
+                const reveal = colPhase * lt;                // 모양 완성(lt=1)된 곳부터 실제색으로
+                const r = tc[0] * (1 - reveal) + d[ci]     * reveal;
+                const g = tc[1] * (1 - reveal) + d[ci + 1] * reveal;
+                const b = tc[2] * (1 - reveal) + d[ci + 2] * reveal;
                 ctx.globalAlpha = Math.min(1, 0.35 + lt * 0.65);
                 ctx.fillStyle = `rgb(${Math.min(255, r) | 0},${Math.min(255, g) | 0},${Math.min(255, b) | 0})`;
                 ctx.fillRect(fx | 0, fy | 0, 1, 1);
