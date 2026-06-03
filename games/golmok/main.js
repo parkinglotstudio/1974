@@ -1,5 +1,5 @@
 import SandEngine   from '../../engine/SandEngine.js';
-import GolmokGame   from './scripts/GolmokGame.js';
+import GolmokGame   from './scripts/GolmokGame.js';   // 메인 씬 컨트롤러(이동 + 시그니처 FX)
 import TitleScene   from './scripts/TitleScene.js';
 import ResultScene  from './scripts/ResultScene.js';
 
@@ -206,41 +206,66 @@ async function init() {
     const defaultScene = urlScene || gj.defaultScene || 'main';
     const E = game._engine;
 
-    // ── 씬 흐름: 타이틀 → 메인 → 결과 ─────────────────────────────
-    // 메인 씬 엔티티(배경+캐릭터)는 메인 진입 시 로드
-    let _mainSceneJSON = null;
-    async function _loadMainEntities() {
-        const sd = gj.scenes?.main;
-        if (!_mainSceneJSON && sd?.src) {
-            const src = sd.src.startsWith('/') ? sd.src : './' + sd.src;
-            _mainSceneJSON = await fetch(src, { cache: 'no-store' }).then(r => r.json());
-        }
-        if (_mainSceneJSON) await applyAssetScene(_mainSceneJSON, assetBase);
+    // ── 씬 흐름: 타이틀 → 메인(가로/세로) → 결과 ──────────────────
+    // 메인은 두 모드(main_landscape 960×540 / main_portrait 540×960)의 빈 씬.
+    // 모드별 씬 JSON 의 resolution 에 맞춰 엔진 논리 해상도를 전환한다.
+    const BASE_W = width, BASE_H = height;               // 타이틀/결과 기준 해상도
+    const _sceneCache = {};                              // 모드별 씬 JSON 캐시
+
+    async function _fetchSceneJSON(sceneKey) {
+        if (_sceneCache[sceneKey]) return _sceneCache[sceneKey];
+        const sd = gj.scenes?.[sceneKey];
+        if (!sd?.src) return null;
+        const src = sd.src.startsWith('/') ? sd.src : './' + sd.src;
+        const json = await fetch(src, { cache: 'no-store' }).then(r => r.json());
+        _sceneCache[sceneKey] = json;
+        return json;
+    }
+
+    // 메인 모드 진입: 해당 모드 해상도로 전환 + (빈)엔티티 적용
+    async function _loadMainScene(sceneKey) {
+        const sj = await _fetchSceneJSON(sceneKey);
+        const res = sj?.resolution;
+        if (res?.width && res?.height) E.setResolution(res.width, res.height);
+        E.entities._entities.clear();
+        if (sj) await applyAssetScene(sj, assetBase);
     }
 
     E.scenes.register('golmok_title',  new TitleScene());
-    E.scenes.register('golmok_main',   new GolmokGame());
+    E.scenes.register('golmok_main',   new GolmokGame());          // 이동 + 시그니처 FX
     E.scenes.register('golmok_result', new ResultScene());
 
-    let _cur = 'golmok_title';
-    async function goScene(id) {
-        if (id === 'golmok_main') await _loadMainEntities();
-        else E.entities._entities.clear();
+    const DEFAULT_MAIN = gj.mainScene || 'main_portrait';
+    let _cur  = 'golmok_title';
+    let _mode = DEFAULT_MAIN;                             // 현재 메인 모드(가로/세로)
+
+    async function goScene(id, mainMode) {
+        if (id === 'golmok_main') {
+            _mode = mainMode || _mode || DEFAULT_MAIN;
+            await _loadMainScene(_mode);
+        } else {
+            E.entities._entities.clear();
+            E.setResolution(BASE_W, BASE_H);             // 타이틀/결과는 기준 해상도
+        }
         E.scenes.change(id);
         _cur = id;
     }
 
-    // 시작 씬: ?scene= (main|golmok_title|golmok_result), 기본 = 타이틀
+    // 시작 씬: ?scene= (main|main_landscape|main_portrait|title|result)
     const _map = {
         main: 'golmok_main', golmok_main: 'golmok_main',
+        main_landscape: 'golmok_main', main_portrait: 'golmok_main',
         title: 'golmok_title', golmok_title: 'golmok_title',
         result: 'golmok_result', golmok_result: 'golmok_result',
     };
-    await goScene(_map[defaultScene] || 'golmok_title');
+    const _startMainMode =
+        defaultScene === 'main_landscape' ? 'main_landscape' :
+        defaultScene === 'main_portrait'  ? 'main_portrait'  : undefined;
+    await goScene(_map[defaultScene] || 'golmok_title', _startMainMode);
 
     E.start();
 
-    // 클릭/터치 → 씬 전환 (타이틀→메인, 결과→타이틀). 메인 클릭은 GolmokGame이 처리.
+    // 클릭/터치 → 씬 전환 (타이틀→메인, 결과→타이틀).
     canvas.addEventListener('pointerdown', () => {
         if (_cur === 'golmok_title')       goScene('golmok_main');
         else if (_cur === 'golmok_result') goScene('golmok_title');

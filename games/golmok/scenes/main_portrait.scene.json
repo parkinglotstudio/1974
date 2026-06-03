@@ -1,0 +1,41 @@
+{
+  "schema": "SandEngine.Scene.v1",
+  "name": "main_portrait",
+  "label": "세로 모드",
+  "orientation": "portrait",
+  "resolution": {
+    "width": 540,
+    "height": 960
+  },
+  "bounds": {
+    "worldWidth": 1706,
+    "worldHeight": 960
+  },
+  "bgCycle": ["1960_1", "1970_1", "1980_1", "2020_1"],
+  "layers": [
+    { "id": "L0", "parallax": 0.15, "children": [] },
+    { "id": "L1", "parallax": 1.00, "children": [] },
+    { "id": "L2", "parallax": 1.00, "children": [] },
+    { "id": "L3", "parallax": 1.40, "children": [] }
+  ],
+  "entities": [
+    {
+      "id": "bg_main",
+      "type": "1960_1",
+      "layer": 1,
+      "x": 0, "y": 0, "pw": 1706, "ph": 960,
+      "visible": true,
+      "asset": "1960_1",
+      "assetCategory": "objects"
+    },
+    {
+      "id": "player",
+      "type": "ch01_player",
+      "layer": 2,
+      "x": 196, "y": 690, "pw": 149, "ph": 259,
+      "visible": true,
+      "asset": "ch01_player",
+      "assetCategory": "characters"
+    }
+  ]
+}

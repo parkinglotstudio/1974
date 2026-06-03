@@ -178,11 +178,12 @@ export default class SandEngine {
         this.layers.composite(this.canvas, this.cameraX, shake.x, shake.y);
 
         // ── FX 패스 (합성 이후, 메인 캔버스 위에 직접) ───────────────
-        // 렌더 순서: Glow(빛) → Rim(엣지) → Fog(안개) → Lighting(어둠) → Vignette(가장자리) → FX(최상단)
+        // 렌더 순서: Glow(빛) → Fog(안개) → Lighting(어둠) → Rim(백라이트, 어둠 위) → Vignette(가장자리) → FX(최상단)
         this.glow.render(this.canvas, this.entities, this.cameraX);
-        this.rim.render(this.canvas, this.entities, this.cameraX);
         this.fog.render(this.canvas, this.entities, this.cameraX);
         this.lighting.render(this.canvas, this.cameraX);
+        // Rim(백라이트)은 조명 '뒤'에 — 어둠 multiply에 먹히지 않고 실루엣 가장자리를 밝힘
+        this.rim.render(this.canvas, this.entities, this.cameraX);
         this.vignette.render(this.canvas);
 
         // 씬 전환 오버레이 (dither, fade 등)
@@ -279,6 +280,20 @@ export default class SandEngine {
     // 카메라 X 만 이동 (단축)
     moveCameraX(x) {
         this.cameraX = this.bounds.clampCameraX(x);
+    }
+
+    // 논리 해상도(가로/세로 등) 런타임 변경. 씬 전환 시 호출.
+    // 캔버스 내부 해상도 + 스케일 + 모든 서브시스템 버퍼를 새 치수로 재구성.
+    setResolution(w, h) {
+        if (w === this.gameWidth && h === this.gameHeight) return;
+        this.gameWidth  = w;
+        this.gameHeight = h;
+        this.canvas.width  = w;
+        this.canvas.height = h;
+        this.scale.gameW = w;
+        this.scale.gameH = h;
+        this._onResize();
+        console.log(`[SandEngine] resolution → ${w}×${h}`);
     }
 
     _onResize() {

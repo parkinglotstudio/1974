@@ -1943,16 +1943,21 @@
                     <span class="import-label">색상</span>
                     <label style="display:flex;align-items:center;gap:4px;cursor:pointer;
                         font-size:9px;font-family:'JetBrains Mono',monospace;color:#aaa;">
-                        <input type="radio" name="colorMode" id="colorModePalette" value="palette" checked
+                        <input type="radio" name="colorMode" id="colorModeExtract" value="extract" checked
+                            style="accent-color:#C8922A;cursor:pointer;">
+                        이미지 색상 추출
+                    </label>
+                    <input type="number" id="importExtractColors" value="128" min="2" max="256" step="1"
+                        title="추출 색상 수 (median-cut 적응형)"
+                        style="width:44px;font-size:9px;font-family:'JetBrains Mono',monospace;
+                        background:#1A1A18;color:#C8922A;border:1px solid #444;border-radius:3px;
+                        padding:1px 3px;text-align:center;">
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;
+                        font-size:9px;font-family:'JetBrains Mono',monospace;color:#aaa;">
+                        <input type="radio" name="colorMode" id="colorModePalette" value="palette"
                             style="accent-color:#C8922A;cursor:pointer;">
                         프로젝트 팔레트
                         <span id="importPaletteLabel" style="color:#C8922A;margin-left:2px;"></span>
-                    </label>
-                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;
-                        font-size:9px;font-family:'JetBrains Mono',monospace;color:#aaa;">
-                        <input type="radio" name="colorMode" id="colorModeExtract" value="extract"
-                            style="accent-color:#C8922A;cursor:pointer;">
-                        이미지 색상 추출
                     </label>
                     <span id="importMaxColors" style="font-size:9px;color:#555;
                         font-family:'JetBrains Mono',monospace;margin-left:4px;"></span>
@@ -3881,6 +3886,7 @@ function _saveSceneState(sceneName) {
             rotate:     e.rotate    ?? 0,
             pixels:         e._pixels        ?? null,
             frames:         e._frames        ?? null,
+            _scanline:      e._scanline      ?? null,
             _palette:       e._palette       ?? null,
             _asset:         e._asset         ?? null,
             _assetCategory: e._assetCategory ?? null,
@@ -5114,54 +5120,82 @@ async function _runPreviewImport(params = null) {
     let finalPalette, pixels;
 
     if (colorMode === 'extract') {
-        const MAX_COLORS = 256;
-        const colorMap   = new Map();
+        // 적응형(median-cut) 양자화 — 사진/그라데이션 이미지의 색을 충실히 보존.
+        const want = Math.max(2, Math.min(256,
+            parseInt(document.getElementById('importExtractColors')?.value ?? '128') || 128));
 
+        // 1) 고유색 히스토그램
+        const hist = new Map();
         for (let i = 0; i < imgData.data.length; i += 4) {
             if (imgData.data[i+3] < 64) continue;
             const key = (imgData.data[i] << 16) | (imgData.data[i+1] << 8) | imgData.data[i+2];
-            colorMap.set(key, (colorMap.get(key) ?? 0) + 1);
+            hist.set(key, (hist.get(key) ?? 0) + 1);
+        }
+        const rgbOf = k => [(k>>16)&0xFF, (k>>8)&0xFF, k&0xFF];
+
+        // 2) median-cut: 색 범위가 가장 넓은 박스를 가장 긴 축에서 반으로 분할
+        let boxes = [[...hist.keys()]];
+        while (boxes.length < want) {
+            let bi = -1, bestRange = -1, bestChan = 0;
+            for (let i = 0; i < boxes.length; i++) {
+                const bx = boxes[i];
+                if (bx.length < 2) continue;
+                const mn = [255,255,255], mx = [0,0,0];
+                for (const k of bx) {
+                    const c = rgbOf(k);
+                    for (let j = 0; j < 3; j++) { if (c[j]<mn[j]) mn[j]=c[j]; if (c[j]>mx[j]) mx[j]=c[j]; }
+                }
+                const rng = [mx[0]-mn[0], mx[1]-mn[1], mx[2]-mn[2]];
+                const m = Math.max(rng[0], rng[1], rng[2]);
+                if (m > bestRange) { bestRange = m; bi = i; bestChan = rng.indexOf(m); }
+            }
+            if (bi < 0) break; // 더 못 나눔
+            const bx = boxes[bi];
+            const sh = 16 - 8 * bestChan; // R<<16 / G<<8 / B<<0
+            bx.sort((a, b) => ((a>>sh)&0xFF) - ((b>>sh)&0xFF));
+            const mid = bx.length >> 1;
+            boxes.splice(bi, 1, bx.slice(0, mid), bx.slice(mid));
         }
 
-        const sorted = [...colorMap.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, MAX_COLORS);
+        // 3) 각 박스의 빈도 가중 평균색 = 대표색
+        const extRGB = boxes.map(bx => {
+            let r=0, g=0, b=0, n=0;
+            for (const k of bx) { const cnt = hist.get(k); const c = rgbOf(k); r+=c[0]*cnt; g+=c[1]*cnt; b+=c[2]*cnt; n+=cnt; }
+            n = n || 1;
+            return [Math.round(r/n), Math.round(g/n), Math.round(b/n)];
+        });
 
-        finalPalette = ['transparent', ...sorted.map(([key]) =>
-            '#' + [(key>>16)&0xFF, (key>>8)&0xFF, key&0xFF]
-                .map(v => v.toString(16).padStart(2,'0')).join('')
-        )];
+        finalPalette = ['transparent', ...extRGB.map(c =>
+            '#' + c.map(v => v.toString(16).padStart(2,'0')).join(''))];
 
-        const palIdx = new Map(sorted.map(([key], i) => [key, i + 1]));
-        const extRGB = sorted.map(([key]) =>
-            [(key>>16)&0xFF, (key>>8)&0xFF, key&0xFF]);
+        // 4) 픽셀 → 최근접 대표색 매핑 (RGB 캐시로 가속)
+        const cache = new Map();
+        const nearest = (r, g, b) => {
+            const key = (r<<16)|(g<<8)|b;
+            const hit = cache.get(key);
+            if (hit !== undefined) return hit;
+            let best = Infinity, bestI = 1;
+            for (let ci = 0; ci < extRGB.length; ci++) {
+                const pc = extRGB[ci];
+                const d = (r-pc[0])**2 * 0.299 + (g-pc[1])**2 * 0.587 + (b-pc[2])**2 * 0.114;
+                if (d < best) { best = d; bestI = ci + 1; }
+            }
+            cache.set(key, bestI);
+            return bestI;
+        };
 
         pixels = [];
         for (let y = 0; y < th; y++) {
             for (let x = 0; x < tw; x++) {
-                const i  = (y * tw + x) * 4;
-                const r  = imgData.data[i], g = imgData.data[i+1],
-                      b  = imgData.data[i+2], a = imgData.data[i+3];
+                const i = (y * tw + x) * 4;
+                const a = imgData.data[i+3];
                 if (a < 64) continue;
-                const key = (r << 16) | (g << 8) | b;
-                let idx = palIdx.get(key);
-                if (idx === undefined) {
-                    let best = Infinity, bestI = 1;
-                    for (let ci = 0; ci < extRGB.length; ci++) {
-                        const pc = extRGB[ci];
-                        const d = (r-pc[0])**2 * 0.299
-                                + (g-pc[1])**2 * 0.587
-                                + (b-pc[2])**2 * 0.114;
-                        if (d < best) { best = d; bestI = ci + 1; }
-                    }
-                    idx = bestI;
-                }
-                pixels.push([x, y, idx]);
+                pixels.push([x, y, nearest(imgData.data[i], imgData.data[i+1], imgData.data[i+2])]);
             }
         }
 
         const span = document.getElementById('importMaxColors');
-        if (span) span.textContent = `${finalPalette.length - 1}색`;
+        if (span) span.textContent = `${finalPalette.length - 1}색 (적응형)`;
 
     } else {
         finalPalette = palColors;
@@ -6804,6 +6838,24 @@ async function main() {
             .filter(([, def]) => def.type !== 'live')
             .map(([name]) => name);
 
+        // 10-b. 씬별 해상도(가로/세로) 수집 → SCENE_DIMS
+        //   json 씬: 씬 파일의 resolution / 그 외: game.json scene.resolution → 기본 해상도
+        SCENE_DIMS = {};
+        const _pid = gameJson.id;
+        for (const [sname, sdef] of Object.entries(gameJson.scenes ?? {})) {
+            let w = sdef.resolution?.width  ?? width;
+            let h = sdef.resolution?.height ?? height;
+            if (sdef.type === 'json' && sdef.src) {
+                try {
+                    const src = sdef.src.startsWith('/') ? sdef.src : `/games/${_pid}/${sdef.src}`;
+                    const sj  = await fetch(src, { cache: 'no-store' }).then(r => r.json());
+                    if (sj?.resolution?.width)  w = sj.resolution.width;
+                    if (sj?.resolution?.height) h = sj.resolution.height;
+                } catch {}
+            }
+            SCENE_DIMS[sname] = { w, h };
+        }
+
         // 11. 멀티프레임 위치 재계산 + live 아트보드 DOM 생성
         _initFramePositions(width, height);
         if (typeof window.buildLiveArtboards === 'function') {
@@ -6905,6 +6957,18 @@ async function main() {
         }
         if (livePlaceholder) livePlaceholder.style.display = 'none';
         if (workStage) workStage.style.display = '';
+
+        // 선택 씬 해상도(가로/세로)로 엔진 전환 → sand-canvas 가 올바른 비율로 렌더,
+        // 활성 프레임 합성도 그 해상도로 표시됨.
+        const _d = _sceneDim(sceneName);
+        if (typeof engine.setResolution === 'function') {
+            engine.setResolution(_d.w, _d.h);
+        } else {
+            engine.gameWidth = _d.w; engine.gameHeight = _d.h;
+        }
+        // overlay/text 캔버스도 해상도 동기화 (합성 시 1:1 매핑)
+        if (overlay)     { overlay.width = _d.w; overlay.height = _d.h; }
+        if (_textCanvas) { _textCanvas.width = _d.w; _textCanvas.height = _d.h; }
 
         // 씬 스택 / 엔티티 / 레이어 클리어
         engine.scenes._stack.length = 0;
@@ -7243,33 +7307,49 @@ let _flowNewConn = null; // { from, mx, my } — 연결선 드래그 중
 // 각 프레임의 캔버스 좌표 (엔진 init 후 _initFramePositions() 로 설정)
 let FRAME_POS = {}; // { sceneName: { x, y } }
 
+// 씬별 논리 해상도 (가로/세로 등). loadProject 에서 씬 JSON resolution 으로 채움.
+// 스크립트/미지정 씬은 game.json 기본 해상도로 폴백.
+let SCENE_DIMS = {}; // { sceneName: { w, h } }
+
+// 씬의 프레임 치수 반환 (없으면 엔진 현재 해상도로 폴백)
+function _sceneDim(name) {
+    const d = SCENE_DIMS[name];
+    if (d?.w && d?.h) return d;
+    const e = window._engine;
+    return { w: e?.gameWidth ?? 540, h: e?.gameHeight ?? 960 };
+}
+
 function _initFramePositions(gw, gh) {
+    // 씬마다 자기 해상도(가로/세로)로 가변 폭 가로 배치.
+    // 프레임 높이는 다를 수 있으므로 공통 상단(top)에 맞춰 정렬.
+    const top = FRAME_PAD_Y + FRAME_LABEL;
+    let cursorX = FRAME_PAD_X;
+    let maxH    = gh;
+
     // non-live 씬 → 픽셀 아트 프레임 (work-canvas)
-    SCENE_NAMES.forEach((name, i) => {
-        FRAME_POS[name] = {
-            x: FRAME_PAD_X + i * (gw + FRAME_GAP),
-            y: FRAME_PAD_Y + FRAME_LABEL,
-        };
+    SCENE_NAMES.forEach((name) => {
+        const d = _sceneDim(name);
+        FRAME_POS[name] = { x: cursorX, y: top };
+        cursorX += d.w + FRAME_GAP;
+        if (d.h > maxH) maxH = d.h;
     });
     // live 씬 → Figma 아트보드 DOM (FRAME_POS에도 등록)
     const proj = window._currentProject;
     const liveNames = Object.entries(proj?.scenes ?? {})
         .filter(([, def]) => def.type === 'live')
         .map(([name]) => name);
-    const nonLiveCount = SCENE_NAMES.length;
-    liveNames.forEach((name, i) => {
+    liveNames.forEach((name) => {
         if (!FRAME_POS[name]) {
-            FRAME_POS[name] = {
-                x: FRAME_PAD_X + (nonLiveCount + i) * (gw + FRAME_GAP),
-                y: FRAME_PAD_Y + FRAME_LABEL,
-            };
+            const d = _sceneDim(name);
+            FRAME_POS[name] = { x: cursorX, y: top };
+            cursorX += d.w + FRAME_GAP;
+            if (d.h > maxH) maxH = d.h;
         }
     });
-    // 캔버스 크기: 전체 씬 기준
-    const allCount = nonLiveCount + liveNames.length;
-    const frameAreaW = FRAME_PAD_X * 2 + allCount * gw + Math.max(0, allCount - 1) * FRAME_GAP;
+    // 캔버스 크기: 전체 씬 누적 폭 기준 (+ 여유 공간)
+    const frameAreaW = cursorX - FRAME_GAP + FRAME_PAD_X;
     const totalW = Math.min(CANVAS_LIMIT, Math.max(frameAreaW + gw * 4, frameAreaW + 1200));
-    const totalH = FRAME_PAD_Y + FRAME_LABEL + gh + gh * 4 + FRAME_PAD_Y;
+    const totalH = top + maxH + maxH * 4 + FRAME_PAD_Y;
     workCanvas.width  = totalW;
     workCanvas.height = totalH;
     window._workW = totalW;
@@ -7283,10 +7363,10 @@ let _frameDrag = null; // { name, startCx, startCy, startFx, startFy }
 function hitTestFrameLabel(cx, cy) {
     const engine = window._engine;
     if (!engine) return null;
-    const gw = engine.gameWidth;
     for (const name of SCENE_NAMES) {
         const p = FRAME_POS[name];
         if (!p) continue;
+        const gw = _sceneDim(name).w;
         // 이름표 위(FRAME_LABEL) + 프레임 상단 30px 까지 드래그 허용
         if (cx >= p.x && cx < p.x + gw &&
             cy >= p.y - FRAME_LABEL && cy < p.y + 30)
@@ -7299,10 +7379,10 @@ function hitTestFrameLabel(cx, cy) {
 function hitTestFrame(cx, cy) {
     const engine = window._engine;
     if (!engine) return null;
-    const gw = engine.gameWidth, gh = engine.gameHeight;
     for (const name of SCENE_NAMES) {
         const p = FRAME_POS[name];
         if (!p) continue;
+        const { w: gw, h: gh } = _sceneDim(name);
         if (cx >= p.x && cx < p.x + gw && cy >= p.y && cy < p.y + gh)
             return { name, gx: cx - p.x, gy: cy - p.y };
     }
@@ -7313,10 +7393,10 @@ function hitTestFrame(cx, cy) {
 function _flowHitDot(cx, cy) {
     const engine = window._engine;
     if (!engine) return null;
-    const gw = engine.gameWidth, gh = engine.gameHeight;
     for (const name of SCENE_NAMES) {
         const p = FRAME_POS[name];
         if (!p) continue;
+        const { w: gw, h: gh } = _sceneDim(name);
         if (Math.hypot(cx - (p.x + gw), cy - (p.y + gh / 2)) <= FLOW_DOT_R + 5)
             return name;
     }
@@ -7341,20 +7421,22 @@ function renderMultiFrame() {
         for (let y = 0; y < H; y += 24)
             ctx.fillRect(x, y, 1, 1);
 
-    // 씬 간 연결선 (프레임 뒤에 그려야 시각적으로 깔끔)
+    // 씬 간 연결선 (프레임 뒤에 그려야 시각적으로 깔끔) — 씬별 해상도 반영
     _flowConns.forEach((c, i) => {
         const f = FRAME_POS[c.from], t = FRAME_POS[c.to];
         if (!f || !t) return;
-        _flowDrawBezier(ctx, f.x + gw, f.y + gh / 2,
-                             t.x,      t.y + gh / 2,
+        const fd = _sceneDim(c.from), td = _sceneDim(c.to);
+        _flowDrawBezier(ctx, f.x + fd.w, f.y + fd.h / 2,
+                             t.x,        t.y + td.h / 2,
                              i === _flowSelConn, c.trigger ?? 'click');
     });
     if (_flowNewConn) {
         const f = FRAME_POS[_flowNewConn.from];
         if (f) {
+            const fd = _sceneDim(_flowNewConn.from);
             ctx.save();
             ctx.strokeStyle = '#C8922A'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
-            const sx = f.x + gw, sy = f.y + gh / 2;
+            const sx = f.x + fd.w, sy = f.y + fd.h / 2;
             const cp = Math.abs(_flowNewConn.mx - sx) * 0.5;
             ctx.beginPath(); ctx.moveTo(sx, sy);
             ctx.bezierCurveTo(sx + cp, sy, _flowNewConn.mx - cp, _flowNewConn.my,
@@ -7363,10 +7445,12 @@ function renderMultiFrame() {
         }
     }
 
-    // 각 씬 프레임 렌더
+    // 각 씬 프레임 렌더 — 씬별 해상도(가로/세로)로 그림
     for (const name of SCENE_NAMES) {
         const pos = FRAME_POS[name];
-        if (pos) _drawSceneFrame(ctx, engine, name, pos.x, pos.y, gw, gh);
+        if (!pos) continue;
+        const { w, h } = _sceneDim(name);
+        _drawSceneFrame(ctx, engine, name, pos.x, pos.y, w, h);
     }
 
     // ── 분리된 엔티티 렌더 (프레임 밖, 캔버스 절대 좌표) ──────

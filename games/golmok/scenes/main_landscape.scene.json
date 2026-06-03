@@ -1,0 +1,31 @@
+{
+  "schema": "SandEngine.Scene.v1",
+  "name": "main_landscape",
+  "label": "가로 모드",
+  "orientation": "landscape",
+  "resolution": {
+    "width": 960,
+    "height": 540
+  },
+  "bounds": {
+    "worldWidth": 941,
+    "worldHeight": 1672
+  },
+  "entities": [
+    {
+      "id": "bg_main",
+      "type": "19870_2",
+      "layer": 1,
+      "x": 0, "y": 0, "pw": 941, "ph": 1672,
+      "visible": true,
+      "asset": "19870_2",
+      "assetCategory": "objects"
+    }
+  ],
+  "layers": [
+    { "id": "L0", "parallax": 0.15, "children": [] },
+    { "id": "L1", "parallax": 1.00, "children": [] },
+    { "id": "L2", "parallax": 1.00, "children": [] },
+    { "id": "L3", "parallax": 1.40, "children": [] }
+  ]
+}

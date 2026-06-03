@@ -28,15 +28,20 @@
     }
   },
   "scenes": {
-    "main": {
-      "type": "json",
-      "src": "scenes/main.scene.json",
-      "label": "메인"
-    },
     "golmok_title": {
       "type": "script",
       "script": "scripts/TitleScene.js",
       "label": "타이틀"
+    },
+    "main_landscape": {
+      "type": "json",
+      "src": "scenes/main_landscape.scene.json",
+      "label": "가로 모드"
+    },
+    "main_portrait": {
+      "type": "json",
+      "src": "scenes/main_portrait.scene.json",
+      "label": "세로 모드"
     },
     "golmok_result": {
       "type": "script",
@@ -45,5 +50,6 @@
     }
   },
   "defaultScene": "golmok_title",
+  "mainScene": "main_portrait",
   "assetBase": "./pixels"
 }
