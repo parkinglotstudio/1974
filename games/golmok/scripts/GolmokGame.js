@@ -212,7 +212,11 @@ export default class GolmokGame extends Scene {
         const L1 = engine.layers.getCanvas(1);
         if (!L1 || !L1.width) return;
         try {
-            const d = L1.getContext('2d').getImageData(0, 0, L1.width, L1.height).data;
+            // 전체 레이어(4320×960)를 읽으면 readback 11ms+ → 배경 전환 시 프레임 드랍.
+            // 대표 영역만 읽는다: 폭은 뷰포트 2배까지, 높이는 상단 65%(조명 받는 하늘/건물).
+            const sw = Math.min(L1.width, (engine.gameWidth || 540) * 2);
+            const sh = Math.min(L1.height, Math.round(L1.height * 0.65));
+            const d = L1.getContext('2d').getImageData(0, 0, sw, sh).data;
             let r = 0, g = 0, b = 0, n = 0;
             for (let i = 0; i < d.length; i += 64) {     // 듬성 샘플(16px 간격)
                 if (d[i + 3] < 16) continue;
@@ -290,9 +294,9 @@ export default class GolmokGame extends Scene {
         const k = 0.5 - 0.5 * Math.cos(this._dayT * (Math.PI * 2 / 60));
         this._fxK = k;
 
-        // 림 = 캐릭터 색상 곡선과 분리. 캐릭터 밝기가 40% 이하로 떨어질 때부터 페이드인.
+        // 림 = 캐릭터 색상 곡선과 분리. 캐릭터 밝기 85%부터 약하게 페이드인(더 빨리), 어두울수록 강해짐.
         const charBright = 1 - (1 - 0.20) * k;                          // 낮 1.0 → 밤 0.20
-        let rimF = (0.60 - charBright) / (0.60 - 0.20);                  // 밝기 60%부터 페이드인 (k≈0.5부터)
+        let rimF = (0.85 - charBright) / (0.85 - 0.20);                  // 밝기 85%부터 페이드인 (해질녘 k≈0.19부터)
         rimF = rimF < 0 ? 0 : rimF > 1 ? 1 : rimF;
         this._rimF = rimF;   // 게임측 _renderCharRim 두께/세기에 사용 (엔진 rim은 비활성)
         for (const f of this._fog) f.x += f.speed * dtSec;               // 안개 드리프트
