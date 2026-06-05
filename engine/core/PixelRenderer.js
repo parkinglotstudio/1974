@@ -118,28 +118,46 @@ export default class PixelRenderer {
     // 기본값은 renderer 너비이지만, asset이 다른 너비로 그려진 경우 명시해야 함.
     // 예: L0 renderer=1080, asset scanline=540px → stride=540
     putScanline(scanline, rgbaCache, ox = 0, oy = 0, stride = this.width) {
-        const buf = this.buf;
-        const imap = this._indexMap;
         const W = this.width;
         const H = this.height;
         const len = scanline.length;
+        const imap = this._indexMap;
 
-        for (let i = 0; i < len; i++) {
-            const idx = scanline[i];
-            if (idx === 0) continue;            // transparent 스킵
-            const rgba = rgbaCache.get(idx);
-            if (!rgba) continue;
+        // ── 고속 경로: 픽셀당 Map.get·나눗셈·4바이트 쓰기를 제거 ──
+        // (출력 바이트는 구버전과 동일 — 같은 팔레트색·같은 idx0/미정의 스킵 규칙)
+        // 1) 팔레트(Map)를 256엔트리 플랫 LUT로 1회 펼침 → 픽셀당 Map.get 제거
+        const lut   = this._slLut   || (this._slLut   = new Uint32Array(256));
+        const valid = this._slValid || (this._slValid = new Uint8Array(256));
+        valid.fill(0);
+        for (const [k, c] of rgbaCache) {
+            if (k > 0 && k < 256 && c) {
+                lut[k]   = ((c[0]) | (c[1] << 8) | (c[2] << 16) | (c[3] << 24)) >>> 0;
+                valid[k] = 1;
+            }
+        }
+        // 2) 버퍼의 Uint32 뷰 (픽셀당 1회 쓰기). resize 시 buffer 교체 → 일치 검사로 갱신
+        if (!this._buf32 || this._buf32.buffer !== this.buf.buffer) {
+            this._buf32 = new Uint32Array(this.buf.buffer);
+        }
+        const buf32 = this._buf32;
 
-            const sx = (i % stride) + ox;
-            const sy = Math.floor(i / stride) + oy;
-            if (sx < 0 || sx >= W || sy < 0 || sy >= H) continue;
-
-            const pos    = (sy * W + sx) << 2;
-            buf[pos]     = rgba[0];
-            buf[pos + 1] = rgba[1];
-            buf[pos + 2] = rgba[2];
-            buf[pos + 3] = rgba[3];
-            if (imap) imap[sy * W + sx] = idx;
+        // 3) 행 단위 순회 — i%stride / floor(i/stride) 픽셀당 연산 제거, sx 클립은 행마다 1회
+        const rows = Math.ceil(len / stride);
+        const cStart = ox < 0 ? -ox : 0;            // sx = c+ox >= 0
+        for (let r = 0; r < rows; r++) {
+            const sy = r + oy;
+            if (sy < 0 || sy >= H) continue;
+            const base = r * stride;
+            let cEnd = len - base; if (cEnd > stride) cEnd = stride;   // 마지막 행 길이
+            if (cEnd > W - ox) cEnd = W - ox;                         // sx < W
+            const dstBase = sy * W + ox;                              // di = dstBase + c = sy*W + sx
+            for (let c = cStart; c < cEnd; c++) {
+                const idx = scanline[base + c];
+                if (idx === 0 || !valid[idx]) continue;               // transparent / 미정의 스킵
+                const di = dstBase + c;
+                buf32[di] = lut[idx];
+                if (imap) imap[di] = idx;
+            }
         }
     }
 

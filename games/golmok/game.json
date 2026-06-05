@@ -43,6 +43,11 @@
       "src": "scenes/main_portrait.scene.json",
       "label": "세로 모드"
     },
+    "golmok_live": {
+      "type": "live",
+      "label": "라이브 (FX 튜닝)",
+      "liveEntry": "games/golmok/index.html?scene=main_portrait"
+    },
     "golmok_result": {
       "type": "script",
       "script": "scripts/ResultScene.js",

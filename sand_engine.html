@@ -953,6 +953,7 @@
     </div>
     <div class="header-scene" id="sceneLabel">—</div>
     <div class="header-actions">
+        <button class="hbtn" id="btnFxInspector" onclick="toggleFxInspector()" title="fx_params.csv 라이브 슬라이더 (라이브 골목 씬 플레이 중 적용)">🎚 FX 인스펙터</button>
         <button class="hbtn" id="btnSaveScene">↓ 씬 저장</button>
     </div>
 </div>
@@ -4679,6 +4680,147 @@ window.addEventListener('resize', () => {
 <div id="liveFSOverlay" onclick="toggleLiveFS()" style="
     display:none;position:fixed;inset:0;background:#000;z-index:9998;cursor:pointer;"
     title="클릭하거나 ESC로 닫기"></div>
+
+<!-- ════ FX 인스펙터 (fx_params.csv 라이브 슬라이더) — 격리 모듈 ════ -->
+<div id="fxInspector" style="display:none;position:fixed;top:46px;right:8px;width:312px;
+    max-height:calc(100vh - 60px);background:#16160F;border:1px solid #3A3A2A;border-radius:6px;
+    z-index:9990;box-shadow:0 8px 28px rgba(0,0,0,0.6);font-family:'JetBrains Mono',monospace;
+    display:none;flex-direction:column;color:#C8C8C0;">
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid #2C2C20;">
+        <span style="font-weight:700;color:#C8922A;font-size:11px;flex:1;">🎚 FX 인스펙터</span>
+        <button onclick="copyFxValues()" title="현재 값을 CSV로 클립보드 복사 (확정값 보고용)"
+            style="font-size:8px;padding:2px 7px;background:#23301F;border:1px solid #3A8A3A;color:#7FE07F;border-radius:3px;cursor:pointer;">📋 CSV 복사</button>
+        <button onclick="resetFxValues()" title="CSV 기본값으로 되돌림 (라이브)"
+            style="font-size:8px;padding:2px 7px;background:#2A2A1C;border:1px solid #5A5A3A;color:#C8C8A0;border-radius:3px;cursor:pointer;">↺ 기본값</button>
+        <button onclick="toggleFxInspector()" style="font-size:11px;padding:0 5px;background:none;border:none;color:#888;cursor:pointer;">✕</button>
+    </div>
+    <div id="fxStatus" style="padding:5px 10px;font-size:8px;border-bottom:1px solid #2C2C20;color:#999;"></div>
+    <div id="fxBody" style="overflow-y:auto;padding:4px 10px 10px;"></div>
+</div>
+
+<script>
+// FX 인스펙터 — fx_params.csv를 슬라이더로 라이브 편집. 저장 안 함(라이브만), 값은 iframe 게임에 postMessage.
+// (에디터 기존 로직과 분리된 격리 스크립트)
+(function(){
+    const CSV_URL = '/games/golmok/data/fx_params.csv';
+    let _rows = null;        // 파싱된 CSV 행(주석/섹션/파라미터 보존 → CSV 복사용)
+    let _cur  = {};          // key → 현재(라이브) 값
+    let _def  = {};          // key → CSV 기본값
+
+    function splitRow(line){
+        const p = line.split(',');
+        return { key:p[0], value:+p[1], min:+p[2], max:+p[3], desc:p.slice(4).join(',') };
+    }
+    function parseCsv(text){
+        const rows = [];
+        for (const raw of text.split(/\r?\n/)) {
+            const line = raw.trim();
+            if (line === '') { rows.push({ type:'blank', text:'' }); continue; }
+            if (line[0] === '#') { rows.push({ type:'comment', text:raw, section: line.includes('──') }); continue; }
+            if (line.startsWith('key,')) { rows.push({ type:'header', text:raw }); continue; }
+            const r = splitRow(line); rows.push({ type:'param', ...r });
+        }
+        return rows;
+    }
+    function stepFor(min,max){
+        const r = max - min;
+        if (r <= 0.2) return 0.001;
+        if (r <= 3)   return 0.01;
+        if (r <= 60 && !(Number.isInteger(min) && Number.isInteger(max))) return 0.1;
+        return 1;
+    }
+    function decFor(step){ return step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0; }
+
+    function liveFrame(){
+        const f = document.getElementById('livePreviewIframe');
+        if (f && f.contentWindow && f.src && f.src !== 'about:blank') return f;
+        return null;
+    }
+    function postFx(key, value){
+        const f = liveFrame();
+        if (f) { try { f.contentWindow.postMessage({ type:'golmok:setFx', key, value }, '*'); } catch(e){} }
+        return !!f;
+    }
+    function refreshStatus(){
+        const el = document.getElementById('fxStatus'); if (!el) return;
+        const f = liveFrame();
+        const isGolmok = f && /golmok|games\//.test(f.src);
+        if (isGolmok) { el.innerHTML = '🟢 라이브 골목 씬 연결됨 — 슬라이더가 즉시 반영됩니다.'; el.style.color = '#7FB47F'; }
+        else { el.innerHTML = '🟡 라이브 골목 씬을 플레이하세요 (씬뷰 <b>▶ 플레이</b>). 그래야 값이 적용됩니다.'; el.style.color = '#C8A050'; }
+    }
+
+    function rowEl(r){
+        const step = stepFor(r.min, r.max), dec = decFor(step);
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'margin:7px 0;';
+        wrap.title = r.desc || '';
+        const cur = (r.key in _cur) ? _cur[r.key] : r.value;
+        wrap.innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;">'
+          + '<span style="font-size:8px;color:#B8B8A8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.key+'</span>'
+          + '<span class="fxVal" style="font-size:9px;color:#E8C870;flex-shrink:0;">'+cur.toFixed(dec)+'</span></div>'
+          + '<input type="range" min="'+r.min+'" max="'+r.max+'" step="'+step+'" value="'+cur+'" '
+          + 'style="width:100%;height:14px;accent-color:#C8922A;cursor:pointer;">'
+          + '<div style="font-size:7px;color:#666;line-height:1.2;margin-top:1px;">'+(r.desc||'')+'</div>';
+        const slider = wrap.querySelector('input');
+        const valEl  = wrap.querySelector('.fxVal');
+        slider.addEventListener('input', () => {
+            const v = +slider.value;
+            _cur[r.key] = v;
+            valEl.textContent = v.toFixed(dec);
+            if (!postFx(r.key, v)) refreshStatus();
+        });
+        return wrap;
+    }
+
+    async function build(){
+        const body = document.getElementById('fxBody');
+        body.innerHTML = '<div style="font-size:9px;color:#888;padding:8px 0;">불러오는 중…</div>';
+        try {
+            const txt = await fetch(CSV_URL, { cache:'no-store' }).then(r => r.text());
+            _rows = parseCsv(txt); _cur = {}; _def = {};
+            for (const r of _rows) if (r.type === 'param') _def[r.key] = r.value;
+            body.innerHTML = '';
+            for (const r of _rows) {
+                if (r.type === 'comment' && r.section) {
+                    const h = document.createElement('div');
+                    h.textContent = r.text.replace(/^#+\s*/,'').replace(/─/g,'').trim();
+                    h.style.cssText = 'font-size:8px;font-weight:700;color:#C8922A;margin:11px 0 2px;border-bottom:1px solid #2C2C20;padding-bottom:2px;';
+                    body.appendChild(h);
+                } else if (r.type === 'param') {
+                    body.appendChild(rowEl(r));
+                }
+            }
+        } catch(e){
+            body.innerHTML = '<div style="font-size:9px;color:#E08080;padding:8px 0;">fx_params.csv 로드 실패: '+e+'</div>';
+        }
+        refreshStatus();
+    }
+
+    window.toggleFxInspector = function(){
+        const el = document.getElementById('fxInspector');
+        const open = el.style.display === 'none' || !el.style.display;
+        el.style.display = open ? 'flex' : 'none';
+        if (open) { if (!_rows) build(); else refreshStatus(); }
+    };
+    window.resetFxValues = function(){
+        if (!_rows) return;
+        for (const r of _rows) if (r.type === 'param') { _cur[r.key] = r.value; postFx(r.key, r.value); }
+        build();   // 슬라이더 위치를 기본값으로 재빌드 (이미 _cur가 비워져 r.value 사용)
+    };
+    window.copyFxValues = function(){
+        if (!_rows) return;
+        const out = _rows.map(r => {
+            if (r.type === 'param') { const v = (r.key in _cur) ? _cur[r.key] : r.value; return r.key+','+v+','+r.min+','+r.max+','+(r.desc||''); }
+            return r.text != null ? r.text : '';
+        }).join('\n');
+        navigator.clipboard?.writeText(out).then(
+            () => { const s = document.getElementById('fxStatus'); const old = s.innerHTML; s.innerHTML = '📋 현재 값 CSV 복사됨 — 채팅에 붙여넣어 확정값 알려주세요.'; s.style.color='#7FE07F'; setTimeout(refreshStatus, 1800); },
+            () => alert('클립보드 복사 실패')
+        );
+    };
+})();
+</script>
 
 </body>
 </html>

@@ -1,5 +1,6 @@
 import { Scene } from '../../../engine/scene/SceneManager.js';
 import { SAND_BASE_RGB, SAND_TONES_RGB } from '../../../engine/SandPalette.js';
+import AnimatorController from '../../../engine/anim/AnimatorController.js';
 
 // ⚠ 아래 let 값들은 코드 기본값(fallback)일 뿐 — 실제 값은 data/*.csv 테이블에서 로드해
 //   _loadConfig()가 덮어쓴다. (엔진=로직, 게임 데이터=CSV 원칙)
@@ -15,6 +16,7 @@ let   BG_TRANS_MS = 2000;   // ← fx_params.csv bg.trans_ms
 const CYCLE_ENABLED = true;  // 화면 끝 도달 시 다음 배경으로 sandburst 전환 ON
 const DIGITAL_ENABLED = false; // 디지털 회로/메시 오버레이 ON/OFF (저장만, 지금은 OFF)
 const SHOW_FPS = true;         // 우상단 FPS 표시 (디버그 — 배경 전환 프레임 드랍 확인용)
+let   ANIM_TEST_SLOW = 1;      // 총 애니 속도 배수 (1=정상. 테스트 시 3 등으로 느리게)
 const FOG_ENABLED = false;     // 안개(절차적 + 드리프트 구름) ON/OFF (지금은 OFF)
 
 // 전환 효과를 차례대로 순환 — 새로 만든 모래 생성형 3종 테스트
@@ -35,6 +37,9 @@ let   SAND_FALL_RATE = 70;    // ← sand.fall_rate
 const SAND_FALL_G    = 4;     // 디지털 블록 크기 px (그리드 정렬)
 let   SAND_GRAVITY   = 130;   // ← sand.gravity
 let   BG_MOTE_RATE   = 32;    // ← bg.mote_rate
+
+// 에디터 FX 라이브 슬라이더 연동용 — 현재 활성 메인 씬 인스턴스(부모 postMessage가 여기로 적용)
+let   _activeGolmok  = null;
 
 // 월드 고정 셀 의사난수 0~1 (콘텐츠가 흐르는 동안 입자가 정체성 유지 → 팝인/팝아웃)
 function sandHash(x, y) {
@@ -120,6 +125,13 @@ export default class GolmokGame extends Scene {
             this._groundY = this._player.y;                          // 씬 설정에 지정된 초기 y좌표(세로 690, 가로 412 등)를 바닥으로 채택
         }
         this._loadConfig(engine);    // 게임 데이터 테이블(CSV)에서 값 로드 (상수 덮어쓰기)
+        this._anim = null;           // 애니메이터 컨트롤러 (플로우) — 비동기 로드, 준비 전엔 수동 setState 폴백
+        this._loadAnimator();
+        this._gun = null; this._attacking = false;   // 총(공격) 스프라이트 — 비동기 로드, 공격 시 별도 엔티티로 스왑
+        this._blend = null;                           // 모래 블렌드(동작 전환) 상태 { t, ms, src, dst, onDone }
+        this._muzzleP = []; this._tracers = []; this._casings = [];   // 발사 임팩트 FX
+        this._recoilT = 0; this._recoilDir = 0; this._muzzleFlash = 0; this._fireAcc = 110;
+        this._loadGun();
         this._preload();
         if (FOG_ENABLED) this._loadFog();
 
@@ -139,6 +151,24 @@ export default class GolmokGame extends Scene {
                 this._targetX = Math.max(0, Math.min((this._worldW ?? WORLD_WIDTH) - p.pw, worldX - p.pw / 2));
             };
             canvas.addEventListener('pointerdown', (ev) => onPoint(ev.clientX));
+        }
+
+        // 키보드 F = 총 발사 (홀드: 준비→발동 루프→떼면 되돌리기)
+        if (!this._keyBound) {
+            this._keyBound = true;
+            window.addEventListener('keydown', (ev) => { if ((ev.key === 'f' || ev.key === 'F') && !ev.repeat) this._startAttack(); });
+            window.addEventListener('keyup',   (ev) => { if (ev.key === 'f' || ev.key === 'F') this._endFire(); });
+        }
+
+        // ── 에디터 FX 라이브 슬라이더 연동 ──────────────────────────
+        // 부모(에디터)가 postMessage({type:'golmok:setFx', key, value})를 보내면 라이브 적용.
+        _activeGolmok = this;
+        if (!GolmokGame._fxMsgBound) {
+            GolmokGame._fxMsgBound = true;
+            window.addEventListener('message', (ev) => {
+                const m = ev.data;
+                if (m && m.type === 'golmok:setFx' && _activeGolmok) _activeGolmok.applyFxParam(m.key, m.value);
+            });
         }
     }
 
@@ -216,6 +246,355 @@ export default class GolmokGame extends Scene {
         this._mapRim = {};
         if (D?.maps) for (const r of D.maps.all()) this._mapRim[r.id] = (r.near_rim === '' || r.near_rim == null) ? 1 : Number(r.near_rim);
         this._curRimMul = this._mapRim[BG_LIST[this._bgIdx]] ?? 1;
+    }
+
+    // ── 애니메이터 컨트롤러(플로우) 로드 ─────────────────────────────
+    // animator/ch01.anim.json(파라미터+전환)을 읽어 캐릭터 asm(상태머신) 위에 얹는다.
+    // 비동기 — 로드 전엔 onUpdate가 수동 setState로 폴백하므로 끊김 없음.
+    async _loadAnimator() {
+        const p = this._player;
+        if (!p || !p.asm) return;
+        try {
+            const def = await fetch('./animator/ch01.anim.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null);
+            if (def) { const c = new AnimatorController(p.asm); c.load(def); this._anim = c; }
+        } catch (e) { console.warn('[golmok] animator load fail:', e); }
+    }
+
+    // ── 총(공격) 스프라이트 로드 + 발 정합 ────────────────────────────
+    // 별도 'gun' 엔티티(layer2, 평소 숨김)로 추가. 공격 시 플레이어를 숨기고 발 위치를 맞춰 스왑.
+    // (플레이어 sprite/카메라 안 건드림 → idle/walk 안전)
+    async _loadGun() {
+        const p = this._player; const e = this.engine;
+        if (!p || !e) return;
+        try {
+            const g = await fetch('./pixels/characters/ch01_gun.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null);
+            if (!g) return;
+            this._gun = e.entities.add('gun', {
+                x: 0, y: 0, pw: g.width, ph: g.height, layer: 2, visible: false,
+                frames: g.frames, _palette: g.palette, stateDef: g.stateDef,
+            });
+            if (ANIM_TEST_SLOW > 1 && this._gun.asm) {   // 테스트용 슬로우 (코팅 효과 확인)
+                for (const k in this._gun.asm.states) this._gun.asm.states[k].fps /= ANIM_TEST_SLOW;
+            }
+            this._gunAnim = new AnimatorController(this._gun.asm);
+            this._gunAnim.load({
+                default: 'atk_start',
+                parameters: [ { name: 'firing', type: 'bool', default: false } ],
+                transitions: [
+                    { from: 'atk_start',   to: 'atk_active',  hasExitTime: true },                       // 준비 끝 → 발동
+                    { from: 'atk_active',  to: 'atk_recover', conditions: [ { p: 'firing', op: '==', v: false } ] }, // 떼면 → 회수
+                    { from: 'atk_recover', to: 'standby',     hasExitTime: true },                        // 회수 끝 → 공격대기
+                ],
+            });
+            // 발 정합 앵커(원시값): 플레이어 idle 0프레임 ↔ 총 atk_start 0프레임. flipX(미러) 고려해 매 프레임 계산.
+            const pa = this._feetAnchor(p._frames?.[0]?.pixels);
+            const ga = this._feetAnchor(g.frames?.[0]?.pixels);
+            this._gunAnchor = (pa && ga)
+                ? { pcx: pa.cx, ppw: p.pw, pby: pa.by, gcx: ga.cx, gpw: this._gun.pw, gby: ga.by }
+                : null;
+            // 총구 이펙트 위치 = 발동 프레임 "머즐플래시(밝은 픽셀) 무게중심" — 이펙트가 총구 안에 오게(스프라이트 플래시와 정합)
+            const afi = g.stateDef?.states?.atk_active?.frames?.[3];
+            const af = (afi != null) ? g.frames[afi]?.pixels : null;
+            if (af && af.length) {
+                const pal = g.palette;
+                const yLimit = g.ph * 0.5;   // 상단(팔/총구)만 — 하단 흰 스니커즈 섞임 방지
+                const pts = [];
+                for (const q of af) {
+                    if (q[1] >= yLimit) continue;
+                    const h = pal[q[2]];
+                    if (!h || h === 'transparent') continue;
+                    const r = parseInt(h.slice(1, 3), 16), gg = parseInt(h.slice(3, 5), 16), b = parseInt(h.slice(5, 7), 16);
+                    if (r * 0.3 + gg * 0.5 + b * 0.2 > 185) pts.push(q);   // 상단 밝은 머즐플래시
+                }
+                // 총구 = 플래시의 "총 쪽(발사 반대편) 40%" 무게중심 ≈ 발사구(barrel tip). FX가 총에서 나가게.
+                if (pts.length > 8) {
+                    let mnx = 1e9, mxx = -1e9;
+                    for (const q of pts) { if (q[0] < mnx) mnx = q[0]; if (q[0] > mxx) mxx = q[0]; }
+                    const cut = mxx - (mxx - mnx) * 0.4;   // 비플립(왼쪽 발사) 기준 총은 오른쪽(큰 x)
+                    let sx = 0, sy = 0, n = 0;
+                    for (const q of pts) { if (q[0] >= cut) { sx += q[0]; sy += q[1]; n++; } }
+                    this._muzzleLocal = n > 4 ? { x: (sx / n) | 0, y: (sy / n) | 0 } : { x: 60, y: 50 };
+                } else this._muzzleLocal = { x: 60, y: 50 };
+            }
+        } catch (err) { console.warn('[golmok] gun load fail:', err); }
+    }
+
+    // 스프라이트 프레임 픽셀의 bbox + 발(하단 8%) 중심 x / 바닥 y
+    _feetAnchor(pixels) {
+        if (!pixels || !pixels.length) return null;
+        let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+        for (const px of pixels) { const x = px[0], y = px[1]; if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+        const footTop = maxY - (maxY - minY) * 0.08;
+        let sx = 0, n = 0;
+        for (const px of pixels) { if (px[1] >= footTop) { sx += px[0]; n++; } }
+        return { cx: n ? sx / n : (minX + maxX) / 2, by: maxY };
+    }
+
+    _startAttack() {
+        if (this._attacking || this._blend || !this._gun || !this._gunAnim) return;
+        const p = this._player;
+        this._attacking = true;
+        this._atkHoldT = 0;                    // 내린 자세 유지 타이머 (리셋)
+        this._atkFlip = !!p?.flipX;            // 플레이어 시선 방향으로 사격 (총 기본은 왼쪽)
+        this._gun.flipX = this._atkFlip;
+        this._gun.asm.setState('atk_start'); this._gun.asm.restart();
+        // 모래가 "진행 중(올라가는) 동작"에 얹히도록 준비 중간 프레임부터 시작 — 앞 절반 windup은 모래 코팅이 대신.
+        const st = this._gun.asm.states['atk_start'];
+        const half = st ? (st.frames.length >> 1) : 0;
+        this._gun.asm._stateFrameIdx = half; this._gun.asm._lastTick = 0;
+        this._gunAnim.setBool('firing', true);
+        this._positionGun();
+        // 총 원본 애니(중간→끝) 재생(visible). idle이 모래로 변해 그 "움직이는 몸"에 날아와 붙었다 걷힘.
+        const src = this._pixelsScreen(p, p?._frameIdx ?? 0, this._atkFlip);   // idle = 모래 원천
+        if (p) p.visible = false;
+        this._gun.visible = true;                                              // 총은 솔리드로 보이고, 모래가 위로 흐름
+        const coatMs = st ? ((st.frames.length - half) / st.fps) * 1000 : 400; // 중간→끝 동안 코팅
+        this._startCoat('raise', this._gun, src, coatMs, null);
+    }
+    _endFire() { this._gunAnim?.setBool('firing', false); }
+
+    // 총을 플레이어 발치에 정합 (flipX 미러 고려)
+    _positionGun() {
+        const p = this._player, a = this._gunAnchor, g = this._gun;
+        if (!p || !g) return;
+        if (a) {
+            const pFeetX = this._atkFlip ? (a.ppw - 1 - a.pcx) : a.pcx;
+            const gFeetX = this._atkFlip ? (a.gpw - 1 - a.gcx) : a.gcx;
+            g.x = p.x + pFeetX - gFeetX;
+            g.y = p.y + (a.pby - a.gby);
+        } else { g.x = p.x; g.y = p.y; }
+        g.x += this._recoilDir * this._recoilT * 3.5;   // 발사 반동(뒤로 톡, 약하게)
+    }
+
+    // 현재 프레임의 마커 앵커(name) 화면좌표 (flip 미러 고려). 없으면 null.
+    _frameAnchor(entity, name) {
+        if (!entity || !entity._frames) return null;
+        const fr = entity._frames[entity.asm ? entity.asm.getCurrentFrame() : entity._frameIdx];
+        const a = fr && fr.anchors && fr.anchors[name];
+        if (!a) return null;
+        const ax = this._atkFlip ? (entity.pw - 1 - a[0]) : a[0];
+        return { x: (entity.x - this.engine.cameraX) + ax, y: entity.y + a[1] };
+    }
+
+    // 총구 화면좌표 + 발사 방향 (dir: +1 오른쪽 / -1 왼쪽)
+    // 마커 앵커('muzzle')가 있으면 그걸(정확·프레임추적), 없으면 휴리스틱(밝은 픽셀 무게중심) 폴백.
+    _muzzlePos() {
+        const g = this._gun;
+        if (!g) return null;
+        const dir = this._atkFlip ? 1 : -1;
+        const an = this._frameAnchor(g, 'muzzle');
+        if (an) return { x: an.x, y: an.y, dir };
+        const m = this._muzzleLocal;
+        if (!m) return null;
+        const mx = this._atkFlip ? (g.pw - 1 - m.x) : m.x;
+        return { x: (g.x - this.engine.cameraX) + mx, y: g.y + m.y, dir };
+    }
+
+    // 한 발 발사 — 머즐버스트(모래)·트레이서·탄피·반동·머즐글로우
+    _spawnShot() {
+        const m = this._muzzlePos(); if (!m) return;
+        const dir = m.dir;
+        this._recoilT = 1; this._recoilDir = -dir;     // 반동: 발사 반대로
+        this._muzzleFlash = 1;                          // 머즐 글로우
+        for (let i = 0; i < 9; i++) {                   // 머즐 모래 버스트(앞으로 확)
+            const sp = 120 + Math.random() * 170;
+            this._muzzleP.push({ x: m.x, y: m.y, vx: dir * sp + (Math.random() - 0.5) * 60, vy: (Math.random() - 0.5) * 130, age: 0, life: 0.13 + Math.random() * 0.1 });
+        }
+        this._tracers.push({ x: m.x, y: m.y, vx: dir * (720 + Math.random() * 180), vy: (Math.random() - 0.5) * 18, age: 0, life: 0.11 });
+    }
+
+    _updateFiringFx(dt) {
+        this._recoilT = Math.max(0, this._recoilT - dt * 0.014);
+        this._muzzleFlash = Math.max(0, this._muzzleFlash - dt * 0.012);
+        const s = dt / 1000;
+        const adv = (arr, grav) => { for (let i = arr.length - 1; i >= 0; i--) { const p = arr[i]; p.age += s; if (p.age >= p.life) { arr.splice(i, 1); continue; } if (grav) p.vy += grav * s; p.x += p.vx * s; p.y += p.vy * s; } };
+        adv(this._muzzleP, 200); adv(this._tracers, 0);
+    }
+
+    _renderFiringFx(ctx) {
+        if (!this._muzzleP.length && !this._tracers.length && this._muzzleFlash <= 0.02) return;
+        const NT = SAND_TONES_RGB.length;
+        // 머즐 글로우 (가산 라디얼)
+        if (this._muzzleFlash > 0.02) {
+            const m = this._muzzlePos();
+            if (m) {
+                const r = 26 * this._muzzleFlash + 7;
+                const gr = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, r);
+                gr.addColorStop(0, `rgba(255,236,184,${0.85 * this._muzzleFlash})`);
+                gr.addColorStop(0.5, `rgba(255,182,92,${0.4 * this._muzzleFlash})`);
+                gr.addColorStop(1, 'rgba(255,150,60,0)');
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, 6.283); ctx.fill(); ctx.restore();
+            }
+        }
+        // 트레이서 (밝은 줄기, 가산)
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        for (const p of this._tracers) {
+            ctx.globalAlpha = Math.max(0, 1 - p.age / p.life);
+            ctx.fillStyle = 'rgb(255,242,206)';
+            ctx.fillRect(((p.vx > 0 ? p.x - 14 : p.x)) | 0, (p.y - 1) | 0, 14, 2);
+        }
+        ctx.restore();
+        // 머즐 모래 버스트
+        for (const p of this._muzzleP) {
+            const tc = SAND_TONES_RGB[(sandHash(p.x, p.y) * NT) | 0];
+            ctx.globalAlpha = Math.max(0, 1 - p.age / p.life) * 0.9;
+            ctx.fillStyle = `rgb(${Math.min(255, tc[0] + 40) | 0},${Math.min(255, tc[1] + 28) | 0},${tc[2] | 0})`;
+            ctx.fillRect(p.x | 0, p.y | 0, 2, 2);
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // 엔티티 한 프레임을 화면좌표 입자 [sx,sy,r,g,b] 목록으로 (모래 블렌드용, 3픽셀 샘플)
+    _pixelsScreen(entity, frameIdx, flip) {
+        const out = [];
+        if (!entity || !entity._frames) return out;
+        const fr = entity._frames[frameIdx]; if (!fr || !fr.pixels) return out;
+        const cache = entity._rgbaCache || this.engine.palette_mgr?.rgbaCache;
+        if (!cache) return out;
+        const pw = entity.pw;
+        const ox = (entity.x - this.engine.cameraX) | 0, oy = entity.y | 0;
+        const px = fr.pixels, STEP = 2;   // 조밀 그레인
+        for (let i = 0; i < px.length; i += STEP) {
+            const q = px[i]; const c = cache.get(q[2]);
+            if (!c || c[3] < 16) continue;
+            out.push([ox + (flip ? (pw - 1 - q[0]) : q[0]), oy + q[1], c[0], c[1], c[2]]);
+        }
+        return out;
+    }
+
+    // 총(공격 중)에 낮밤 톤 — 플레이어 reveal과 "동일 공식"(배경톤으로 부드럽게 어두워짐, 순수 검정 X).
+    // 솔리드 총 위에, 같은 픽셀을 어두워진 색으로 덮어 칠한다. 낮(k≈0)엔 원본 그대로(스킵).
+    _renderGunLight(ctx) {
+        const g = this._gun;
+        if (!g || !g.visible || !g.asm) return;
+        const k = this._fxK ?? 0;
+        if (k < 0.02) return;                          // 낮엔 손대지 않음(밝게)
+        const p = this._p;
+        const avgLum = this._lastAvgLum ?? 0.5;        // 최근 배경 밝기(플레이어가 계산해 저장)
+        const nightReveal = p.revBase + p.revLumScale * Math.min(1, avgLum * 1.6);
+        const reveal = 1 - (1 - nightReveal) * k;      // 낮 1.0 → 밤 nightReveal
+        const blend  = p.revBlend * k;                 // 밤에 배경색 융합
+        const bt = this._bgTone || { r: 120, g: 110, b: 100 };
+        const body = this._pixelsScreen(g, g.asm.getCurrentFrame(), this._atkFlip);
+        ctx.save();
+        ctx.globalAlpha = 1;
+        for (const d of body) {
+            const r = (d[2] * reveal * (1 - blend) + bt.r * blend) | 0;
+            const gg = (d[3] * reveal * (1 - blend) + bt.g * blend) | 0;
+            const b = (d[4] * reveal * (1 - blend) + bt.b * blend) | 0;
+            ctx.fillStyle = `rgb(${r},${gg},${b})`;
+            ctx.fillRect(d[0] | 0, d[1] | 0, 3, 3);
+        }
+        ctx.restore();
+    }
+
+    // 모래 코팅 시작. bodyEntity = 그 밑에서 재생되는 "원본"(움직임, 엔진이 솔리드 100% 렌더). src = 모래 출발 포즈.
+    // 캐릭터는 엔티티 렌더 그대로 두고(깜박임 방지), 모래는 그 위에 오버레이로만 흐른다.
+    _startCoat(mode, bodyEntity, src, ms, onDone) {
+        this._blend = { mode, bodyEntity, src: src || [], t: 0, ms: Math.max(1, ms), flip: this._atkFlip, onDone };
+    }
+
+    // 모래 코팅 — "하나의 흐르는 파도": 모래 띠가 몸을 가로질러 한 방향으로 쓸고 지나간다.
+    //  · 라이즈(시작)=뒤→앞,  공격대기(끝)=앞→뒤 (통일된 방향성).
+    //  · 띠의 앞 가장자리=생성(모래 나타남), 뒤 가장자리=사라짐. 띠가 지나간 자리에서 캐릭터가 드러남.
+    //  · 픽셀은 진행 방향으로 출렁(surge) + 지글지글. 띠 양끝은 sin으로 부드럽게 페이드.
+    _renderSandCoat(ctx, b, W, H) {
+        const ent = b.bodyEntity;
+        if (!ent || !ent.asm) return;
+        let t = b.t; t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const ease = t * t * (3 - 2 * t);
+        const body = this._pixelsScreen(ent, ent.asm.getCurrentFrame(), b.flip);  // 움직이는 원본 몸
+        const src = b.src, sN = src.length || 1, NT = SAND_TONES_RGB.length;
+        const isLower = b.mode === 'lower';
+        const Tj = (performance.now() * 0.05) | 0;   // 매 프레임 변하는 지글 시드
+        const dirF = this._atkFlip ? 1 : -1;         // 발사(앞=총구) 방향
+        const surgeDir = isLower ? -dirF : dirF;     // 라이즈=앞으로 / 공격대기=뒤로
+        const BAND = 0.5;                            // 파도 띠 폭(한 번에 모래인 비율)
+        let bMinX = 1e9, bMaxX = -1e9;
+        for (const d of body) { if (d[0] < bMinX) bMinX = d[0]; if (d[0] > bMaxX) bMaxX = d[0]; }
+        const bRange = Math.max(1, bMaxX - bMinX);
+        // 픽셀의 파도 진행 위치 p (0=파도 시작쪽, 1=끝쪽). genT~clrT 사이가 "모래 띠".
+        const waveP = (d) => {
+            const frontN = (dirF > 0 ? (d[0] - bMinX) : (bMaxX - d[0])) / bRange;   // 0=뒤, 1=앞(총구)
+            return isLower ? (1 - frontN) : frontN;                                 // 라이즈 뒤→앞 / 공격대기 앞→뒤
+        };
+        const bc = this._blendCv || (this._blendCv = document.createElement('canvas'));
+        if (bc.width !== W || bc.height !== H) { bc.width = W; bc.height = H; }
+        const bx = bc.getContext('2d');
+
+        // 캐릭터(원본)는 엔티티가 솔리드 100%로 이미 렌더됨(깜박임 없음). 그 위에 모래 띠만 오버레이로 흐른다.
+        // 모래 띠 (생성→사라짐 한 방향 흐름)
+        bx.clearRect(0, 0, W, H);
+        const baseA = isLower ? 0.8 : 0.7;
+        for (let j = 0; j < body.length; j++) {
+            const d = body[j];
+            const p = waveP(d);
+            const genT = p * (1 - BAND) + (sandHash(d[0] * 0.7, d[1] * 0.7) - 0.5) * 0.12;
+            if (ease <= genT || ease >= genT + BAND) continue;                       // 띠 밖 = 모래 없음
+            if (isLower && sandHash(d[0] * 2.1 + 7, d[1] * 1.7) < 0.4) continue;      // 공격대기: 성기게
+            const near = (ease - genT) / BAND;                                       // 0(생성)→1(사라짐)
+            const o = src[(j * 97 + 13) % sN];
+            const fly = Math.min(1, near * 2.2);                                     // 생성 시 src→몸으로 안착
+            let px = o[0] + (d[0] - o[0]) * fly + (sandHash(d[0] * 0.9 + Tj, d[1] * 0.4) - 0.5) * 3.0 + surgeDir * near * near * 13;
+            let py = o[1] + (d[1] - o[1]) * fly + (sandHash(d[0] * 0.3, d[1] * 0.9 + Tj) - 0.5) * 3.0 - near * 4;
+            const tc = SAND_TONES_RGB[(sandHash(d[0] * 3.1 + 5, d[1] * 2.3 + 9) * NT) | 0];
+            bx.globalAlpha = baseA * Math.sin(near * Math.PI);                       // 띠 양끝(생성/사라짐) 부드럽게
+            bx.fillStyle = `rgb(${(tc[0] * 0.8 + d[2] * 0.2) | 0},${(tc[1] * 0.8 + d[3] * 0.2) | 0},${(tc[2] * 0.8 + d[4] * 0.2) | 0})`;
+            bx.fillRect(px | 0, py | 0, 2, 2);
+        }
+        bx.globalAlpha = 1;
+        ctx.save();
+        ctx.filter = 'blur(0.4px)';
+        ctx.drawImage(bc, 0, 0);
+        ctx.restore();
+    }
+
+    // ── 에디터 FX 라이브 슬라이더 적용 ───────────────────────────────
+    // fx_params.csv key → 소스값(this._p.* 또는 모듈 let) 갱신. onUpdate/render가 매 프레임
+    // 이 소스값을 읽으므로 다음 프레임에 바로 반영(저장 X — 확정값은 코드/CSV에 수동 반영).
+    // 매핑은 _loadConfig()와 1:1 대응.
+    applyFxParam(key, value) {
+        const v = Number(value);
+        if (!Number.isFinite(v)) return false;
+        const p = this._p;
+        switch (key) {
+            // 모듈 let (사용처가 매 프레임 읽음)
+            case 'bg.trans_ms':      BG_TRANS_MS   = v; break;
+            case 'bg.mote_rate':     BG_MOTE_RATE  = v; break;
+            case 'intro.ms':         INTRO_MS      = v; break;
+            case 'sand.band_max':    SAND_BAND_MAX = v; break;
+            case 'sand.grain':       SAND_GRAIN    = v; break;
+            case 'sand.settle_ms':   SAND_SETTLE_MS= v; break;
+            case 'sand.buildup_ms':  SAND_BUILDUP_MS=v; break;
+            case 'sand.fall_rate':   SAND_FALL_RATE= v; break;
+            case 'sand.gravity':     SAND_GRAVITY  = v; break;
+            // this._p (낮밤/림/리빌/조명/근경림 — render·onUpdate가 매 프레임 읽음)
+            case 'daynight.period_s':        p.dayPeriod   = v; break;
+            case 'daynight.char_bright_min': p.charMin     = v; break;
+            case 'rim.fade_threshold':       p.rimThresh   = v; break;
+            case 'rim.peak':                 p.rimPeak     = v; break;
+            case 'rim.floor_mult':           p.rimFloorMul = v; break;
+            case 'rim.width_base':           p.rimWidth    = v; break;
+            case 'rim.dir_base':             p.rimDirBase  = v; break;
+            case 'reveal.night_base':        p.revBase     = v; break;
+            case 'reveal.night_lum_scale':   p.revLumScale = v; break;
+            case 'reveal.blend':             p.revBlend    = v; break;
+            case 'light.ambient_max':        p.ambMax      = v; break;
+            case 'light.key_intensity_max':  p.keyMax      = v; break;
+            case 'light.vignette_max':       p.vigMax      = v; break;
+            case 'light.glow_max':           p.glowMax     = v; break;
+            case 'light.fog_max':            p.fogMax      = v; break;
+            case 'light.bloom_threshold':    // 블룸 임계는 캐시 재빌드 필요
+                p.bloomThreshold = v;
+                if (this.engine?.glow) this.engine.glow._bloomThreshold = v;
+                if (this.engine?.layers) for (const L of this.engine.layers.layers) L._bloomReady = false;
+                break;
+            case 'nearrim.base':             p.nearRimBase = v; break;
+            case 'nearrim.night':            p.nearRimNight= v; break;
+            default: return false;
+        }
+        return true;
     }
 
     // 구름-포그 텍스쳐 로드 → 캔버스로 1회 래스터 (앞/뒤 2겹)
@@ -360,15 +739,56 @@ export default class GolmokGame extends Scene {
             if (Math.abs(diff) <= step) { player.x = this._targetX; this._targetX = null; }
             else dx = diff > 0 ? MOVE_SPEED : -MOVE_SPEED;
         }
+        // 이동 잠금: 공격·공격대기·블렌드(특수 동작) 중엔 이동키/클릭이동 무시. idle/walk에서만 이동.
+        //   ※ 나중에 "이동 가능한 특수 동작"이 생기면 그 상태를 여기 예외로 추가.
+        if (this._attacking || this._blend) { dx = 0; this._targetX = null; }
         if (dx !== 0) {
             player.x += dx * dtSec;
             player.flipX = dx > 0;                                           // 에셋 기본 시선(왼쪽) 반영하여 방향 전환 (dx > 0 일 때 flip)
             player.x = Math.max(0, Math.min(this._worldW - player.pw, player.x));
-            player.setState('walk');
-        } else {
-            player.setState('idle');
         }
+        // 애니: 로직은 파라미터만 세팅 → 컨트롤러(플로우)가 전환 결정. 미준비 시 수동 폴백.
+        if (this._anim) { this._anim.setParam('speed', dx !== 0 ? 1 : 0); this._anim.update(); }
+        else            { player.setState(dx !== 0 ? 'walk' : 'idle'); }
         player.y = this._groundY;                                            // 하드코딩된 GROUND_Y 대신 동적 바닥 높이 적용
+
+        // 모래 코팅 진행 — 본체는 코팅 렌더가 직접 그림(투명도 40%→100%). 끝나면 엔티티 렌더(100%)로 인계.
+        if (this._blend) {
+            this._blend.t += dt / this._blend.ms;
+            if (this._blend.t >= 1) {
+                const b = this._blend; this._blend = null;
+                if (b.bodyEntity) b.bodyEntity.visible = true;   // 코팅 끝 → 엔티티가 100%로 재생(이후 발사)
+                if (b.onDone) b.onDone();
+            }
+        }
+
+        // 공격(총): 발치 정합 + 플로우. 되돌리기는 끝까지 재생 후 "내린 자세 유지(hold)".
+        //  · 유지 중 움직이면 즉시 이동(walk, 모래 없음). · 가만히 5초 지나면 모래 효과로 idle 전환(블렌딩 구간).
+        if (this._attacking && this._gun && this._gunAnim) {
+            this._positionGun();
+            this._gunAnim.update();
+            const asm = this._gun.asm;
+            // 발사 중(atk_active) — 일정 간격으로 한 발씩 임팩트 FX
+            if (asm.current === 'atk_active' && this._gun.visible) {
+                this._fireAcc += dt;
+                let guard = 0;
+                while (this._fireAcc >= 110 && guard++ < 4) { this._fireAcc -= 110; this._spawnShot(); }
+            } else {
+                this._fireAcc = 110;   // 다음 발동 진입 시 즉발
+            }
+            if (!this._blend && asm.current === 'standby' && asm.isDone()) {
+                // 공격대기 끝 → idle로 전환하고, "idle(솔리드) 위에" 모래 파도를 띄움(스왑 어색함 없음).
+                const src = this._pixelsScreen(this._gun, asm.getCurrentFrame(), this._atkFlip);  // 모래 원천 = 대기 자세
+                this._gun.visible = false;
+                if (player) {
+                    player.visible = true;            // idle 보임(코팅 본체)
+                    if (player.asm) { player.asm.setState('idle'); player.asm.restart(); }  // idle 0프레임부터
+                }
+                this._attacking = false;
+                this._startCoat('lower', player, src, 550, null);   // body=idle, 모래 파도가 idle 위로 흐름
+            }
+        }
+        this._updateFiringFx(dt);   // 발사 파티클(머즐버스트/트레이서/탄피)·반동·글로우 갱신 (비행 중엔 항상)
 
         // 카메라
         const rawCamX = player.x + player.pw / 2 - engine.gameWidth / 2;
@@ -459,6 +879,7 @@ export default class GolmokGame extends Scene {
         const ctx = canvas.getContext('2d');
         const W = canvas.width, H = canvas.height;
         let overlay = false;
+        this._renderStamp = (this._renderStamp | 0) + 1;   // FX 소스 공유 캐시 유효성 판별용
 
         if (this._tr) {
             const t = this._tr.t;
@@ -585,6 +1006,9 @@ export default class GolmokGame extends Scene {
             return;   // 인트로 중엔 일반 캐릭터/모래알/디지털/포그 스킵
         }
 
+        // 프레임당 FX 소스 readback 통합 — 근경림·캐릭터영역이 쓸 픽셀을 한 캔버스에 패킹해 getImageData 1회로 읽음
+        this._buildFxSrc(W, H);
+
         // 근경 역광 림 — 원경(뒤) 빛이 근경 실루엣 가장자리를 감싸 입체감/공간감 부여
         this._renderNearRim(ctx, W, H);
 
@@ -594,15 +1018,24 @@ export default class GolmokGame extends Scene {
         // 발밑 그림자 (항상, 캐릭터 아래) — 정지=픽셀 깨짐 / 이동=블러 모션
         this._drawShadow(ctx);
 
-        // 캐릭터 본체 (그림자 위, 항상 재그림 - 비침 방지 및 배경색 융합 렌더러 적용)
-        const moving = this._sandI > 0.05;
-        const l2 = this.engine.layers.getCanvas(2);
-        const reg = this._readCharRegion(W, H);   // L1+L2 캐릭터 영역 1회 읽기 → trail·reveal·rim 공유
-        if (moving) this._renderCharTrail(ctx, reg);
-        this._renderCharReveal(ctx, reg, l2, W, H);
+        // 캐릭터 본체 — 공격(총) 중엔 총에 낮밤 다크닝(+코팅), 아니면 일반 캐릭터 FX.
+        const gunActive = this._attacking && this._gun && this._gun.visible;
+        if (this._blend) {
+            if (gunActive) this._renderGunLight(ctx);     // 코팅 중에도 총에 낮밤 적용
+            this._renderSandCoat(ctx, this._blend, W, H);
+        } else if (gunActive) {
+            this._renderGunLight(ctx);                    // 발사 중 총에 낮밤 다크닝
+        } else {
+            const moving = this._sandI > 0.05;
+            const l2 = this.engine.layers.getCanvas(2);
+            const reg = this._readCharRegion(W, H);   // L1+L2 캐릭터 영역 1회 읽기 → trail·reveal·rim 공유
+            if (moving) this._renderCharTrail(ctx, reg);
+            this._renderCharReveal(ctx, reg, l2, W, H);
+            this._renderCharRim(ctx, reg);            // 외곽 역광 rim — 뒤 배경색 픽셀별
+        }
 
-        // 캐릭터 외곽 역광 rim — 뒤 배경색을 픽셀별로 받아 가장자리에서 페이드
-        this._renderCharRim(ctx, reg);
+        // 발사 임팩트 FX (머즐 글로우·모래버스트·트레이서·탄피) — 캐릭터 위
+        this._renderFiringFx(ctx);
 
         // 앰비언트 모래알 (캐릭터 외곽 디지털 디졸브) — 요청으로 OFF
         if (CHAR_DISSOLVE_ENABLED) this._drawAmbientSand(ctx);
@@ -804,27 +1237,27 @@ export default class GolmokGame extends Scene {
     }
 
     // 배경(L1) 픽셀이 위로 천천히 피어오르는 모래알 — 분위기
+    // 색 샘플은 직전 프레임 통합버퍼(_fx)의 근경 밴드에서(1×1 readback 스톨 제거). 근경 parallax=1 → 화면x↔밴드 정합.
     _updateBgMotes(dt) {
         const dtSec = dt / 1000;
         const e = this.engine, W = e.gameWidth, H = e.gameHeight;
-        const L1 = e.layers.getCanvas(1);
-        const lctx1 = L1 ? L1.getContext('2d') : null;
-        if (lctx1) {
+        const fx = this._fx;   // update는 render 전 → 직전 프레임 패킹분 (앰비언트라 1프레임 지연 무관)
+        if (fx) {
+            const fd = fx.fd, S = fx.fxW;
             this._bgMoteAcc += BG_MOTE_RATE * dtSec;
             let guard = 0;
             while (this._bgMoteAcc >= 1 && guard++ < 40) {
                 this._bgMoteAcc -= 1;
                 const x = (Math.random() * W) | 0;
                 const y = (H * 0.45 + Math.random() * H * 0.55) | 0;   // 중하단에서 피어오름
-                const sx = Math.min(L1.width - 1, Math.max(0, Math.floor(e.cameraX) + x));
-                let col; try { col = lctx1.getImageData(sx, y, 1, 1).data; } catch (_) { break; }
-                if (col[3] < 16) continue;
+                const bi = (((y >> 1) * S) + (x >> 1)) << 2;           // 근경 밴드(band1L) 반해상 좌표
+                if (fd[bi + 3] < 16) continue;                         // 근경 실루엣 있는 곳만
                 this._bgMotes.push({
                     x, y,
                     vy: -(8 + Math.random() * 22),       // 위로
                     vx: (Math.random() - 0.5) * 8,
                     age: 0, maxlife: 1.2 + Math.random() * 1.8,
-                    r: Math.min(255, col[0] + 70), g: Math.min(255, col[1] + 64), b: Math.min(255, col[2] + 54),
+                    r: Math.min(255, fd[bi] + 70), g: Math.min(255, fd[bi + 1] + 64), b: Math.min(255, fd[bi + 2] + 54),
                 });
             }
         }
@@ -847,8 +1280,78 @@ export default class GolmokGame extends Scene {
         ctx.globalAlpha = 1;
     }
 
-    // 캐릭터 영역의 L1(배경)·L2(캐릭터) 픽셀을 1회만 읽어 reveal·rim·trail이 공유 (getImageData 호출 절반)
+    // 프레임당 FX 소스 readback 통합기 —
+    // 근경림(L1 알파·L0 색, 반해상) + 캐릭터영역(L0 색·L2 본체, 1:1) 을 한 캔버스에 패킹해
+    // getImageData 1회로 읽는다. 기존: nearRim 2회 + charRegion 2회 = 프레임당 4회 GPU 스톨 → 1회.
+    // 각 소비자에 넘기는 픽셀 바이트는 기존과 동일(같은 다운스케일/1:1 복사) → 룩 변화 없음.
+    _buildFxSrc(W, H) {
+        const e = this.engine;
+        const L0 = e.layers.getCanvas(0), L1 = e.layers.getCanvas(1), L2 = e.layers.getCanvas(2);
+        if (!L0 || !L1) { this._fx = null; return; }
+        const px1 = e.layers.get(1)?.parallax ?? 1;
+        const px0 = e.layers.get(0)?.parallax ?? 0.3;
+        const hw = W >> 1, hh = H >> 1;
+        const sx1 = Math.min(Math.max(0, Math.floor(e.cameraX * px1)), Math.max(0, L1.width - W));
+        const sx0 = Math.min(Math.max(0, Math.floor(e.cameraX * px0)), Math.max(0, L0.width - W));
+
+        // 캐릭터 영역 좌표 (_readCharRegion 폴백과 동일 규칙)
+        let cr = null;
+        const p = this._player;
+        if (p && L2) {
+            const psx = (p.x - e.cameraX) | 0;
+            const x0 = Math.max(0, psx - 2), x1 = Math.min(W, psx + p.pw + 2);
+            const y0 = Math.max(0, p.y - 2), y1 = Math.min(H, p.y + p.ph + 2);
+            const rw = x1 - x0, rh = y1 - y0;
+            if (rw > 0 && rh > 0) {
+                let bgsx = Math.floor(e.cameraX * px0) + x0; if (bgsx < 0) bgsx = 0;
+                const lw = Math.max(1, Math.min(rw, L0.width - bgsx));
+                cr = { x0, y0, rw, rh, lw, bgsx };
+            }
+        }
+
+        // 패킹 캔버스: 상단 band1(반해상 L1|L0), 하단 band2(캐릭터 L0|L2)
+        const fxW = Math.max(hw << 1, cr ? cr.lw + cr.rw : 1);
+        const fxH = hh + (cr ? cr.rh : 0);
+        const cv = this._fxCanvas || (this._fxCanvas = document.createElement('canvas'));
+        if (cv.width !== fxW || cv.height !== fxH) { cv.width = fxW; cv.height = fxH; }
+        const fctx = this._fxCtx || (this._fxCtx = cv.getContext('2d', { willReadFrequently: true }));
+        fctx.imageSmoothingEnabled = true;   // 근경림 반해상 다운스케일 (기존 c0/c1 기본값과 동일)
+        fctx.clearRect(0, 0, fxW, fxH);
+        fctx.drawImage(L1, sx1, 0, W, H, 0,  0, hw, hh);   // band1L: 근경 알파
+        fctx.drawImage(L0, sx0, 0, W, H, hw, 0, hw, hh);   // band1R: 원경 색
+        if (cr) {
+            fctx.drawImage(L0, cr.bgsx, cr.y0, cr.lw, cr.rh, 0,     hh, cr.lw, cr.rh);   // band2L: 캐릭터 뒤 원경색
+            fctx.drawImage(L2, cr.x0,   cr.y0, cr.rw, cr.rh, cr.lw, hh, cr.rw, cr.rh);   // band2R: 캐릭터 본체
+        }
+        let fd;
+        try { fd = fctx.getImageData(0, 0, fxW, fxH).data; }
+        catch (_) { this._fx = null; return; }
+
+        // 캐릭터 영역을 타이트 배열로 재포장 (소비자 선형 인덱싱·putImageData 호환 → 바이트 동일)
+        let char = null;
+        if (cr) {
+            const { lw, rw, rh } = cr;
+            const l1d = new Uint8ClampedArray(lw * rh * 4);
+            for (let y = 0; y < rh; y++) {
+                const s = ((hh + y) * fxW) << 2;
+                l1d.set(fd.subarray(s, s + (lw << 2)), (y * lw) << 2);
+            }
+            const l2img = new ImageData(rw, rh);
+            const l2d = l2img.data;
+            for (let y = 0; y < rh; y++) {
+                const s = ((hh + y) * fxW + lw) << 2;
+                l2d.set(fd.subarray(s, s + (rw << 2)), (y * rw) << 2);
+            }
+            char = { x0: cr.x0, y0: cr.y0, rw, rh, lw, l1d, l2img };
+        }
+        this._fx = { fd, fxW, hw, hh, char };
+        this._fxStamp = this._renderStamp;
+    }
+
+    // 캐릭터 영역의 L0(원경 색)·L2(캐릭터) 픽셀. 같은 프레임 _buildFxSrc 패킹분이 있으면 공유(readback 0),
+    // 없으면(인트로 등 단독 경로) 자체 1회 읽기로 폴백. reveal·rim·trail이 공유.
     _readCharRegion(W, H) {
+        if (this._fx && this._fxStamp === this._renderStamp) return this._fx.char;
         const e = this.engine; const p = this._player;
         // env(림/리빌의 배경색) = 원경(L0). 근경(L1)은 검은 실루엣이라 색이 없음.
         // → 캐릭터 뒤에 실제로 보이는 색(원경: 노을·도시 불빛)을 픽셀별로 받는다.
@@ -872,49 +1375,39 @@ export default class GolmokGame extends Scene {
     // 근경(L1 검은 실루엣) 가장자리에 원경(L0) 빛을 역광으로 입힘 → 평평한 실루엣에 입체감/공간감.
     // env(뒤 색) = 원경, 대상 = 근경 엣지. 뒤가 밝을수록(불빛·노을) 강하게 빛나고 어두우면 안 빛남.
     _renderNearRim(ctx, W, H) {
-        const e = this.engine;
-        const L0 = e.layers.getCanvas(0), L1 = e.layers.getCanvas(1);
-        if (!L0 || !L1) return;
+        const fx = this._fx;
+        if (!fx) return;                    // 통합 readback(_buildFxSrc) 미준비 시 스킵
         const p = this._p;
         const mul = this._curRimMul ?? 1;   // 맵별 배율 (밝은 원경 맵은 낮게)
         const STR = (p.nearRimBase + (p.nearRimNight - p.nearRimBase) * (this._fxK ?? 0)) * mul; // 낮 약, 밤 강
         if (STR <= 0.02) return;
-        const px1 = e.layers.get(1)?.parallax ?? 1;
-        const px0 = e.layers.get(0)?.parallax ?? 0.3;
-        const sx1 = Math.min(Math.max(0, Math.floor(e.cameraX * px1)), Math.max(0, L1.width - W));
-        const sx0 = Math.min(Math.max(0, Math.floor(e.cameraX * px0)), Math.max(0, L0.width - W));
-        // ── 절반 해상도로 처리 (getImageData readback 비용 1/4, 부드러운 글로우라 화질 영향 없음) ──
-        const hw = W >> 1, hh = H >> 1;
-        const s1 = this._nrS1 || (this._nrS1 = document.createElement('canvas'));
-        const s0 = this._nrS0 || (this._nrS0 = document.createElement('canvas'));
+        // ── 통합 버퍼에서 직접 읽음: 근경 알파=band1L(0,0), 원경 색=band1R(hw,0), stride=fxW ──
+        // (소스 픽셀은 기존 s1/s0 반해상 다운스케일과 동일 → 결과 화질 동일)
+        const fd = fx.fd, S = fx.fxW, hw = fx.hw, hh = fx.hh;
         const cv = this._nrCanvas || (this._nrCanvas = document.createElement('canvas'));
-        s1.width = hw; s1.height = hh; s0.width = hw; s0.height = hh; cv.width = hw; cv.height = hh;
-        const c1 = s1.getContext('2d'), c0 = s0.getContext('2d'), nctx = cv.getContext('2d');
-        let nA, fC;
-        try {
-            c1.clearRect(0, 0, hw, hh); c1.drawImage(L1, sx1, 0, W, H, 0, 0, hw, hh);   // 근경 축소
-            c0.clearRect(0, 0, hw, hh); c0.drawImage(L0, sx0, 0, W, H, 0, 0, hw, hh);   // 원경 축소
-            nA = c1.getImageData(0, 0, hw, hh).data;
-            fC = c0.getImageData(0, 0, hw, hh).data;
-        } catch (_) { return; }
+        if (cv.width !== hw || cv.height !== hh) { cv.width = hw; cv.height = hh; }
+        const nctx = cv.getContext('2d');
         const out = nctx.createImageData(hw, hh);
         const od = out.data;
-        const rowB = hw << 2;   // 반해상도에서 R=1 ≈ 풀해상도 R=2
+        const rowS = S << 2;        // 패킹 버퍼 한 행 (= R=1 이웃)
+        const farOff = hw << 2;     // 원경 밴드 x오프셋 (band1R)
         for (let y = 0; y < hh; y++) {
             for (let x = 0; x < hw; x++) {
-                const i = (y * hw + x) << 2;
-                if (nA[i + 3] < 40) continue;                             // 근경 불투명만
-                const l = x > 0 ? nA[i - 4 + 3] : 0;
-                const r = x < hw - 1 ? nA[i + 4 + 3] : 0;
-                const u = y > 0 ? nA[i - rowB + 3] : 0;
-                const dn = y < hh - 1 ? nA[i + rowB + 3] : 0;
+                const ni = (y * S + x) << 2;                              // 근경 알파 (band1L)
+                if (fd[ni + 3] < 40) continue;                            // 근경 불투명만
+                const l = x > 0 ? fd[ni - 4 + 3] : 0;
+                const r = x < hw - 1 ? fd[ni + 4 + 3] : 0;
+                const u = y > 0 ? fd[ni - rowS + 3] : 0;
+                const dn = y < hh - 1 ? fd[ni + rowS + 3] : 0;
                 if (l >= 40 && r >= 40 && u >= 40 && dn >= 40) continue;   // 엣지만
-                const fr = fC[i], fg = fC[i + 1], fb = fC[i + 2];
+                const fi = ni + farOff;                                    // 원경 색 (band1R)
+                const fr = fd[fi], fg = fd[fi + 1], fb = fd[fi + 2];
                 const lum = fr * 0.299 + fg * 0.587 + fb * 0.114;
                 if (lum < 24) continue;                                   // 뒤 어두우면 역광 없음
                 let a = STR * (lum < 200 ? lum / 200 : 1) * 0.6;
                 if (a <= 0.02) continue; if (a > 1) a = 1;
-                od[i] = fr; od[i + 1] = fg; od[i + 2] = fb; od[i + 3] = (a * 255) | 0;
+                const oi = (y * hw + x) << 2;                              // out 타이트 버퍼
+                od[oi] = fr; od[oi + 1] = fg; od[oi + 2] = fb; od[oi + 3] = (a * 255) | 0;
             }
         }
         nctx.putImageData(out, 0, 0);
@@ -936,6 +1429,7 @@ export default class GolmokGame extends Scene {
             avgLum += (l1d[i] * 0.299 + l1d[i + 1] * 0.587 + l1d[i + 2] * 0.114) / 255; count++;
         }
         if (count > 0) { bgR /= count; bgG /= count; bgB /= count; avgLum /= count; }
+        this._lastAvgLum = avgLum;   // 총 다크닝(공격 중)이 동일 배경밝기 재사용
         const cd = l2img.data;
         const k = this._fxK ?? 1.0;
         const nightReveal = this._p.revBase + this._p.revLumScale * Math.min(1, avgLum * 1.6);  // 밤 리빌(배경 밝기 비례) — fx_params.csv

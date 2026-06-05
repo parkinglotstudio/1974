@@ -1,0 +1,18 @@
+{
+  "schema": "SandEngine.Animator.v1",
+  "sprite": "ch01_player",
+  "default": "idle",
+
+  "parameters": [
+    { "name": "speed",  "type": "float",   "default": 0 },
+    { "name": "fire",   "type": "trigger" },
+    { "name": "firing", "type": "bool",    "default": false }
+  ],
+
+  "transitions": [
+    { "from": "idle", "to": "walk", "conditions": [ { "p": "speed", "op": ">",  "v": 0.1 } ] },
+    { "from": "walk", "to": "idle", "conditions": [ { "p": "speed", "op": "<=", "v": 0.1 } ] }
+  ],
+
+  "_note": "states(프레임/fps/loop)는 스프라이트 stateDef에 있음. 여기는 parameters+transitions(플로우)만. 총 3종(atk_start/atk_active/atk_recover)은 gif 변환 후 추가."
+}
