@@ -282,8 +282,7 @@ export default class GolmokGame extends Scene {
                 parameters: [ { name: 'firing', type: 'bool', default: false } ],
                 transitions: [
                     { from: 'atk_start',   to: 'atk_active',  hasExitTime: true },                       // 준비 끝 → 발동
-                    { from: 'atk_active',  to: 'atk_recover', conditions: [ { p: 'firing', op: '==', v: false } ] }, // 떼면 → 회수
-                    { from: 'atk_recover', to: 'standby',     hasExitTime: true },                        // 회수 끝 → 공격대기
+                    { from: 'atk_active',  to: 'atk_recover', conditions: [ { p: 'firing', op: '==', v: false } ] }, // 떼면 → 회수 (회수 끝나면 바로 idle, 공격대기 없음)
                 ],
             });
             // 발 정합 앵커(원시값): 플레이어 idle 0프레임 ↔ 총 atk_start 0프레임. flipX(미러) 고려해 매 프레임 계산.
@@ -293,7 +292,9 @@ export default class GolmokGame extends Scene {
                 ? { pcx: pa.cx, ppw: p.pw, pby: pa.by, gcx: ga.cx, gpw: this._gun.pw, gby: ga.by }
                 : null;
             // 총구 이펙트 위치 = 발동 프레임 "머즐플래시(밝은 픽셀) 무게중심" — 이펙트가 총구 안에 오게(스프라이트 플래시와 정합)
-            const afi = g.stateDef?.states?.atk_active?.frames?.[3];
+            this._muzzleLocal = { x: (g.width * 0.5) | 0, y: (g.height * 0.42) | 0 };   // 기본값(검출 실패 대비)
+            const afr = g.stateDef?.states?.atk_active?.frames;
+            const afi = afr ? afr[Math.min(3, afr.length - 1)] : null;   // 발사 루프가 짧아도(3프레임) 안전
             const af = (afi != null) ? g.frames[afi]?.pixels : null;
             if (af && af.length) {
                 const pal = g.palette;
@@ -492,7 +493,17 @@ export default class GolmokGame extends Scene {
     // 모래 코팅 시작. bodyEntity = 그 밑에서 재생되는 "원본"(움직임, 엔진이 솔리드 100% 렌더). src = 모래 출발 포즈.
     // 캐릭터는 엔티티 렌더 그대로 두고(깜박임 방지), 모래는 그 위에 오버레이로만 흐른다.
     _startCoat(mode, bodyEntity, src, ms, onDone) {
-        this._blend = { mode, bodyEntity, src: src || [], t: 0, ms: Math.max(1, ms), flip: this._atkFlip, onDone };
+        if (bodyEntity) bodyEntity.visible = false; // 실루엣 튐을 차단하기 위해 본체 일시 비활성화
+        this._blend = { 
+            mode, 
+            bodyEntity, 
+            src: src || [], 
+            t: 0, 
+            ms: Math.max(1, ms), 
+            flip: this._atkFlip, 
+            onDone,
+            startCamX: this.engine.cameraX // 코팅 시작 시점의 카메라 X 저장 (이동 튐 방지용)
+        };
     }
 
     // 모래 코팅 — "하나의 흐르는 파도": 모래 띠가 몸을 가로질러 한 방향으로 쓸고 지나간다.
@@ -514,6 +525,10 @@ export default class GolmokGame extends Scene {
         let bMinX = 1e9, bMaxX = -1e9;
         for (const d of body) { if (d[0] < bMinX) bMinX = d[0]; if (d[0] > bMaxX) bMaxX = d[0]; }
         const bRange = Math.max(1, bMaxX - bMinX);
+        
+        // 실시간 카메라 횡스크롤 스크롤 델타 보정
+        const camDiff = this.engine.cameraX - (b.startCamX ?? this.engine.cameraX);
+
         // 픽셀의 파도 진행 위치 p (0=파도 시작쪽, 1=끝쪽). genT~clrT 사이가 "모래 띠".
         const waveP = (d) => {
             const frontN = (dirF > 0 ? (d[0] - bMinX) : (bMaxX - d[0])) / bRange;   // 0=뒤, 1=앞(총구)
@@ -523,9 +538,53 @@ export default class GolmokGame extends Scene {
         if (bc.width !== W || bc.height !== H) { bc.width = W; bc.height = H; }
         const bx = bc.getContext('2d');
 
-        // 캐릭터(원본)는 엔티티가 솔리드 100%로 이미 렌더됨(깜박임 없음). 그 위에 모래 띠만 오버레이로 흐른다.
-        // 모래 띠 (생성→사라짐 한 방향 흐름)
         bx.clearRect(0, 0, W, H);
+
+        // 실시간 캐릭터 불투명도 보간 계수 연산: t=0.5일 때 약 50%의 반투명 상태가 됨
+        const alphaFactor = 1.0 - 0.5 * Math.sin(t * Math.PI);
+        const k = this._fxK ?? 0;
+        const pParams = this._p;
+        const avgLum = this._lastAvgLum ?? 0.5;
+        const nightReveal = pParams.revBase + pParams.revLumScale * Math.min(1, avgLum * 1.6);
+        const reveal = 1 - (1 - nightReveal) * k;
+        const blend = pParams.revBlend * k;
+        const bt = this._bgTone || { r: 120, g: 110, b: 100 };
+
+        const applyDarkening = (r, g, b) => {
+            if (k < 0.02) return [r, g, b];
+            const dr = (r * reveal * (1 - blend) + bt.r * blend) | 0;
+            const dg = (g * reveal * (1 - blend) + bt.g * blend) | 0;
+            const db = (b * reveal * (1 - blend) + bt.b * blend) | 0;
+            return [dr, dg, db];
+        };
+
+        // 1) 이전 포즈(src) 직접 렌더링 (투명도 크로스페이드 및 카메라 스크롤 오차 보정 반영)
+        bx.save();
+        bx.globalAlpha = (1 - t) * alphaFactor;
+        for (let i = 0; i < src.length; i++) {
+            const o = src[i];
+            const px = (o[0] - camDiff) | 0;
+            const py = o[1] | 0;
+            const color = applyDarkening(o[2], o[3], o[4]);
+            bx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+            bx.fillRect(px, py, 3, 3);
+        }
+        bx.restore();
+
+        // 2) 새 포즈(body) 직접 렌더링 (투명도 크로스페이드 반영)
+        bx.save();
+        bx.globalAlpha = t * alphaFactor;
+        for (let i = 0; i < body.length; i++) {
+            const d = body[i];
+            const px = d[0] | 0;
+            const py = d[1] | 0;
+            const color = applyDarkening(d[2], d[3], d[4]);
+            bx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+            bx.fillRect(px, py, 3, 3);
+        }
+        bx.restore();
+
+        // 3) 모래 띠 (생성→사라짐 한 방향 흐름)
         const baseA = isLower ? 0.8 : 0.7;
         for (let j = 0; j < body.length; j++) {
             const d = body[j];
@@ -536,11 +595,20 @@ export default class GolmokGame extends Scene {
             const near = (ease - genT) / BAND;                                       // 0(생성)→1(사라짐)
             const o = src[(j * 97 + 13) % sN];
             const fly = Math.min(1, near * 2.2);                                     // 생성 시 src→몸으로 안착
-            let px = o[0] + (d[0] - o[0]) * fly + (sandHash(d[0] * 0.9 + Tj, d[1] * 0.4) - 0.5) * 3.0 + surgeDir * near * near * 13;
-            let py = o[1] + (d[1] - o[1]) * fly + (sandHash(d[0] * 0.3, d[1] * 0.9 + Tj) - 0.5) * 3.0 - near * 4;
+            
+            // 카메라 스크롤 보정이 반영된 이전 포즈 X 좌표
+            const srcX = o[0] - camDiff;
+            
+            // 입자가 사방으로 퍼지는 반경(Jitter)을 2.2px로 슬림하게 좁히고,
+            // 쏠리는 오프셋(Surge)도 8px로 조율하여 캐릭터 바디 실루엣에 딱 핏(Fit)되게 제어
+            let px = srcX + (d[0] - srcX) * fly + (sandHash(d[0] * 0.9 + Tj, d[1] * 0.4) - 0.5) * 2.2 + surgeDir * near * near * 8;
+            let py = o[1] + (d[1] - o[1]) * fly + (sandHash(d[0] * 0.3, d[1] * 0.9 + Tj) - 0.5) * 2.2 - near * 4;
+            
             const tc = SAND_TONES_RGB[(sandHash(d[0] * 3.1 + 5, d[1] * 2.3 + 9) * NT) | 0];
-            bx.globalAlpha = baseA * Math.sin(near * Math.PI);                       // 띠 양끝(생성/사라짐) 부드럽게
+            bx.globalAlpha = baseA * Math.sin(near * Math.PI) * alphaFactor;                       // 띠 양끝(생성/사라짐) 부드럽게 + alphaFactor 곱함
             bx.fillStyle = `rgb(${(tc[0] * 0.8 + d[2] * 0.2) | 0},${(tc[1] * 0.8 + d[3] * 0.2) | 0},${(tc[2] * 0.8 + d[4] * 0.2) | 0})`;
+            
+            // 모래알 크기는 고정 2px로 칠해 캐릭터 덩치가 커 보이지 않게 통일
             bx.fillRect(px | 0, py | 0, 2, 2);
         }
         bx.globalAlpha = 1;
@@ -776,9 +844,9 @@ export default class GolmokGame extends Scene {
             } else {
                 this._fireAcc = 110;   // 다음 발동 진입 시 즉발
             }
-            if (!this._blend && asm.current === 'standby' && asm.isDone()) {
-                // 공격대기 끝 → idle로 전환하고, "idle(솔리드) 위에" 모래 파도를 띄움(스왑 어색함 없음).
-                const src = this._pixelsScreen(this._gun, asm.getCurrentFrame(), this._atkFlip);  // 모래 원천 = 대기 자세
+            if (!this._blend && asm.current === 'atk_recover' && asm.isDone()) {
+                // 회수(내리기) 끝 → 바로 idle로 전환하고, "idle(솔리드) 위에" 모래 파도를 띄움(공격대기 생략).
+                const src = this._pixelsScreen(this._gun, asm.getCurrentFrame(), this._atkFlip);  // 모래 원천 = 내린 자세
                 this._gun.visible = false;
                 if (player) {
                     player.visible = true;            // idle 보임(코팅 본체)

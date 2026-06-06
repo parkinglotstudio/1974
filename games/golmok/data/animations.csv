@@ -2,5 +2,5 @@
 # frames: 프레임 수. fps: 초당 프레임. loop: 반복(1/0).
 # 실제 프레임 픽셀은 캐릭터 JSON 에셋에 있고, 여기선 타이밍(fps/loop)만 데이터화.
 char_id,state,frames,fps,loop,notes
-ch01_player,idle,48,5,1,대기
-ch01_player,walk,16,18,1,걷기
+ch01_player,idle,96,5,1,대기(여성 idel2)
+ch01_player,walk,11,12,1,걷기(여성)

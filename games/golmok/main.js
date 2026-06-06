@@ -1,5 +1,5 @@
 import SandEngine   from '../../engine/SandEngine.js';
-import GolmokGame   from './scripts/GolmokGame.js';   // 메인 씬 컨트롤러(이동 + 시그니처 FX)
+import GolmokGame   from './scripts/GolmokGame.js?v=sandfx2';   // 메인 씬 컨트롤러(이동 + 시그니처 FX) — ?v 캐시버스트
 import TitleScene   from './scripts/TitleScene.js';
 import ResultScene  from './scripts/ResultScene.js';
 import { loadCsvTable, loadParamTable } from '../../engine/data/Csv.js';  // 게임 데이터(CSV) 로더
