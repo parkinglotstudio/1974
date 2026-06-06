@@ -82,7 +82,11 @@ async function applyAssetScene(sceneJSON, assetBase) {
 
         // asset 필드 — 에디터 저장 씬 형식
         if (def.asset) {
-            const assetName = def.asset;
+            let assetName = def.asset;
+            // 남/녀 캐릭터 스왑(?char=male): 플레이어 스프라이트 변형 선택
+            if (assetName === 'ch01_player' && new URLSearchParams(location.search).get('char') === 'male') {
+                assetName = 'ch01_player_male';
+            }
             let pixelData   = null;
 
             // 1. 카테고리 힌트 직접 시도

@@ -273,7 +273,8 @@ export default class GolmokGame extends Scene {
         const p = this._player; const e = this.engine;
         if (!p || !e) return;
         try {
-            const g = await fetch('./pixels/characters/ch01_gun.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null);
+            const _male = new URLSearchParams(location.search).get('char') === 'male';   // 남/녀 스왑
+            const g = await fetch(`./pixels/characters/ch01_gun${_male ? '_male' : ''}.json`, { cache: 'no-store' }).then(r => r.ok ? r.json() : null);
             if (!g) return;
             this._gun = e.entities.add('gun', {
                 x: 0, y: 0, pw: g.width, ph: g.height, layer: 2, visible: false,

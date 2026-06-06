@@ -9,10 +9,97 @@
     body { background:#000; display:flex; align-items:center; justify-content:center;
             height:100vh; overflow:hidden; }
     canvas { display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#000; }
+
+    /* ── 테스트용 오버레이 UI (탭은 버튼에서만 받고 나머진 캔버스로 통과) ── */
+    #ui { position:fixed; inset:0; pointer-events:none; z-index:10;
+          font-family:system-ui,-apple-system,sans-serif; -webkit-user-select:none; user-select:none; touch-action:none; }
+    #ui button { pointer-events:auto; -webkit-tap-highlight-color:transparent; touch-action:none;
+                 border:1px solid rgba(255,255,255,.35); background:rgba(20,22,28,.62); color:#e8e8ec;
+                 border-radius:10px; font-size:14px; cursor:pointer; backdrop-filter:blur(2px); }
+    #ui button:active { background:rgba(80,90,110,.8); }
+    #ui button.on    { background:#3b6ea5; border-color:#7fb0e6; color:#fff; }
+
+    /* 상단 바 */
+    #topbar { position:absolute; top:8px; left:50%; transform:translateX(-50%);
+              display:flex; gap:14px; align-items:center; }
+    #topbar .grp { display:flex; gap:4px; padding:3px; background:rgba(0,0,0,.35); border-radius:12px; }
+    #topbar button { padding:6px 12px; }
+
+    /* 가로 전용 컨트롤 */
+    #pad { position:absolute; bottom:18px; left:0; right:0; display:none;
+           justify-content:space-between; padding:0 20px; align-items:flex-end; }
+    #pad.show { display:flex; }
+    #pad .move { display:flex; gap:14px; }
+    #pad .btn  { width:74px; height:74px; border-radius:50%; font-size:26px;
+                 display:flex; align-items:center; justify-content:center; }
+    #pad #atk  { width:92px; height:92px; font-size:18px; background:rgba(150,50,50,.6); border-color:rgba(255,140,140,.5); }
+    #pad #atk:active { background:rgba(210,70,70,.85); }
   </style>
 </head>
 <body>
 <canvas id="game-canvas"></canvas>
+
+<div id="ui">
+  <div id="topbar">
+    <div class="grp" id="modeGrp">
+      <button data-mode="portrait">세로</button>
+      <button data-mode="landscape">가로</button>
+    </div>
+    <div class="grp" id="charGrp">
+      <button data-char="female">여</button>
+      <button data-char="male">남</button>
+    </div>
+  </div>
+
+  <div id="pad">
+    <div class="move">
+      <button class="btn" id="left">◀</button>
+      <button class="btn" id="right">▶</button>
+    </div>
+    <button id="atk">공격</button>
+  </div>
+</div>
+
+<script>
+  // ── 상태: URL 파라미터에서 모드/캐릭터 읽기 ──
+  const params = new URLSearchParams(location.search);
+  const mode = params.get('scene') === 'main_portrait' ? 'portrait' : 'landscape';  // 기본=가로(mainScene)
+  const char = params.get('char') === 'male' ? 'male' : 'female';
+
+  // 활성 버튼 표시
+  document.querySelectorAll('#modeGrp button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  document.querySelectorAll('#charGrp button').forEach(b => b.classList.toggle('on', b.dataset.char === char));
+  // 가로일 때만 컨트롤 노출
+  if (mode === 'landscape') document.getElementById('pad').classList.add('show');
+
+  // ── 모드/캐릭터 전환: 파라미터 세팅 후 리로드 ──
+  function reloadWith(key, val) {
+    const u = new URL(location.href);
+    u.searchParams.set('char', char);                       // 현재 캐릭터 유지
+    u.searchParams.set('scene', mode === 'portrait' ? 'main_portrait' : 'main_landscape'); // 현재 모드 유지
+    u.searchParams.set(key, val);
+    location.href = u.toString();
+  }
+  document.querySelectorAll('#modeGrp button').forEach(b =>
+    b.addEventListener('click', () => reloadWith('scene', b.dataset.mode === 'portrait' ? 'main_portrait' : 'main_landscape')));
+  document.querySelectorAll('#charGrp button').forEach(b =>
+    b.addEventListener('click', () => reloadWith('char', b.dataset.char)));
+
+  // ── 온스크린 컨트롤 → 합성 키 이벤트(엔진 input + 게임이 window에서 수신) ──
+  function holdKey(el, key) {
+    const down = (e) => { e.preventDefault(); window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })); el.classList.add('on'); };
+    const up   = (e) => { if (e) e.preventDefault(); window.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true })); el.classList.remove('on'); };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointerleave', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  holdKey(document.getElementById('left'),  'ArrowLeft');
+  holdKey(document.getElementById('right'), 'ArrowRight');
+  holdKey(document.getElementById('atk'),   'f');           // 누르는 동안 발사(루프), 떼면 회수
+</script>
+
 <script type="module" src="./main.js"></script>
 </body>
 </html>
