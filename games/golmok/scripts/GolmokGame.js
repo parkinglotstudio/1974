@@ -743,12 +743,50 @@ export default class GolmokGame extends Scene {
         this._ensureBg(BG_LIST[(curIdx + 1) % n]);             // 다음 배경 미리 로드
     }
 
+    // 배경 스캔라인(JSON) → 캔버스 1회 래스터 (원경 크로스페이드용 _img).
+    _rasterBgCanvas(d) {
+        const cv = document.createElement('canvas'); cv.width = d.width; cv.height = d.height;
+        const ctx = cv.getContext('2d');
+        const img = ctx.createImageData(d.width, d.height); const od = img.data;
+        const pal = d.palette.map(c => (!c || c === 'transparent') ? null
+            : [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16), c.length >= 9 ? parseInt(c.slice(7, 9), 16) : 255]);
+        const sl = d.scanline;
+        for (let i = 0; i < sl.length; i++) { const c = pal[sl[i]]; if (!c) continue; const o = i << 2; od[o] = c[0]; od[o + 1] = c[1]; od[o + 2] = c[2]; od[o + 3] = c[3]; }
+        ctx.putImageData(img, 0, 0);
+        return cv;
+    }
+    _farCanvas(era) {
+        this._farCv = this._farCv || {};
+        if (this._farCv[era]) return this._farCv[era];
+        const d = this._bgCache[era] && this._bgCache[era].far;
+        if (!d || !d.scanline) return null;
+        return (this._farCv[era] = this._rasterBgCanvas(d));
+    }
+    // 원경을 "크로스페이드 2장(_img, 비정적)"으로 셋업 — 캐시 준비되면 1회. (근경 1장에 원경 2개 노출)
+    _ensureFarXfade(engine) {
+        if (this._farXfade) return;
+        const eraA = BG_LIST[this._bgIdx];
+        const eraB = BG_LIST[(this._bgIdx + 1) % BG_LIST.length];
+        const ca = this._farCanvas(eraA), cb = this._farCanvas(eraB);
+        if (!ca || !cb) return;   // 캐시 아직 → 다음 프레임
+        engine.entities.remove('bg_far');                          // 씬의 스캔라인 원경 제거
+        const by = this._bgY || 0;
+        const mk = (id, cv, a) => {
+            const e = engine.entities.add(id, { x: 0, y: by, pw: cv.width, ph: cv.height, layer: 0, visible: true, static: false });
+            if (e) { e._isSample = true; e._img = cv; e.alpha = a; }
+            return e;
+        };
+        this._bgFar  = mk('bg_far',  ca, 1);   // 항상 풀
+        this._bgFar2 = mk('bg_far2', cb, 0);   // 위에 알파로 페이드인
+        this._farXfade = true;
+    }
+
     _swapBg(engine, era) {
         const d = this._bgCache[era];
         if (!d) return;
-        // 이전 배경 오브젝트 해제 (근경 bg_main, 원경 bg_far, player 제외)
+        // 이전 배경 오브젝트 해제 (근경 bg_main, 원경 bg_far/bg_far2, player 제외)
         for (const id of [...engine.entities._entities.keys()]) {
-            if (id !== 'bg_main' && id !== 'bg_far' && id !== 'player') engine.entities.remove(id);
+            if (id !== 'bg_main' && id !== 'bg_far' && id !== 'bg_far2' && id !== 'player') engine.entities.remove(id);
         }
         // 근경(near) → L1 bg_main
         engine.entities.remove('bg_main');
@@ -757,13 +795,20 @@ export default class GolmokGame extends Scene {
             layer: 1, visible: true, _scanline: d.near.scanline, _palette: d.near.palette,
         });
         if (near) { near.type = `${era}_near`; near._asset = `${era}_near`; near._assetCategory = 'objects'; }
-        // 원경(far) → L0 bg_far
-        engine.entities.remove('bg_far');
-        const far = engine.entities.add('bg_far', {
-            x: 0, y: this._bgY ?? 0, pw: d.far.width, ph: d.far.height,     // 가로 시프트 y 유지
-            layer: 0, visible: true, _scanline: d.far.scanline, _palette: d.far.palette,
-        });
-        if (far) { far.type = `${era}_far`; far._asset = `${era}_far`; far._assetCategory = 'objects'; }
+        // 원경(far) → 크로스페이드 2장(_img)으로 관리: farA=현재 era, farB=다음 era. 셋업 전이면 폴백(스캔라인 단일).
+        if (this._farXfade) {
+            const eraB = BG_LIST[(this._bgIdx + 1) % BG_LIST.length];
+            const ca = this._farCanvas(era), cb = this._farCanvas(eraB);
+            if (this._bgFar  && ca) { this._bgFar._img  = ca; this._bgFar.alpha  = 1; }
+            if (this._bgFar2 && cb) { this._bgFar2._img = cb; this._bgFar2.alpha = 0; }
+        } else {
+            engine.entities.remove('bg_far');
+            const far = engine.entities.add('bg_far', {
+                x: 0, y: this._bgY ?? 0, pw: d.far.width, ph: d.far.height,
+                layer: 0, visible: true, _scanline: d.far.scanline, _palette: d.far.palette,
+            });
+            if (far) { far.type = `${era}_far`; far._asset = `${era}_far`; far._assetCategory = 'objects'; }
+        }
         this._bgTone = null;   // 배경 바뀌면 톤 재샘플 → 림/조명 자동 매칭
         this._curRimMul = this._mapRim?.[era] ?? 1;   // 맵별 근경 림 배율
         // 원경(L0)만 블룸 재빌드 — 근경(L1)은 검은 실루엣이라 블룸 불필요(4320폭 재빌드 낭비 방지)
@@ -928,6 +973,14 @@ export default class GolmokGame extends Scene {
         // ── 배경 순환 + 전환 ──────────────────────────────────────
         // CYCLE_ENABLED=false 동안 전체 순환/끝-도달 전환 비활성 (세로 4장 전환은 추후)
         if (!CYCLE_ENABLED || !this._bgReady) return;
+
+        // ── 원경 크로스페이드: 근경 1장 지나는 동안 원경이 스크롤 40~62%에서 원경A→원경B로 ──
+        this._ensureFarXfade(engine);
+        if (this._farXfade && this._bgFar2) {
+            const span = Math.max(1, this._worldW - engine.gameWidth);
+            const frac = engine.cameraX / span;
+            this._bgFar2.alpha = frac < 0.40 ? 0 : frac > 0.62 ? 1 : (frac - 0.40) / 0.22;
+        }
 
         if (this._tr) {
             this._tr.t += dt / BG_TRANS_MS;

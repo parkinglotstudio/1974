@@ -180,6 +180,7 @@ export default class EntitySystem {
                         const ew = entity.pw || 32;
                         const eh = entity.ph || 32;
                         renderer.ctx.save();
+                        if (entity.alpha != null && entity.alpha < 1) renderer.ctx.globalAlpha = Math.max(0, entity.alpha);   // 크로스페이드 등 투명도
                         renderer.ctx.translate(ox + ew / 2, oy + eh / 2);
                         const sx = entity.flipX ? -1 : 1;
                         const sy = entity.flipY ? -1 : 1;
