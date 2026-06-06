@@ -9,7 +9,7 @@ const WORLD_WIDTH = 2560;
 const GROUND_Y    = 412;   // 발끝 = 412+405 = 817 (캐릭터 1.5배 높이 405, 바닥선 817 유지)
 
 // ── 배경 순환 ───────────────────────────────────────────────────────
-let   BG_LIST     = ['1960_1', '2020_1']; // ← maps.csv cycle_order (현재 2장만 순환)
+let   BG_LIST     = ['2020a', '2020b']; // ← maps.csv cycle_order (2020 야경 2장 순환)
 const BG_PID      = '1974';
 const BG_INTERVAL = 10000;  // 10초마다 다음 배경
 let   BG_TRANS_MS = 2000;   // ← fx_params.csv bg.trans_ms

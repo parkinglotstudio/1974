@@ -8,40 +8,41 @@
     "height": 960
   },
   "bounds": {
-    "worldWidth": 1706,
+    "worldWidth": 2433,
     "worldHeight": 960
   },
-  "bgCycle": ["1960_1", "1970_1", "1980_1", "2020_1"],
+  "bgCycle": ["2020a", "2020b"],
   "layers": [
     { "id": "L0", "parallax": 0.30, "children": [] },
     { "id": "L1", "parallax": 1.00, "children": [] },
     { "id": "L2", "parallax": 1.00, "children": [] },
     { "id": "L3", "parallax": 1.40, "children": [] }
   ],
+  "_note": "배경 1280높이를 960뷰에 맞춰 y -320 시프트 → 바닥 밴드 노출. worldWidth 2433. 플레이어 y681(발끝 940). _swapBg가 y(-320)를 _bgY로 유지.",
   "entities": [
     {
       "id": "bg_far",
-      "type": "1960_1_far",
+      "type": "2020a_far",
       "layer": 0,
-      "x": 0, "y": 0, "pw": 1706, "ph": 960,
+      "x": 0, "y": -320, "pw": 2433, "ph": 1280,
       "visible": true,
-      "asset": "1960_1_far",
+      "asset": "2020a_far",
       "assetCategory": "objects"
     },
     {
       "id": "bg_main",
-      "type": "1960_1_near",
+      "type": "2020a_near",
       "layer": 1,
-      "x": 0, "y": 0, "pw": 1706, "ph": 960,
+      "x": 0, "y": -320, "pw": 2433, "ph": 1280,
       "visible": true,
-      "asset": "1960_1_near",
+      "asset": "2020a_near",
       "assetCategory": "objects"
     },
     {
       "id": "player",
       "type": "ch01_player",
       "layer": 2,
-      "x": 196, "y": 660, "pw": 149, "ph": 259,
+      "x": 196, "y": 681, "pw": 149, "ph": 259,
       "visible": true,
       "asset": "ch01_player",
       "assetCategory": "characters"

@@ -8,41 +8,41 @@
     "height": 540
   },
   "bounds": {
-    "worldWidth": 1706,
+    "worldWidth": 2433,
     "worldHeight": 540
   },
-  "bgCycle": ["1960_1", "1970_1", "1980_1", "2020_1"],
+  "bgCycle": ["2020a", "2020b"],
   "layers": [
     { "id": "L0", "parallax": 0.30, "children": [] },
     { "id": "L1", "parallax": 1.00, "children": [] },
     { "id": "L2", "parallax": 1.00, "children": [] },
     { "id": "L3", "parallax": 1.40, "children": [] }
   ],
-  "_note": "배경(960 높이)을 540 뷰에 맞춰 y를 -420 시프트 → 바닥 밴드(원본 y420~960) 노출. 배경 아트 자르지 않음. 플레이어도 동일 -420 시프트(660→240, 발끝 499). _swapBg가 이 y(-420)를 유지(GolmokGame._bgY).",
+  "_note": "배경 1280높이를 540뷰에 맞춰 y -740 시프트 → 바닥 밴드 노출(아트 안 자름). 끝(worldWidth 2433)까지 가면 _swapBg로 2020a→2020b. 플레이어 y261(발끝 520). _swapBg가 이 y(-740)를 _bgY로 유지.",
   "entities": [
     {
       "id": "bg_far",
-      "type": "1960_1_far",
+      "type": "2020a_far",
       "layer": 0,
-      "x": 0, "y": -420, "pw": 1706, "ph": 960,
+      "x": 0, "y": -740, "pw": 2433, "ph": 1280,
       "visible": true,
-      "asset": "1960_1_far",
+      "asset": "2020a_far",
       "assetCategory": "objects"
     },
     {
       "id": "bg_main",
-      "type": "1960_1_near",
+      "type": "2020a_near",
       "layer": 1,
-      "x": 0, "y": -420, "pw": 1706, "ph": 960,
+      "x": 0, "y": -740, "pw": 2433, "ph": 1280,
       "visible": true,
-      "asset": "1960_1_near",
+      "asset": "2020a_near",
       "assetCategory": "objects"
     },
     {
       "id": "player",
       "type": "ch01_player",
       "layer": 2,
-      "x": 196, "y": 240, "pw": 149, "ph": 259,
+      "x": 196, "y": 261, "pw": 149, "ph": 259,
       "visible": true,
       "asset": "ch01_player",
       "assetCategory": "characters"
