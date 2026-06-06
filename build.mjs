@@ -10,7 +10,9 @@ const OUT = 'dist';
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 
-// 1) 번들 + 압축 (소스맵 OFF → 역추적 불가)
+// 1) 번들 + 압축 (소스맵 OFF → 역추적 불가). 파일명에 빌드 해시 → 캐시 무효화 자동.
+const hash = Date.now().toString(36);   // 빌드마다 고유 (Vercel 캐시 bust)
+const outJs = `app.${hash}.min.js`;
 await build({
   entryPoints: [`${SRC}/main.js`],
   bundle: true,
@@ -19,11 +21,11 @@ await build({
   format: 'esm',
   target: 'es2020',
   legalComments: 'none',
-  outfile: `${OUT}/app.min.js`,
+  outfile: `${OUT}/${outJs}`,
 });
 
-// 2) index.html → app.min.js 참조로 교체
-const html = readFileSync(`${SRC}/index.html`, 'utf-8').replace('./main.js', './app.min.js');
+// 2) index.html → 해시 포함 파일명으로 교체
+const html = readFileSync(`${SRC}/index.html`, 'utf-8').replace('./main.js', `./${outJs}`);
 writeFileSync(`${OUT}/index.html`, html);
 
 // 3) 런타임 데이터(JSON)만 복사 (로직은 app.min.js 안)

@@ -153,6 +153,7 @@ export default class GolmokGame extends Scene {
             window.addEventListener('keydown', (ev) => { if ((ev.key === 'f' || ev.key === 'F') && !ev.repeat) this._startAttack(); });
             window.addEventListener('keyup',   (ev) => { if (ev.key === 'f' || ev.key === 'F') this._endFire(); });
         }
+        window._golmokGame = this;   // 온스크린 공격 버튼이 직접 호출용 (모바일 합성이벤트 차단 우회)
 
         // ── 에디터 FX 라이브 슬라이더 연동 ──────────────────────────
         // 부모(에디터)가 postMessage({type:'golmok:setFx', key, value})를 보내면 라이브 적용.

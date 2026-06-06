@@ -85,10 +85,22 @@
   document.querySelectorAll('#charGrp button').forEach(b =>
     b.addEventListener('click', () => reloadWith('char', b.dataset.char)));
 
-  // ── 온스크린 컨트롤 → 합성 키 이벤트(엔진 input + 게임이 window에서 수신) ──
+  // ── 온스크린 컨트롤 ──
+  // 이동: 합성 KeyboardEvent (엔진 InputManager가 수신)
+  // 공격: 합성 이벤트가 모바일에서 차단될 수 있어 window 이벤트 + 직접 호출 병행
   function holdKey(el, key) {
-    const down = (e) => { e.preventDefault(); window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })); el.classList.add('on'); };
-    const up   = (e) => { if (e) e.preventDefault(); window.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true })); el.classList.remove('on'); };
+    const fireOpts = { key, bubbles: true, cancelable: true };
+    const down = (e) => {
+      e.preventDefault();
+      window.dispatchEvent(new KeyboardEvent('keydown', fireOpts));
+      window.dispatchEvent(new KeyboardEvent('keypress', fireOpts));  // 일부 브라우저 호환
+      el.classList.add('on');
+    };
+    const up = (e) => {
+      if (e) e.preventDefault();
+      window.dispatchEvent(new KeyboardEvent('keyup', fireOpts));
+      el.classList.remove('on');
+    };
     el.addEventListener('pointerdown', down);
     el.addEventListener('pointerup', up);
     el.addEventListener('pointerleave', up);
@@ -97,7 +109,19 @@
   }
   holdKey(document.getElementById('left'),  'ArrowLeft');
   holdKey(document.getElementById('right'), 'ArrowRight');
-  holdKey(document.getElementById('atk'),   'f');           // 누르는 동안 발사(루프), 떼면 회수
+
+  // 공격: window 이벤트 외에 직접 게임 함수 호출도 병행 (모바일 합성이벤트 차단 우회)
+  const atkBtn = document.getElementById('atk');
+  atkBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true }));
+    // 게임 인스턴스 직접 접근 (window._golmokGame은 GolmokGame.onEnter에서 세팅)
+    if (window._golmokGame) window._golmokGame._startAttack?.();
+    atkBtn.classList.add('on');
+  });
+  atkBtn.addEventListener('pointerup',     (e) => { e.preventDefault(); window.dispatchEvent(new KeyboardEvent('keyup', { key: 'f', bubbles: true })); if (window._golmokGame) window._golmokGame._endFire?.(); atkBtn.classList.remove('on'); });
+  atkBtn.addEventListener('pointerleave',  (e) => { window.dispatchEvent(new KeyboardEvent('keyup', { key: 'f', bubbles: true })); if (window._golmokGame) window._golmokGame._endFire?.(); atkBtn.classList.remove('on'); });
+  atkBtn.addEventListener('pointercancel', (e) => { window.dispatchEvent(new KeyboardEvent('keyup', { key: 'f', bubbles: true })); if (window._golmokGame) window._golmokGame._endFire?.(); atkBtn.classList.remove('on'); });
 </script>
 
 <script type="module" src="./main.js"></script>
