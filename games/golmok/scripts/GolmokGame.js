@@ -1410,7 +1410,7 @@ export default class GolmokGame extends Scene {
         if (!L0 || !L1) { this._fx = null; return; }
         const px1 = e.layers.get(1)?.parallax ?? 1;
         const px0 = e.layers.get(0)?.parallax ?? 0.3;
-        const hw = W >> 1, hh = H >> 1;
+        const hw = W >> 2, hh = H >> 2;   // 근경림 소스 = 쿼터해상도 (readback·루프 대폭↓, 밤 역광은 부드러운 글로우라 영향 미미). 캐릭터 영역은 아래 풀해상 유지.
         const sx1 = Math.min(Math.max(0, Math.floor(e.cameraX * px1)), Math.max(0, L1.width - W));
         const sx0 = Math.min(Math.max(0, Math.floor(e.cameraX * px0)), Math.max(0, L0.width - W));
 
