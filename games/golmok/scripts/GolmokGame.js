@@ -13,7 +13,7 @@ let   BG_LIST     = ['2020a', '2020b']; // ← maps.csv cycle_order (2020 야경
 const BG_PID      = '1974';
 const BG_INTERVAL = 10000;  // 10초마다 다음 배경
 let   BG_TRANS_MS = 2000;   // ← fx_params.csv bg.trans_ms
-const CYCLE_ENABLED = true;  // 화면 끝 도달 시 다음 배경으로 sandburst 전환 ON
+const CYCLE_ENABLED = false; // 화면 끝 도달 시 배경 순환/전환 — 요청으로 OFF(끝에서 그냥 멈춤, 존 이동 없음)
 const FAR_XFADE = false;     // 원경 크로스페이드(근경1에 원경2) — 성능 위해 OFF (원경=정적). 켜면 매 프레임 L0 재래스터.
 const DIGITAL_ENABLED = false; // 디지털 회로/메시 오버레이 ON/OFF (저장만, 지금은 OFF)
 const SHOW_FPS = true;         // 우상단 FPS 표시 (디버그 — 배경 전환 프레임 드랍 확인용)
