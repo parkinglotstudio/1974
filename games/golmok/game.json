@@ -55,6 +55,6 @@
     }
   },
   "defaultScene": "golmok_title",
-  "mainScene": "main_portrait",
+  "mainScene": "main_landscape",
   "assetBase": "./pixels"
 }

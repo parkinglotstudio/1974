@@ -112,9 +112,12 @@ export default class GolmokGame extends Scene {
         // 캐릭터 rim은 게임측 _renderCharRim 단일 사용 (방향 명확 + 픽셀별 배경색 env + floor).
         // 엔진 rim은 lightDir 반대쪽 엣지에도 그려 게임 rim과 합쳐지면 방향이 뭉개지므로 OFF.
         engine.rim.disable();
+        const _landscape = engine.gameWidth > engine.gameHeight;     // 가로 모드 여부(960×540 등)
         if (FOG_ENABLED) {
             engine.fog.enable();
-            engine.fog.enableLayerFog({ startY: 430, endY: 960, color: '#9fb3cc', maxOpacity: 0.5, direction: 'bottom' });
+            engine.fog.enableLayerFog(_landscape
+                ? { startY: engine.gameHeight - 130, endY: engine.gameHeight, color: '#9fb3cc', maxOpacity: 0.5, direction: 'bottom' }  // 가로: 바닥 밴드만
+                : { startY: 430, endY: 960, color: '#9fb3cc', maxOpacity: 0.5, direction: 'bottom' });
         } else {
             engine.fog.disable();
         }
@@ -124,6 +127,9 @@ export default class GolmokGame extends Scene {
         if (this._player) {
             this._groundY = this._player.y;                          // 씬 설정에 지정된 초기 y좌표(세로 690, 가로 412 등)를 바닥으로 채택
         }
+        // 배경 시프트 y(가로=-420, 세로=0) — 배경 교체(_swapBg) 시 유지하기 위해 씬에서 채택.
+        const _bgM = engine.entities.get('bg_main');
+        this._bgY = _bgM ? (_bgM.y | 0) : 0;
         this._loadConfig(engine);    // 게임 데이터 테이블(CSV)에서 값 로드 (상수 덮어쓰기)
         this._anim = null;           // 애니메이터 컨트롤러 (플로우) — 비동기 로드, 준비 전엔 수동 setState 폴백
         this._loadAnimator();
@@ -667,9 +673,13 @@ export default class GolmokGame extends Scene {
 
     // 구름-포그 텍스쳐 로드 → 캔버스로 1회 래스터 (앞/뒤 2겹)
     async _loadFog() {
-        const defs = [
-            { file: 'fog_1', y: -20, dh: 540, speed: 5,  baseAlpha: 0.42 },  // 뒤(위), 느림
-            { file: 'fog_2', y: 360, dh: 640, speed: 11, baseAlpha: 0.5  },  // 앞(아래), 빠름
+        const _land = this.engine.gameWidth > this.engine.gameHeight;     // 가로 모드 540 높이
+        const defs = _land ? [
+            { file: 'fog_1', y: 180, dh: 360, speed: 5,  baseAlpha: 0.36 },  // 가로: 바닥쪽 옅게
+            { file: 'fog_2', y: 320, dh: 300, speed: 11, baseAlpha: 0.44 },
+        ] : [
+            { file: 'fog_1', y: -20, dh: 540, speed: 5,  baseAlpha: 0.42 },  // 세로: 뒤(위), 느림
+            { file: 'fog_2', y: 360, dh: 640, speed: 11, baseAlpha: 0.5  },  // 세로: 앞(아래), 빠름
         ];
         for (const def of defs) {
             try {
@@ -742,14 +752,14 @@ export default class GolmokGame extends Scene {
         // 근경(near) → L1 bg_main
         engine.entities.remove('bg_main');
         const near = engine.entities.add('bg_main', {
-            x: 0, y: 0, pw: d.near.width, ph: d.near.height,
+            x: 0, y: this._bgY ?? 0, pw: d.near.width, ph: d.near.height,   // 가로 시프트 y 유지
             layer: 1, visible: true, _scanline: d.near.scanline, _palette: d.near.palette,
         });
         if (near) { near.type = `${era}_near`; near._asset = `${era}_near`; near._assetCategory = 'objects'; }
         // 원경(far) → L0 bg_far
         engine.entities.remove('bg_far');
         const far = engine.entities.add('bg_far', {
-            x: 0, y: 0, pw: d.far.width, ph: d.far.height,
+            x: 0, y: this._bgY ?? 0, pw: d.far.width, ph: d.far.height,     // 가로 시프트 y 유지
             layer: 0, visible: true, _scanline: d.far.scanline, _palette: d.far.palette,
         });
         if (far) { far.type = `${era}_far`; far._asset = `${era}_far`; far._assetCategory = 'objects'; }

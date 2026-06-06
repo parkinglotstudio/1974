@@ -8,24 +8,44 @@
     "height": 540
   },
   "bounds": {
-    "worldWidth": 941,
-    "worldHeight": 1672
+    "worldWidth": 1706,
+    "worldHeight": 540
   },
-  "entities": [
-    {
-      "id": "bg_main",
-      "type": "19870_2",
-      "layer": 1,
-      "x": 0, "y": 0, "pw": 941, "ph": 1672,
-      "visible": true,
-      "asset": "19870_2",
-      "assetCategory": "objects"
-    }
-  ],
+  "bgCycle": ["1960_1", "1970_1", "1980_1", "2020_1"],
   "layers": [
-    { "id": "L0", "parallax": 0.15, "children": [] },
+    { "id": "L0", "parallax": 0.30, "children": [] },
     { "id": "L1", "parallax": 1.00, "children": [] },
     { "id": "L2", "parallax": 1.00, "children": [] },
     { "id": "L3", "parallax": 1.40, "children": [] }
+  ],
+  "_note": "배경(960 높이)을 540 뷰에 맞춰 y를 -420 시프트 → 바닥 밴드(원본 y420~960) 노출. 배경 아트 자르지 않음. 플레이어도 동일 -420 시프트(660→240, 발끝 499). _swapBg가 이 y(-420)를 유지(GolmokGame._bgY).",
+  "entities": [
+    {
+      "id": "bg_far",
+      "type": "1960_1_far",
+      "layer": 0,
+      "x": 0, "y": -420, "pw": 1706, "ph": 960,
+      "visible": true,
+      "asset": "1960_1_far",
+      "assetCategory": "objects"
+    },
+    {
+      "id": "bg_main",
+      "type": "1960_1_near",
+      "layer": 1,
+      "x": 0, "y": -420, "pw": 1706, "ph": 960,
+      "visible": true,
+      "asset": "1960_1_near",
+      "assetCategory": "objects"
+    },
+    {
+      "id": "player",
+      "type": "ch01_player",
+      "layer": 2,
+      "x": 196, "y": 240, "pw": 149, "ph": 259,
+      "visible": true,
+      "asset": "ch01_player",
+      "assetCategory": "characters"
+    }
   ]
 }
