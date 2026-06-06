@@ -121,14 +121,14 @@ def build_player():
 
     clips = [
         ('idle', 6,  True, idle_fr),  # 1990 여성 서 있는 idel2.gif
-        ('walk', 12, True, normalize_to_char_h([G.clean_blobs(f) for f in load_clip(find('여성걷는'))], per_frame=True)),   # 1990 여성걷는 모습.gif (clean=스트레이 픽셀 제거→폭 이상치 방지)
+        ('walk', 12, True, normalize_to_char_h([G.clean_blobs(f) for f in load_clip(find('여성걷는'))])),   # 1990 여성걷는 모습.gif (union-bbox=원본 위치·흔들림 유지로 튐 방지, clean=노이즈 제거)
     ]
     pasted, states, idx = [], {}, 0
     for name, fps, lp, fr in clips:
         rng = []
         for f in fr:
             cv = Image.new('RGBA', (PLAYER_W, PLAYER_H), (0, 0, 0, 0))
-            x = round(PLAYER_W / 2 - _feet_cx(f))          # 발 중심을 캔버스 중앙에 (걸음 미끄러짐 방지)
+            x = (PLAYER_W - f.width) // 2                   # 중앙 정렬(union 프레임=원본 위치/흔들림 유지 → 튐 없음)
             y = PLAYER_H - f.height - PLAYER_BOTTOM_PAD     # 발밑 하단 정렬
             cv.paste(f, (x, max(0, y)), f)
             pasted.append(cv); rng.append(idx); idx += 1
