@@ -24,6 +24,10 @@ export default class LayerSystem {
     /** 레이어별 기본 패럴랙스 계수 */
     static PARALLAX = [0.15, 0.6, 1.0, 1.4];
 
+    /** 월드 캔버스 폭 상한 — 배경 월드폭(수천)이면 충분. 넓은 뷰(가로 시네마)에서 과대 캔버스/성능저하 방지.
+     *  배경 월드폭이 이보다 크면 이 값을 올릴 것(스크롤이 잘리지 않게). */
+    static MAX_CW = 5120;
+
     /** 레이어 이름 (디버그/에디터용) */
     static NAMES = ['원경', '중경', '게임', '전경'];
 
@@ -39,7 +43,9 @@ export default class LayerSystem {
         const widthMults = [4, 8, 1, 8];
 
         for (let i = 0; i < 4; i++) {
-            const cWidth = viewWidth * widthMults[i];
+            // 캔버스 폭 = viewWidth×mult 이되 상한 캡(가로 시네마처럼 뷰가 넓으면 14080폭 등 과대 → 성능 저하).
+            // 배경 월드폭(~수천)이면 충분하므로 LayerSystem.MAX_CW로 제한.
+            const cWidth = Math.min(viewWidth * widthMults[i], LayerSystem.MAX_CW);
             const canvas = document.createElement('canvas');
             canvas.width  = cWidth;
             canvas.height = viewHeight;
@@ -216,7 +222,7 @@ export default class LayerSystem {
         this.viewHeight = viewHeight;
         const widthMults = [4, 8, 1, 8];   // L2는 스크린 좌표 → ×1 (constructor와 동일)
         for (let i = 0; i < 4; i++) {
-            const cWidth = viewWidth * widthMults[i];
+            const cWidth = Math.min(viewWidth * widthMults[i], LayerSystem.MAX_CW);   // 상한 캡(과대 캔버스 방지)
             const l      = this.layers[i];
             l.cWidth        = cWidth;
             l.canvas.width  = cWidth;   // 캔버스 크기 변경 → 내용 비워짐

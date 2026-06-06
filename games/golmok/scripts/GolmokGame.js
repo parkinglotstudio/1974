@@ -14,6 +14,7 @@ const BG_PID      = '1974';
 const BG_INTERVAL = 10000;  // 10초마다 다음 배경
 let   BG_TRANS_MS = 2000;   // ← fx_params.csv bg.trans_ms
 const CYCLE_ENABLED = true;  // 화면 끝 도달 시 다음 배경으로 sandburst 전환 ON
+const FAR_XFADE = false;     // 원경 크로스페이드(근경1에 원경2) — 성능 위해 OFF (원경=정적). 켜면 매 프레임 L0 재래스터.
 const DIGITAL_ENABLED = false; // 디지털 회로/메시 오버레이 ON/OFF (저장만, 지금은 OFF)
 const SHOW_FPS = true;         // 우상단 FPS 표시 (디버그 — 배경 전환 프레임 드랍 확인용)
 let   ANIM_TEST_SLOW = 1;      // 총 애니 속도 배수 (1=정상. 테스트 시 3 등으로 느리게)
@@ -143,21 +144,8 @@ export default class GolmokGame extends Scene {
 
         this._intro = { t: 0 };   // 게임 진입 연출 시작 (배경 모래-생성 + 캐릭터 픽셀 모이기)
 
-        // ── 화면 클릭/터치 → 그 지점으로 걸어가기 ──────────────────
-        const canvas = engine.canvas;
-        if (canvas && !this._clickBound) {
-            this._clickBound = true;
-            canvas.style.cursor = 'pointer';
-            const onPoint = (clientX) => {
-                const p = this._player; if (!p) return;
-                const rect = canvas.getBoundingClientRect();
-                if (rect.width <= 0) return;
-                const gx     = (clientX - rect.left) / rect.width * engine.gameWidth; // 화면→논리 X
-                const worldX = engine.cameraX + gx;                                   // →월드 X
-                this._targetX = Math.max(0, Math.min((this._worldW ?? WORLD_WIDTH) - p.pw, worldX - p.pw / 2));
-            };
-            canvas.addEventListener('pointerdown', (ev) => onPoint(ev.clientX));
-        }
+        // ── 탭-이동(존이동) 제거: 이동은 온스크린 컨트롤(◀▶)·키보드로만 ──
+        // (이전 "화면 클릭 → 그 지점으로 걸어가기"는 비활성화)
 
         // 키보드 F = 총 발사 (홀드: 준비→발동 루프→떼면 되돌리기)
         if (!this._keyBound) {
@@ -764,7 +752,7 @@ export default class GolmokGame extends Scene {
     }
     // 원경을 "크로스페이드 2장(_img, 비정적)"으로 셋업 — 캐시 준비되면 1회. (근경 1장에 원경 2개 노출)
     _ensureFarXfade(engine) {
-        if (this._farXfade) return;
+        if (!FAR_XFADE || this._farXfade) return;   // OFF면 원경=정적(성능)
         const eraA = BG_LIST[this._bgIdx];
         const eraB = BG_LIST[(this._bgIdx + 1) % BG_LIST.length];
         const ca = this._farCanvas(eraA), cb = this._farCanvas(eraB);

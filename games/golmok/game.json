@@ -54,7 +54,7 @@
       "label": "결과"
     }
   },
-  "defaultScene": "golmok_title",
+  "defaultScene": "main_landscape",
   "mainScene": "main_landscape",
   "assetBase": "./pixels"
 }

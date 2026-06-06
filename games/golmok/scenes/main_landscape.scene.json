@@ -4,12 +4,12 @@
   "label": "가로 모드",
   "orientation": "landscape",
   "resolution": {
-    "width": 960,
-    "height": 540
+    "width": 1760,
+    "height": 740
   },
   "bounds": {
     "worldWidth": 2433,
-    "worldHeight": 540
+    "worldHeight": 740
   },
   "bgCycle": ["2020a", "2020b"],
   "layers": [
@@ -18,13 +18,13 @@
     { "id": "L2", "parallax": 1.00, "children": [] },
     { "id": "L3", "parallax": 1.40, "children": [] }
   ],
-  "_note": "배경 1280높이를 540뷰에 맞춰 y -740 시프트 → 바닥 밴드 노출(아트 안 자름). 끝(worldWidth 2433)까지 가면 _swapBg로 2020a→2020b. 플레이어 y261(발끝 520). _swapBg가 이 y(-740)를 _bgY로 유지.",
+  "_note": "시네마 비율 2.39:1(1760x740) — 기기엔 레터박스(상하 검은바)로. 배경 1280높이를 740뷰에 맞춰 y -540 시프트(바닥 밴드). 캐릭터 259=화면 35%(48%→완화, 세로 27%에 근접). 더 작게(세로 수준) 가려면 배경 폭을 넓혀야 스크롤 확보됨. 플레이어 y466(발끝 725).",
   "entities": [
     {
       "id": "bg_far",
       "type": "2020a_far",
       "layer": 0,
-      "x": 0, "y": -740, "pw": 2433, "ph": 1280,
+      "x": 0, "y": -540, "pw": 2433, "ph": 1280,
       "visible": true,
       "asset": "2020a_far",
       "assetCategory": "objects"
@@ -33,7 +33,7 @@
       "id": "bg_main",
       "type": "2020a_near",
       "layer": 1,
-      "x": 0, "y": -740, "pw": 2433, "ph": 1280,
+      "x": 0, "y": -540, "pw": 2433, "ph": 1280,
       "visible": true,
       "asset": "2020a_near",
       "assetCategory": "objects"
@@ -42,7 +42,7 @@
       "id": "player",
       "type": "ch01_player",
       "layer": 2,
-      "x": 196, "y": 261, "pw": 149, "ph": 259,
+      "x": 196, "y": 466, "pw": 149, "ph": 259,
       "visible": true,
       "asset": "ch01_player",
       "assetCategory": "characters"
