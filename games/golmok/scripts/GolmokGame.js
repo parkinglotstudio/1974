@@ -578,8 +578,14 @@ export default class GolmokGame extends Scene {
             let py = o[1] + (d[1] - o[1]) * fly + (sandHash(d[0] * 0.3, d[1] * 0.9 + Tj) - 0.5) * 2.2 - near * 4;
             
             const tc = SAND_TONES_RGB[(sandHash(d[0] * 3.1 + 5, d[1] * 2.3 + 9) * NT) | 0];
-            bx.globalAlpha = baseA * Math.sin(near * Math.PI) * alphaFactor;                       // 띠 양끝(생성/사라짐) 부드럽게 + alphaFactor 곱함
-            bx.fillStyle = `rgb(${(tc[0] * 0.8 + d[2] * 0.2) | 0},${(tc[1] * 0.8 + d[3] * 0.2) | 0},${(tc[2] * 0.8 + d[4] * 0.2) | 0})`;
+            // 시간대 림 색상 반영: 낮(k=0)=원래 모래색, 밤(k→1)=bgTone(배경 대표색)으로 블렌드
+            const bt = this._bgTone || { r: tc[0], g: tc[1], b: tc[2] };
+            const kv = this._fxK ?? 0;
+            const sr = (tc[0] * (1 - kv * 0.55) + bt.r * kv * 0.55) | 0;
+            const sg = (tc[1] * (1 - kv * 0.55) + bt.g * kv * 0.55) | 0;
+            const sb = (tc[2] * (1 - kv * 0.55) + bt.b * kv * 0.55) | 0;
+            bx.globalAlpha = baseA * Math.sin(near * Math.PI) * alphaFactor;
+            bx.fillStyle = `rgb(${sr},${sg},${sb})`;
             
             // 모래알 크기는 고정 2px로 칠해 캐릭터 덩치가 커 보이지 않게 통일
             bx.fillRect(px | 0, py | 0, 2, 2);
@@ -1643,12 +1649,17 @@ export default class GolmokGame extends Scene {
                 const spread = rw * 0.8 + 100;
                 const fx = x0 + lx + (h - 0.5) * spread * s + Math.sin(h2 * 25 + s * 8) * 14 * s;
                 const fy = y0 + ly - s * (rh * 0.55) + Math.cos(h * 19) * 8 * s;
-                // 색: (A) 모래색으로 모양 형성 → (B) colPhase로 실제색 드러남 (정착된 픽셀만)
+                // 색: (A) 모래색(시간대 림색 블렌드) → (B) colPhase로 실제색 드러남
                 const tc = SAND_TONES_RGB[(h2 * NT) | 0];
-                const reveal = colPhase * lt;                // 모양 완성(lt=1)된 곳부터 실제색으로
-                const r = tc[0] * (1 - reveal) + d[ci]     * reveal;
-                const g = tc[1] * (1 - reveal) + d[ci + 1] * reveal;
-                const b = tc[2] * (1 - reveal) + d[ci + 2] * reveal;
+                const bt2 = this._bgTone || { r: tc[0], g: tc[1], b: tc[2] };
+                const kv2 = this._fxK ?? 0;
+                const tcR = (tc[0] * (1 - kv2 * 0.55) + bt2.r * kv2 * 0.55);
+                const tcG = (tc[1] * (1 - kv2 * 0.55) + bt2.g * kv2 * 0.55);
+                const tcB = (tc[2] * (1 - kv2 * 0.55) + bt2.b * kv2 * 0.55);
+                const reveal = colPhase * lt;
+                const r = tcR * (1 - reveal) + d[ci]     * reveal;
+                const g = tcG * (1 - reveal) + d[ci + 1] * reveal;
+                const b = tcB * (1 - reveal) + d[ci + 2] * reveal;
                 ctx.globalAlpha = Math.min(1, 0.35 + lt * 0.65);
                 ctx.fillStyle = `rgb(${Math.min(255, r) | 0},${Math.min(255, g) | 0},${Math.min(255, b) | 0})`;
                 ctx.fillRect(fx | 0, fy | 0, 1, 1);
