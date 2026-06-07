@@ -142,13 +142,14 @@ export default class GolmokGame extends Scene {
         // ── 탭-이동(존이동) 제거: 이동은 온스크린 컨트롤(◀▶)·키보드로만 ──
         // (이전 "화면 클릭 → 그 지점으로 걸어가기"는 비활성화)
 
-        // 키보드 F = 총 발사 (홀드: 준비→발동 루프→떼면 되돌리기)
+        // 키보드 F = 총 발사 + 온스크린 버튼 CustomEvent (크롬 Android 모듈 스코프 격리 우회)
         if (!this._keyBound) {
             this._keyBound = true;
             window.addEventListener('keydown', (ev) => { if ((ev.key === 'f' || ev.key === 'F') && !ev.repeat) this._startAttack(); });
             window.addEventListener('keyup',   (ev) => { if (ev.key === 'f' || ev.key === 'F') this._endFire(); });
+            window.addEventListener('golmok:attack:start', () => this._startAttack());
+            window.addEventListener('golmok:attack:end',   () => this._endFire());
         }
-        window._golmokGame = this;   // 온스크린 공격 버튼이 직접 호출용 (모바일 합성이벤트 차단 우회)
 
         // ── 에디터 FX 라이브 슬라이더 연동 ──────────────────────────
         // 부모(에디터)가 postMessage({type:'golmok:setFx', key, value})를 보내면 라이브 적용.
