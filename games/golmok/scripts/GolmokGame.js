@@ -103,26 +103,19 @@ export default class GolmokGame extends Scene {
         // 월드 폭 = 씬이 설정한 bounds 사용 (가로/세로 씬마다 다름). 덮어쓰지 않음.
         this._worldW = engine.bounds.worldWidth || WORLD_WIDTH;
 
-        // 엔진 FX 전부 ON (테스트)
+        // 엔진 FX (세로 기준)
         engine.lighting.setAmbient(0.0);                             // 시작=낮(어둠 없음). onUpdate가 k로 조절
-        engine.lighting.clearLights();                               // key 라이트 없음 — 밤은 ambient(어둠)+glow(불빛)의 콘트라스트로 표현
-        engine.glow.enable();                                        // 배경 밝은 픽셀(도시 불빛) 블룸용
-        // ⚠ 캐릭터(L2) 발광 OFF: ch01_player 팔레트 idx10(#3c3d40 옷색)이 엔진 예약 발광 인덱스와
-        //   충돌해 밤에 노란 halo가 생김. 캐릭터엔 발광 픽셀이 없으니 idx10 발광을 제거한다.
-        engine.glow.removeEmissiveIndex(10);
-        // 캐릭터 rim은 게임측 _renderCharRim 단일 사용 (방향 명확 + 픽셀별 배경색 env + floor).
-        // 엔진 rim은 lightDir 반대쪽 엣지에도 그려 게임 rim과 합쳐지면 방향이 뭉개지므로 OFF.
-        engine.rim.disable();
-        const _landscape = engine.gameWidth > engine.gameHeight;     // 가로 모드 여부(960×540 등)
+        engine.lighting.clearLights();                               // key 라이트 없음
+        engine.glow.enable();
+        engine.glow.removeEmissiveIndex(10);                         // 캐릭터 idx10 발광 OFF (밤 노란 halo 방지)
+        engine.rim.disable();                                        // 엔진 rim OFF — 게임측 _renderCharRim 단일 사용
         if (FOG_ENABLED) {
             engine.fog.enable();
-            engine.fog.enableLayerFog(_landscape
-                ? { startY: engine.gameHeight - 130, endY: engine.gameHeight, color: '#9fb3cc', maxOpacity: 0.5, direction: 'bottom' }  // 가로: 바닥 밴드만
-                : { startY: 430, endY: 960, color: '#9fb3cc', maxOpacity: 0.5, direction: 'bottom' });
+            engine.fog.enableLayerFog({ startY: 430, endY: 960, color: '#9fb3cc', maxOpacity: 0.5, direction: 'bottom' });
         } else {
             engine.fog.disable();
         }
-        engine.vignette.setPreset('warm');                           // 가장자리 비네트
+        engine.vignette.setPreset('warm');
 
         this._player = engine.entities.get('player');
         if (this._player) {
@@ -131,6 +124,8 @@ export default class GolmokGame extends Scene {
         // 배경 시프트 y(가로=-420, 세로=0) — 배경 교체(_swapBg) 시 유지하기 위해 씬에서 채택.
         const _bgM = engine.entities.get('bg_main');
         this._bgY = _bgM ? (_bgM.y | 0) : 0;
+        const _bgF = engine.entities.get('bg_far');
+        this._bgFarY = _bgF ? (_bgF.y | 0) : this._bgY;
         this._loadConfig(engine);    // 게임 데이터 테이블(CSV)에서 값 로드 (상수 덮어쓰기)
         this._anim = null;           // 애니메이터 컨트롤러 (플로우) — 비동기 로드, 준비 전엔 수동 setState 폴백
         this._loadAnimator();
@@ -287,32 +282,11 @@ export default class GolmokGame extends Scene {
             this._gunAnchor = (pa && ga)
                 ? { pcx: pa.cx, ppw: p.pw, pby: pa.by, gcx: ga.cx, gpw: this._gun.pw, gby: ga.by }
                 : null;
-            // 총구 이펙트 위치 = 발동 프레임 "머즐플래시(밝은 픽셀) 무게중심" — 이펙트가 총구 안에 오게(스프라이트 플래시와 정합)
-            this._muzzleLocal = { x: (g.width * 0.5) | 0, y: (g.height * 0.42) | 0 };   // 기본값(검출 실패 대비)
-            const afr = g.stateDef?.states?.atk_active?.frames;
-            const afi = afr ? afr[Math.min(3, afr.length - 1)] : null;   // 발사 루프가 짧아도(3프레임) 안전
-            const af = (afi != null) ? g.frames[afi]?.pixels : null;
-            if (af && af.length) {
-                const pal = g.palette;
-                const yLimit = g.ph * 0.5;   // 상단(팔/총구)만 — 하단 흰 스니커즈 섞임 방지
-                const pts = [];
-                for (const q of af) {
-                    if (q[1] >= yLimit) continue;
-                    const h = pal[q[2]];
-                    if (!h || h === 'transparent') continue;
-                    const r = parseInt(h.slice(1, 3), 16), gg = parseInt(h.slice(3, 5), 16), b = parseInt(h.slice(5, 7), 16);
-                    if (r * 0.3 + gg * 0.5 + b * 0.2 > 185) pts.push(q);   // 상단 밝은 머즐플래시
-                }
-                // 총구 = 플래시의 "총 쪽(발사 반대편) 40%" 무게중심 ≈ 발사구(barrel tip). FX가 총에서 나가게.
-                if (pts.length > 8) {
-                    let mnx = 1e9, mxx = -1e9;
-                    for (const q of pts) { if (q[0] < mnx) mnx = q[0]; if (q[0] > mxx) mxx = q[0]; }
-                    const cut = mxx - (mxx - mnx) * 0.4;   // 비플립(왼쪽 발사) 기준 총은 오른쪽(큰 x)
-                    let sx = 0, sy = 0, n = 0;
-                    for (const q of pts) { if (q[0] >= cut) { sx += q[0]; sy += q[1]; n++; } }
-                    this._muzzleLocal = n > 4 ? { x: (sx / n) | 0, y: (sy / n) | 0 } : { x: 60, y: 50 };
-                } else this._muzzleLocal = { x: 60, y: 50 };
-            }
+            // 총구 이펙트 위치 = 발동 프레임 "머즐플래시(밝은 픽셀) 무게중심"
+            // ⚠ 주의: 새 캐릭터 에셋 ch01_gun(148x255)의 머즐플래시 픽셀들이 아래로 처진 화염 덩어리 형태라,
+            //   단순 평균 검출을 적용하면 Y좌표가 무릎 높이(Y:69)로 무너집니다.
+            //   따라서 11번 프레임의 실제 총신(gun barrel) 및 총구 끝(barrel tip) 픽셀 좌표인 [X: 10, Y: 55]로 명확히 정합합니다.
+            this._muzzleLocal = { x: 10, y: 55 };
         } catch (err) { console.warn('[golmok] gun load fail:', err); }
     }
 
@@ -380,11 +354,19 @@ export default class GolmokGame extends Scene {
         if (!g) return null;
         const dir = this._atkFlip ? 1 : -1;
         const an = this._frameAnchor(g, 'muzzle');
-        if (an) return { x: an.x, y: an.y, dir };
-        const m = this._muzzleLocal;
-        if (!m) return null;
-        const mx = this._atkFlip ? (g.pw - 1 - m.x) : m.x;
-        return { x: (g.x - this.engine.cameraX) + mx, y: g.y + m.y, dir };
+        let xVal, yVal;
+        if (an) {
+            xVal = an.x;
+            yVal = an.y;
+        } else {
+            const m = this._muzzleLocal;
+            if (!m) return null;
+            const mx = this._atkFlip ? (g.pw - 1 - m.x) : m.x;
+            xVal = (g.x - this.engine.cameraX) + mx;
+            yVal = g.y + m.y;
+        }
+        // 총구 바깥(앞)쪽으로 이펙트 시작점을 16px 전진시킵니다.
+        return { x: xVal + dir * 16, y: yVal, dir };
     }
 
     // 한 발 발사 — 머즐버스트(모래)·트레이서·탄피·반동·머즐글로우
@@ -393,6 +375,7 @@ export default class GolmokGame extends Scene {
         const dir = m.dir;
         this._recoilT = 1; this._recoilDir = -dir;     // 반동: 발사 반대로
         this._muzzleFlash = 1;                          // 머즐 글로우
+
         for (let i = 0; i < 9; i++) {                   // 머즐 모래 버스트(앞으로 확)
             const sp = 120 + Math.random() * 170;
             this._muzzleP.push({ x: m.x, y: m.y, vx: dir * sp + (Math.random() - 0.5) * 60, vy: (Math.random() - 0.5) * 130, age: 0, life: 0.13 + Math.random() * 0.1 });
@@ -405,12 +388,12 @@ export default class GolmokGame extends Scene {
         this._muzzleFlash = Math.max(0, this._muzzleFlash - dt * 0.012);
         const s = dt / 1000;
         const adv = (arr, grav) => { for (let i = arr.length - 1; i >= 0; i--) { const p = arr[i]; p.age += s; if (p.age >= p.life) { arr.splice(i, 1); continue; } if (grav) p.vy += grav * s; p.x += p.vx * s; p.y += p.vy * s; } };
-        adv(this._muzzleP, 200); adv(this._tracers, 0);
+        adv(this._muzzleP, 140);
+        adv(this._tracers, 0);
     }
 
     _renderFiringFx(ctx) {
         if (!this._muzzleP.length && !this._tracers.length && this._muzzleFlash <= 0.02) return;
-        const NT = SAND_TONES_RGB.length;
         // 머즐 글로우 (가산 라디얼)
         if (this._muzzleFlash > 0.02) {
             const m = this._muzzlePos();
@@ -432,13 +415,6 @@ export default class GolmokGame extends Scene {
             ctx.fillRect(((p.vx > 0 ? p.x - 14 : p.x)) | 0, (p.y - 1) | 0, 14, 2);
         }
         ctx.restore();
-        // 머즐 모래 버스트
-        for (const p of this._muzzleP) {
-            const tc = SAND_TONES_RGB[(sandHash(p.x, p.y) * NT) | 0];
-            ctx.globalAlpha = Math.max(0, 1 - p.age / p.life) * 0.9;
-            ctx.fillStyle = `rgb(${Math.min(255, tc[0] + 40) | 0},${Math.min(255, tc[1] + 28) | 0},${tc[2] | 0})`;
-            ctx.fillRect(p.x | 0, p.y | 0, 2, 2);
-        }
         ctx.globalAlpha = 1;
     }
 
@@ -759,7 +735,7 @@ export default class GolmokGame extends Scene {
         const ca = this._farCanvas(eraA), cb = this._farCanvas(eraB);
         if (!ca || !cb) return;   // 캐시 아직 → 다음 프레임
         engine.entities.remove('bg_far');                          // 씬의 스캔라인 원경 제거
-        const by = this._bgY || 0;
+        const by = this._bgFarY ?? (this._bgY || 0);
         const mk = (id, cv, a) => {
             const e = engine.entities.add(id, { x: 0, y: by, pw: cv.width, ph: cv.height, layer: 0, visible: true, static: false });
             if (e) { e._isSample = true; e._img = cv; e.alpha = a; }
@@ -793,7 +769,7 @@ export default class GolmokGame extends Scene {
         } else {
             engine.entities.remove('bg_far');
             const far = engine.entities.add('bg_far', {
-                x: 0, y: this._bgY ?? 0, pw: d.far.width, ph: d.far.height,
+                x: 0, y: this._bgFarY ?? (this._bgY ?? 0), pw: d.far.width, ph: d.far.height,
                 layer: 0, visible: true, _scanline: d.far.scanline, _palette: d.far.palette,
             });
             if (far) { far.type = `${era}_far`; far._asset = `${era}_far`; far._assetCategory = 'objects'; }
@@ -932,6 +908,8 @@ export default class GolmokGame extends Scene {
         this._dayT += dtSec;
         const k = 0.5 - 0.5 * Math.cos(this._dayT * (Math.PI * 2 / this._p.dayPeriod));
         this._fxK = k;
+
+
 
         // 림 = 캐릭터 색상 곡선과 분리. 캐릭터 밝기 rimThresh부터 약하게 페이드인, 어두울수록 강해짐. (값: fx_params.csv)
         const charBright = 1 - (1 - this._p.charMin) * k;               // 낮 1.0 → 밤 charMin
