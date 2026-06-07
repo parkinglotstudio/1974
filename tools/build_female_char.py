@@ -94,9 +94,7 @@ def normalize_to_char_h(frames, per_frame=False):
     rh = max(heights) if heights else 1
     sc = CHAR_H / rh
     if per_frame:
-        maxw = max(((b[2] - b[0]) for b in bbs if b), default=1)
-        if maxw * sc > (PLAYER_W - 6):              # 개별 프레임 최대폭 기준 캡(이동거리 무관)
-            sc = (PLAYER_W - 6) / maxw
+        # run처럼 뻗은 포즈는 폭이 캔버스(149)를 넘어도 OK — 높이만 맞추고 폭은 캔버스에 중앙 클립
         out = []
         for f, b in zip(frames, bbs):
             if not b:
@@ -122,16 +120,21 @@ def build_player():
     clips = [
         ('idle', 6,  True,  idle_fr),
         ('walk', 12, True,  normalize_to_char_h([G.clean_blobs(f) for f in load_clip(find('여성걷는'))])),
-        ('run',  20, True,  normalize_to_char_h([G.clean_blobs(G.dekey(f)) for f in load_clip(find('여성뛰는'))], per_frame=True)),   # 뛰기: 이동 gif라 per_frame
-        ('run_stop', 14, False, normalize_to_char_h([G.clean_blobs(G.dekey(f)) for f in load_clip(find('멈추는 동작'))])),            # 멈추기: non-loop
+        ('run',  20, True,  normalize_to_char_h([G.clean_blobs(G.dekey(f)) for f in load_clip(find('여성뛰는'))], per_frame=True)),
+        ('run_stop', 14, False, normalize_to_char_h([G.clean_blobs(G.dekey(f)) for f in load_clip(find('멈추는 동작'))], per_frame=True)),
     ]
+    # 발 중심 정렬 적용 클립 (per_frame=True인 이동 클립들 — 튐 방지)
+    FEET_ALIGN = {'run', 'run_stop'}
     pasted, states, idx = [], {}, 0
     for name, fps, lp, fr in clips:
         rng = []
         for f in fr:
             cv = Image.new('RGBA', (PLAYER_W, PLAYER_H), (0, 0, 0, 0))
-            x = (PLAYER_W - f.width) // 2                   # 중앙 정렬(union 프레임=원본 위치/흔들림 유지 → 튐 없음)
-            y = PLAYER_H - f.height - PLAYER_BOTTOM_PAD     # 발밑 하단 정렬
+            if name in FEET_ALIGN:
+                x = round(PLAYER_W / 2 - _feet_cx(f))       # 발 중심을 캔버스 중앙에 (튐 방지)
+            else:
+                x = (PLAYER_W - f.width) // 2               # union-bbox 클립: 중앙 고정(원본 흔들림 유지)
+            y = PLAYER_H - f.height - PLAYER_BOTTOM_PAD
             cv.paste(f, (x, max(0, y)), f)
             pasted.append(cv); rng.append(idx); idx += 1
         states[name] = {'frames': rng, 'loop': lp, 'fps': fps}
