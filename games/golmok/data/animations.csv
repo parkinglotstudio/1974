@@ -4,3 +4,5 @@
 char_id,state,frames,fps,loop,notes
 ch01_player,idle,96,5,1,대기(여성 idel2)
 ch01_player,walk,11,12,1,걷기(여성)
+ch01_player,run,12,20,1,달리기(여성)
+ch01_player,run_stop,8,14,0,달리다멈추기(여성)

@@ -4,15 +4,18 @@
   "default": "idle",
 
   "parameters": [
-    { "name": "speed",  "type": "float",   "default": 0 },
-    { "name": "fire",   "type": "trigger" },
-    { "name": "firing", "type": "bool",    "default": false }
+    { "name": "speed",   "type": "float",   "default": 0 },
+    { "name": "running", "type": "bool",    "default": false },
+    { "name": "fire",    "type": "trigger" },
+    { "name": "firing",  "type": "bool",    "default": false }
   ],
 
   "transitions": [
-    { "from": "idle", "to": "walk", "conditions": [ { "p": "speed", "op": ">",  "v": 0.1 } ] },
-    { "from": "walk", "to": "idle", "conditions": [ { "p": "speed", "op": "<=", "v": 0.1 } ] }
-  ],
-
-  "_note": "states(프레임/fps/loop)는 스프라이트 stateDef에 있음. 여기는 parameters+transitions(플로우)만. 총 3종(atk_start/atk_active/atk_recover)은 gif 변환 후 추가."
+    { "from": "idle",     "to": "walk",     "conditions": [ { "p": "speed", "op": ">",  "v": 0.1 } ] },
+    { "from": "walk",     "to": "idle",     "conditions": [ { "p": "speed", "op": "<=", "v": 0.1 } ] },
+    { "from": "walk",     "to": "run",      "conditions": [ { "p": "speed", "op": ">",  "v": 0.1 }, { "p": "running", "op": "==", "v": true } ] },
+    { "from": "run",      "to": "run_stop", "conditions": [ { "p": "running", "op": "==", "v": false } ] },
+    { "from": "run",      "to": "run_stop", "conditions": [ { "p": "speed",   "op": "<=", "v": 0.1 } ] },
+    { "from": "run_stop", "to": "idle",     "hasExitTime": true }
+  ]
 }

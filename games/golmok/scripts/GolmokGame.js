@@ -835,12 +835,25 @@ export default class GolmokGame extends Scene {
             if (Math.abs(diff) <= step) { player.x = this._targetX; this._targetX = null; }
             else dx = diff > 0 ? MOVE_SPEED : -MOVE_SPEED;
         }
-        // 이동 잠금: 공격·공격대기·블렌드(특수 동작) 중엔 이동키/클릭이동 무시. idle/walk에서만 이동.
-        //   ※ 나중에 "이동 가능한 특수 동작"이 생기면 그 상태를 여기 예외로 추가.
+        // 이동 잠금: 공격·블렌드 중 무시
         if (this._attacking || this._blend) { dx = 0; this._targetX = null; }
+
+        // 달리기 타이머 — 이동키 2초 이상 홀드 → running=true, 떼면 false
+        if (dx !== 0 && !this._attacking && !this._blend) {
+            this._runTimer = (this._runTimer || 0) + dtSec;
+        } else {
+            this._runTimer = 0;
+        }
+        const RUN_THRESHOLD = 2.0;   // 2초 홀드 → 달리기 전환
+        const isRunning = (this._runTimer >= RUN_THRESHOLD);
+        if (this._anim) this._anim.setBool('running', isRunning);
+
+        // 달리기 중 이동 속도 1.8배
+        const RUN_SPEED = MOVE_SPEED * 1.8;
         if (dx !== 0) {
-            player.x += dx * dtSec;
-            player.flipX = dx > 0;                                           // 에셋 기본 시선(왼쪽) 반영하여 방향 전환 (dx > 0 일 때 flip)
+            const spd = isRunning ? RUN_SPEED : MOVE_SPEED;
+            player.x += (dx > 0 ? spd : -spd) * dtSec;
+            player.flipX = dx > 0;
             player.x = Math.max(0, Math.min(this._worldW - player.pw, player.x));
         }
         // 애니: 로직은 파라미터만 세팅 → 컨트롤러(플로우)가 전환 결정. 미준비 시 수동 폴백.

@@ -120,8 +120,10 @@ def build_player():
     idle_fr = idle_fr + idle_fr[-2:0:-1]
 
     clips = [
-        ('idle', 6,  True, idle_fr),  # 1990 여성 서 있는 idel2.gif
-        ('walk', 12, True, normalize_to_char_h([G.clean_blobs(f) for f in load_clip(find('여성걷는'))])),   # 1990 여성걷는 모습.gif (union-bbox=원본 위치·흔들림 유지로 튐 방지, clean=노이즈 제거)
+        ('idle', 6,  True,  idle_fr),
+        ('walk', 12, True,  normalize_to_char_h([G.clean_blobs(f) for f in load_clip(find('여성걷는'))])),
+        ('run',  20, True,  normalize_to_char_h([G.clean_blobs(G.dekey(f)) for f in load_clip(find('여성뛰는'))], per_frame=True)),   # 뛰기: 이동 gif라 per_frame
+        ('run_stop', 14, False, normalize_to_char_h([G.clean_blobs(G.dekey(f)) for f in load_clip(find('멈추는 동작'))])),            # 멈추기: non-loop
     ]
     pasted, states, idx = [], {}, 0
     for name, fps, lp, fr in clips:
