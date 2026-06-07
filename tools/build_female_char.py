@@ -75,10 +75,21 @@ def build_gun():
 
 # ── 플레이어: 클립별 정규화 → 149x259 고정 캔버스 발밑 정렬 ──────────────
 def _feet_cx(img):
-    """이미지 하단 12% 불투명 픽셀의 중심 x (발 중심) — 정렬 기준(걸음 미끄러짐 방지)."""
+    """하단 12% 픽셀 수평 중심 (발 중심)."""
     px = img.load(); W, H = img.size
     y0 = max(0, int(H * 0.88)); sx = n = 0
     for y in range(y0, H):
+        for x in range(W):
+            if px[x, y][3] > 24:
+                sx += x; n += 1
+    return (sx / n) if n else W / 2.0
+
+
+def _torso_cx(img):
+    """상위 70% 픽셀 수평 중심 (몸통 중심) — 달리기처럼 몸통이 기울 때 팔다리 아닌 몸통 기준 정렬."""
+    px = img.load(); W, H = img.size
+    y_end = int(H * 0.70); sx = n = 0
+    for y in range(0, y_end):
         for x in range(W):
             if px[x, y][3] > 24:
                 sx += x; n += 1
@@ -123,17 +134,17 @@ def build_player():
         ('run',  20, True,  normalize_to_char_h([G.clean_blobs(G.dekey(f)) for f in load_clip(find('여성뛰는'))], per_frame=True)),
         ('run_stop', 14, False, normalize_to_char_h([G.clean_blobs(G.dekey(f)) for f in load_clip(find('멈추는 동작'))], per_frame=True)),
     ]
-    # 발 중심 정렬 적용 클립 (per_frame=True인 이동 클립들 — 튐 방지)
-    FEET_ALIGN = {'run', 'run_stop'}
+    # 정렬 기준: run/run_stop은 몸통 중심(_torso_cx), 나머지는 bbox 중앙
+    TORSO_ALIGN = {'run', 'run_stop'}
     pasted, states, idx = [], {}, 0
     for name, fps, lp, fr in clips:
         rng = []
         for f in fr:
             cv = Image.new('RGBA', (PLAYER_W, PLAYER_H), (0, 0, 0, 0))
-            if name in FEET_ALIGN:
-                x = round(PLAYER_W / 2 - _feet_cx(f))       # 발 중심을 캔버스 중앙에 (튐 방지)
+            if name in TORSO_ALIGN:
+                x = round(PLAYER_W / 2 - _torso_cx(f))   # 몸통 중심을 캔버스 중앙에 — 팔다리만 클립, 몸통 튐 없음
             else:
-                x = (PLAYER_W - f.width) // 2               # union-bbox 클립: 중앙 고정(원본 흔들림 유지)
+                x = (PLAYER_W - f.width) // 2             # bbox 중앙 정렬
             y = PLAYER_H - f.height - PLAYER_BOTTOM_PAD
             cv.paste(f, (x, max(0, y)), f)
             pasted.append(cv); rng.append(idx); idx += 1
