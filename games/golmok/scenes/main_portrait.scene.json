@@ -8,34 +8,34 @@
     "height": 960
   },
   "bounds": {
-    "worldWidth": 2433,
+    "worldWidth": 3119,
     "worldHeight": 960
   },
-  "bgCycle": ["2020a", "2020b"],
+  "bgCycle": ["2021"],
   "layers": [
     { "id": "L0", "parallax": 0.30, "children": [] },
     { "id": "L1", "parallax": 1.00, "children": [] },
     { "id": "L2", "parallax": 1.00, "children": [] },
     { "id": "L3", "parallax": 1.40, "children": [] }
   ],
-  "_note": "배경 1280높이를 960뷰에 맞춰 y -320 시프트 → 바닥 밴드 노출. worldWidth 2433. 플레이어 y681(발끝 940). _swapBg가 y(-320)를 _bgY로 유지.",
+  "_note": "2021 도시(가로와 동일 에셋). 근경=2021_near(3119x1280 검정실루엣, y-320로 하단960 노출), 원경=2021_far(3748x960, y0). worldWidth 3119(근경폭). 월드 50% 도달 시 원경(L0)만 모래 시그니처로 2021_far7로 교체. 플레이어 y681(발끝940).",
   "entities": [
     {
       "id": "bg_far",
-      "type": "2020a_far",
+      "type": "2021_far",
       "layer": 0,
-      "x": 0, "y": -320, "pw": 2433, "ph": 1280,
+      "x": 0, "y": 0, "pw": 3748, "ph": 960,
       "visible": true,
-      "asset": "2020a_far",
+      "asset": "2021_far",
       "assetCategory": "objects"
     },
     {
       "id": "bg_main",
-      "type": "2020a_near",
+      "type": "2021_near",
       "layer": 1,
-      "x": 0, "y": -320, "pw": 2433, "ph": 1280,
+      "x": 0, "y": -320, "pw": 3119, "ph": 1280,
       "visible": true,
-      "asset": "2020a_near",
+      "asset": "2021_near",
       "assetCategory": "objects"
     },
     {

@@ -26,7 +26,7 @@
     #topbar button { padding:6px 12px; }
     #btnFs { padding:6px 10px; font-size:18px; line-height:1; }
 
-    /* 가로 전용 컨트롤 */
+    /* 온스크린 컨트롤 (가로=기본, 세로=작게+반투명) */
     #pad { position:absolute; bottom:18px; left:0; right:0; display:none;
            justify-content:space-between; padding:0 20px; align-items:flex-end; }
     #pad.show { display:flex; }
@@ -35,6 +35,12 @@
                  display:flex; align-items:center; justify-content:center; }
     #pad #atk  { width:92px; height:92px; font-size:18px; background:rgba(150,50,50,.6); border-color:rgba(255,140,140,.5); }
     #pad #atk:active { background:rgba(210,70,70,.85); }
+
+    /* 세로 모드: 컨트롤 작게 + 반투명 */
+    #pad.portrait { opacity:.42; bottom:12px; padding:0 14px; }
+    #pad.portrait .move { gap:10px; }
+    #pad.portrait .btn { width:48px; height:48px; font-size:20px; }
+    #pad.portrait #atk { width:60px; height:60px; font-size:13px; }
   </style>
 </head>
 <body>
@@ -51,6 +57,7 @@
       <button data-char="male">남</button>
     </div>
     <button id="btnFs" title="전체화면">⛶</button>
+    <button id="btnFreeze" title="화면 정지/재생 (단축키 P)">⏸</button>
   </div>
 
   <div id="pad">
@@ -71,8 +78,10 @@
   // 활성 버튼 표시
   document.querySelectorAll('#modeGrp button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
   document.querySelectorAll('#charGrp button').forEach(b => b.classList.toggle('on', b.dataset.char === char));
-  // 가로일 때만 컨트롤 노출
-  if (mode === 'landscape') document.getElementById('pad').classList.add('show');
+  // 컨트롤 노출: 가로=기본, 세로=작게+반투명(portrait 클래스)
+  const pad = document.getElementById('pad');
+  pad.classList.add('show');
+  if (mode === 'portrait') pad.classList.add('portrait');
 
   // ── 모드/캐릭터 전환: 파라미터 세팅 후 리로드 ──
   function reloadWith(key, val) {
@@ -111,6 +120,21 @@
   atkBtn.addEventListener('pointerleave', stopAtk);
   atkBtn.addEventListener('pointercancel', stopAtk);
   atkBtn.addEventListener('contextmenu', e => e.preventDefault());
+
+  // ── 화면 정지/재생 (스크린샷용 — 엔진 루프 멈춰서 마지막 프레임 고정) ──
+  const freezeBtn = document.getElementById('btnFreeze');
+  let frozen = false;
+  function toggleFreeze() {
+    const eng = window._game && window._game._engine;
+    if (!eng) return;
+    frozen = !frozen;
+    if (frozen) { eng.stop(); freezeBtn.textContent = '▶'; freezeBtn.classList.add('on'); }
+    else        { eng.start(); freezeBtn.textContent = '⏸'; freezeBtn.classList.remove('on'); }
+  }
+  freezeBtn.addEventListener('click', toggleFreeze);
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'p' || e.key === 'P') toggleFreeze();
+  });
 
   // ── 전체화면 버튼 ──
   const fsBtn = document.getElementById('btnFs');

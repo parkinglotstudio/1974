@@ -8,6 +8,13 @@
       "chapter": 1,
       "desc": "540×960 · Ch.1 · 모래엔진 기준 게임",
       "entry": "games/golmok/index.html"
+    },
+    {
+      "id": "doubledown_pixel",
+      "name": "더블 다운 픽셀",
+      "icon": "♠",
+      "desc": "270×480 · 세로 9:16 · 매치-3",
+      "entry": "games/doubledown_pixel/index.html"
     }
   ]
 }

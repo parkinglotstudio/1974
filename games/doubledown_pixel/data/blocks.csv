@@ -1,0 +1,6 @@
+block_type,emoji,bg_color,particle_a,particle_b,idle_type
+BLOCK_01,heart,0xE6DFD3,0xF5EFEB,0xCCD5C1,float
+BLOCK_02,star,0xE28743,0xF1A974,0xFAD2B5,shine
+BLOCK_03,circle,0x98D5CD,0xBCE3DE,0xE9F7F5,pulse
+BLOCK_04,diamond,0x789D8A,0x9CBBAA,0xC2D7CC,heartbeat
+BLOCK_05,triangle,0xB5C4B1,0xCCD5C7,0xE3E8E1,spin

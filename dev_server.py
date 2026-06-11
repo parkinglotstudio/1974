@@ -12,14 +12,29 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         print(f"[REQUEST POST] path={self.path}", flush=True)
-        if self.path == '/api/create-project':
+        if self.path == '/api/log':
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                body   = json.loads(self.rfile.read(length))
+                level  = body.get('level', 'LOG')
+                msg    = body.get('message', '')
+                print(f"[BROWSER {level}] {msg}", flush=True)
+            except Exception as e:
+                print(f"[ERROR parsing browser log] {e}", flush=True)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(b'{"ok":true}')
+            return
+
+        elif self.path == '/api/create-project':
             length = int(self.headers.get('Content-Length', 0))
             body   = json.loads(self.rfile.read(length))
             pid    = body.get('id', '')
             gj     = body.get('gameJson', {})
 
             # ── 폴더 구조 생성 ──────────────────────────────────
-            proj_dir = os.path.join(ROOT, 'content', pid)
+            proj_dir = os.path.join(ROOT, 'games', pid)
             for sub in ['scenes', 'prefabs', 'palettes', 'scripts', 'pixels']:
                 os.makedirs(os.path.join(proj_dir, sub), exist_ok=True)
 
@@ -159,18 +174,23 @@ init().catch(e => console.error('[{pid}]', e));
                     f.write(html_content)
                 print(f'[API] created index.html: {pid}', flush=True)
 
-            # ── content/index.json 업데이트 ─────────────────────
-            idx_path = os.path.join(ROOT, 'content', 'index.json')
+            # ── games/index.json 업데이트 ─────────────────────
+            idx_path = os.path.join(ROOT, 'games', 'index.json')
             if os.path.exists(idx_path):
                 with open(idx_path, encoding='utf-8') as f:
                     idx = json.load(f)
             else:
-                idx = {'projects': []}
-            if not any(p['id'] == pid for p in idx['projects']):
+                idx = {'games': []}
+            
+            key_name = 'games' if 'games' in idx else 'projects'
+            if key_name not in idx:
+                idx[key_name] = []
+
+            if not any(p['id'] == pid for p in idx[key_name]):
                 w = gj.get('resolution', {}).get('width', '?')
                 h = gj.get('resolution', {}).get('height', '?')
                 ch = gj.get('chapter', '')
-                idx['projects'].append({
+                idx[key_name].append({
                     'id':      pid,
                     'name':    gj.get('name', pid),
                     'icon':    '🎮',
@@ -206,13 +226,18 @@ init().catch(e => console.error('[{pid}]', e));
                 self.end_headers()
                 return
 
-            gj_path = os.path.join(ROOT, 'content', pid, 'game.json')
+            gj_path = os.path.join(ROOT, 'games', pid, 'game.json')
             if not os.path.isfile(gj_path):
-                self.send_response(404)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(b'{"ok":false,"error":"project not found"}')
-                return
+                # 레거시 지원
+                gj_path_legacy = os.path.join(ROOT, 'content', pid, 'game.json')
+                if os.path.isfile(gj_path_legacy):
+                    gj_path = gj_path_legacy
+                else:
+                    self.send_response(404)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(b'{"ok":false,"error":"project not found"}')
+                    return
 
             with open(gj_path, 'w', encoding='utf-8') as f:
                 json.dump(gj, f, ensure_ascii=False, indent=2)
@@ -230,8 +255,8 @@ init().catch(e => console.error('[{pid}]', e));
             rel_path = body.get('path', '')
             content  = body.get('content', '')
 
-            # content/ 또는 projects/ 경로만 허용
-            if not (rel_path.startswith('content/') or rel_path.startswith('projects/')) \
+            # games/, content/ 또는 projects/ 경로 허용
+            if not (rel_path.startswith('games/') or rel_path.startswith('content/') or rel_path.startswith('projects/')) \
                or '..' in rel_path:
                 self.send_response(403)
                 self.end_headers()
@@ -256,8 +281,9 @@ init().catch(e => console.error('[{pid}]', e));
             content  = body.get('json', '')
             name     = body.get('name', 'unknown')
 
-            # projects/ 또는 assets/pixels/ 경로만 허용
-            allowed = (rel_path.startswith('projects/') or
+            # games/, projects/ 또는 assets/pixels/ 경로 허용
+            allowed = (rel_path.startswith('games/') or
+                       rel_path.startswith('projects/') or
                        rel_path.startswith('assets/pixels/'))
             if not allowed or '..' in rel_path:
                 self.send_response(403)
@@ -293,16 +319,27 @@ init().catch(e => console.error('[{pid}]', e));
             if project and category:
                 safe_proj = project.replace('..', '').replace('/', '').replace('\\', '')
                 safe_cat  = category.replace('..', '').replace('/', '').replace('\\', '')
-                full_path = os.path.join(ROOT, 'projects', safe_proj, 'pixels', safe_cat, f'{name}.json')
+                full_path = os.path.join(ROOT, 'games', safe_proj, 'pixels', safe_cat, f'{name}.json')
                 if not os.path.isfile(full_path):
-                    # 카테고리 내 검색
-                    proj_dir = os.path.join(ROOT, 'projects', safe_proj, 'pixels')
+                    full_path = os.path.join(ROOT, 'projects', safe_proj, 'pixels', safe_cat, f'{name}.json')
+                
+                if not os.path.isfile(full_path):
+                    # 카테고리 내 검색 (games)
+                    proj_dir = os.path.join(ROOT, 'games', safe_proj, 'pixels')
                     full_path = None
                     for cat_name in ['backgrounds','characters','objects','items']:
                         p = os.path.join(proj_dir, cat_name, f'{name}.json')
                         if os.path.isfile(p):
                             full_path = p
                             break
+                    # 카테고리 내 검색 (projects 레거시)
+                    if not full_path or not os.path.isfile(full_path):
+                        proj_dir_legacy = os.path.join(ROOT, 'projects', safe_proj, 'pixels')
+                        for cat_name in ['backgrounds','characters','objects','items']:
+                            p = os.path.join(proj_dir_legacy, cat_name, f'{name}.json')
+                            if os.path.isfile(p):
+                                full_path = p
+                                break
             else:
                 full_path = os.path.join(ROOT, 'assets', 'pixels', f'{name}.json')
 
@@ -470,8 +507,11 @@ init().catch(e => console.error('[{pid}]', e));
             safe_cat  = category.replace('..', '').replace('/', '').replace('\\', '')
             safe_proj = project.replace('..', '').replace('/', '').replace('\\', '')
 
-            # 임시 폴더에 samples 저장
-            dst_dir = os.path.join(ROOT, 'assets', 'samples', safe_cat)
+            # 임시 폴더에 혹은 프로젝트 samples 폴더에 저장
+            if safe_cat == '프로젝트샘플':
+                dst_dir = os.path.join(ROOT, 'games', safe_proj, 'samples')
+            else:
+                dst_dir = os.path.join(ROOT, 'assets', 'samples', safe_cat)
             os.makedirs(dst_dir, exist_ok=True)
             dst_path = os.path.join(dst_dir, f"{safe_name}.gif")
 
@@ -601,9 +641,12 @@ init().catch(e => console.error('[{pid}]', e));
             from urllib.parse import urlparse, parse_qs
             qs      = parse_qs(urlparse(self.path).query)
             pid     = (qs.get('project', ['1974'])[0]).replace('..', '').replace('/', '').replace('\\', '')
-            proj_dir = os.path.join(ROOT, 'projects', pid)
+            # games 디렉토리 우선 스캔
+            proj_dir = os.path.join(ROOT, 'games', pid)
+            if not os.path.isdir(proj_dir):
+                proj_dir = os.path.join(ROOT, 'projects', pid)
 
-            # ── 픽셀 JSON: projects/<pid>/pixels/<category>/*.json ──
+            # ── 픽셀 JSON: games/<pid>/pixels/<category>/*.json ──
             px_root = os.path.join(proj_dir, 'pixels')
             PIXEL_CATS = ['backgrounds', 'characters', 'objects', 'items']
             pixel_data = {}   # { category: [pixelJSON, ...] }
@@ -628,8 +671,10 @@ init().catch(e => console.error('[{pid}]', e));
                     if entries:
                         pixel_data[cat] = entries
 
-            # ── 팔레트: projects/<pid>/identity/*.json ──────────────
-            id_dir   = os.path.join(proj_dir, 'identity')
+            # ── 팔레트: games/<pid>/palettes/*.json (기존 identity) ──────────────
+            id_dir   = os.path.join(proj_dir, 'palettes')
+            if not os.path.isdir(id_dir):
+                id_dir = os.path.join(proj_dir, 'identity')
             palettes = []
             if os.path.isdir(id_dir):
                 for fname in sorted(os.listdir(id_dir)):
@@ -663,6 +708,18 @@ init().catch(e => console.error('[{pid}]', e));
                 except Exception:
                     pass
 
+            # ── 프로젝트 로컬 샘플 사진 스캔 ──
+            local_sm_dir = os.path.join(ROOT, 'games', pid, 'samples')
+            if os.path.isdir(local_sm_dir):
+                from urllib.parse import quote as _quote
+                imgs = sorted([
+                    f'games/{pid}/samples/{_quote(fn)}'
+                    for fn in os.listdir(local_sm_dir)
+                    if fn.lower().endswith(EXTS)
+                ])
+                if imgs:
+                    sample_files['프로젝트샘플'] = imgs
+
             # learningData = 모든 카테고리 flatten (레거시 호환)
             flat_pixels = []
             for cat in PIXEL_CATS:
@@ -690,7 +747,9 @@ init().catch(e => console.error('[{pid}]', e));
             from urllib.parse import urlparse, parse_qs
             qs       = parse_qs(urlparse(self.path).query)
             pid      = (qs.get('project', ['1974'])[0]).replace('..', '').replace('/', '').replace('\\', '')
-            px_root  = os.path.join(ROOT, 'projects', pid, 'pixels')
+            px_root  = os.path.join(ROOT, 'games', pid, 'pixels')
+            if not os.path.isdir(px_root):
+                px_root  = os.path.join(ROOT, 'projects', pid, 'pixels')
             PIXEL_CATS = ['backgrounds', 'characters', 'objects', 'items']
             result = {}
             for cat in PIXEL_CATS:
@@ -795,6 +854,36 @@ init().catch(e => console.error('[{pid}]', e));
             rel_path = unquote(self.path).lstrip('/')
             full_path = os.path.join(ROOT, rel_path)
             print(f"[DEBUG SAMPLE PROXY] request={self.path} -> rel={rel_path} -> full={full_path}", flush=True)
+            if os.path.isfile(full_path):
+                ext = os.path.splitext(full_path)[1].lower()
+                mime = 'image/png'
+                if ext in ['.jpg', '.jpeg']: mime = 'image/jpeg'
+                elif ext == '.gif': mime = 'image/gif'
+                elif ext == '.webp': mime = 'image/webp'
+                elif ext == '.bmp': mime = 'image/bmp'
+                try:
+                    with open(full_path, 'rb') as f:
+                        data = f.read()
+                    print(f"  [OK] size={len(data)} mime={mime}", flush=True)
+                    self.send_response(200)
+                    self.send_header('Content-Type', mime)
+                    self.send_header('Content-Length', str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
+                except Exception as e:
+                    print(f"  [ERROR] read failed: {e}", flush=True)
+                    self.send_response(500)
+                    self.end_headers()
+                    return
+            else:
+                print(f"  [FAIL] file not found!", flush=True)
+
+        # games/.../samples 정적 파일 한글 서빙 대응 프록시
+        if self.path.startswith('/games/') and '/samples/' in self.path:
+            rel_path = unquote(self.path).lstrip('/')
+            full_path = os.path.join(ROOT, rel_path)
+            print(f"[DEBUG GAME SAMPLE PROXY] request={self.path} -> rel={rel_path} -> full={full_path}", flush=True)
             if os.path.isfile(full_path):
                 ext = os.path.splitext(full_path)[1].lower()
                 mime = 'image/png'

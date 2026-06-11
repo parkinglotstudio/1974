@@ -1,0 +1,29 @@
+{
+  "schema": "SandEngine.Scene.v1",
+  "name": "main",
+  "label": "메인",
+  "orientation": "portrait",
+  "resolution": {
+    "width": 270,
+    "height": 480
+  },
+  "bounds": {
+    "worldWidth": 270,
+    "worldHeight": 480
+  },
+  "layers": [
+    { "id": "L0", "parallax": 0.15, "children": [] },
+    { "id": "L1", "parallax": 0.60, "children": [] },
+    { "id": "L2", "parallax": 1.00, "children": [] },
+    { "id": "L3", "parallax": 0.00, "children": [] }
+  ],
+  "entities": [
+    {
+      "id": "board_bg",
+      "type": "board_bg",
+      "layer": 1,
+      "x": 9, "y": 84, "pw": 252, "ph": 252,
+      "visible": true
+    }
+  ]
+}

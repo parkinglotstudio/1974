@@ -45,7 +45,8 @@ def conv_near(name):
     strip = src.resize((WORLD_W, nh), Image.LANCZOS)
     canvas = Image.new('RGBA', (WORLD_W, WORLD_H), (0, 0, 0, 0))
     canvas.paste(strip, (0, WORLD_H - nh), strip)        # 하단 배치(지면=캔버스 바닥)
-    pal, scan = S.black_silhouette_scanline(canvas)
+    # ⚠ 검은 실루엣 강제 대신, 원본 색상을 그대로 보존하기 위해 quantize_scanline(64색)을 적용합니다.
+    pal, scan = S.quantize_scanline(canvas, max_colors=64)
     return pal, scan
 
 

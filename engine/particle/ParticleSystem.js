@@ -41,6 +41,7 @@ export default class ParticleSystem {
                 case 'streak':      this._initStreak(p, config);      break;
                 case 'wake':        this._initWake(p, config);        break;
                 case 'drift':       this._initDrift(p, config);       break;
+                case 'pixel_burst': this._initPixelBurst(p, config);  break;
             }
         }
     }
@@ -118,6 +119,7 @@ export default class ParticleSystem {
                 case 'wake':        this._updateWake(p, dt);        break;
                 case 'drift':       this._updateDrift(p, dt);       break;
                 case 'text_form':   this._updateTextForm(p, dt);    break;
+                case 'pixel_burst': this._updatePixelBurst(p, dt);  break;
             }
         }
     }
@@ -146,7 +148,17 @@ export default class ParticleSystem {
                 if (!rgba) continue;
                 const sx = Math.round(layerIdx === 2 ? p.x - cameraX : p.x);
                 const sy = Math.round(p.y);
-                renderer.putPixel(sx, sy, rgba, p.palIdx);
+                
+                const sz = p.size ?? 1;
+                if (sz <= 1) {
+                    renderer.putPixel(sx, sy, rgba, p.palIdx);
+                } else {
+                    for (let dy = 0; dy < sz; dy++) {
+                        for (let dx = 0; dx < sz; dx++) {
+                            renderer.putPixel(sx + dx, sy + dy, rgba, p.palIdx);
+                        }
+                    }
+                }
             }
             renderer.flush();
         }
@@ -476,6 +488,43 @@ export default class ParticleSystem {
         const p = { alive: false, type: null };
         this._particles.push(p);
         return p;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // PIXEL_BURST — 총구 픽셀 불꽃 (V12 추가)
+    // config: cx, cy, dir(사격 방향: 1 우, -1 좌), palIndices(선택가능한 팔레트 색상 배열)
+    // ══════════════════════════════════════════════════════════════
+    _initPixelBurst(p, cfg) {
+        p.type    = 'pixel_burst';
+        p.alive   = true;
+        p.x       = cfg.cx ?? 240;
+        p.y       = cfg.cy ?? 135;
+        p.gravity = cfg.gravity ?? 180;
+        p.life    = 0.12 + Math.random() * 0.18;
+        p.maxLife = p.life;
+        p.layer   = cfg.layer ?? 2;
+        
+        // 픽셀 크기 랜덤 지정 (1 ~ 3px)
+        p.size    = cfg.size ?? (Math.random() < 0.4 ? 1 : Math.random() < 0.7 ? 2 : 3);
+        
+        const dir = cfg.dir ?? 1;
+        const sp   = 100 + Math.random() * 150;
+        p.vx      = dir * sp + (Math.random() - 0.5) * 60;
+        p.vy      = (Math.random() - 0.5) * 110;
+        
+        if (cfg.palIndices && cfg.palIndices.length) {
+            p.palIdx = cfg.palIndices[Math.floor(Math.random() * cfg.palIndices.length)];
+        } else {
+            p.palIdx = cfg.palIdx ?? 1;
+        }
+    }
+    _updatePixelBurst(p, dt) {
+        p.vx   *= (1 - dt * 2.5);
+        p.vy   += p.gravity * dt;
+        p.x    += p.vx * dt;
+        p.y    += p.vy * dt;
+        p.life -= dt;
+        if (p.life <= 0) p.alive = false;
     }
 
     get liveCount() {

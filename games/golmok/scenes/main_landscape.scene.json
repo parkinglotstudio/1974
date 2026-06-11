@@ -8,34 +8,34 @@
     "height": 740
   },
   "bounds": {
-    "worldWidth": 4896,
+    "worldWidth": 3119,
     "worldHeight": 740
   },
-  "bgCycle": ["2020a", "2020b"],
+  "bgCycle": ["2021"],
   "layers": [
     { "id": "L0", "parallax": 0.30, "children": [] },
     { "id": "L1", "parallax": 1.00, "children": [] },
     { "id": "L2", "parallax": 1.00, "children": [] },
     { "id": "L3", "parallax": 1.40, "children": [] }
   ],
-  "_note": "시네마 2.39:1(1760x740). 근경=2020long_near(4896폭, 흰배경 실루엣, 연속 전경) → worldWidth 4896 긴 스크롤. 배경 1280높이를 740뷰에 y -540 시프트(바닥밴드). 원경은 2433폭 한 장이라 시차0.30으로 후반에 멈춤(clamp) — 근경 테스트용. 플레이어 y466.",
+  "_note": "시네마(1760x740). 2021 도시: 근경=2021_near(3119x1280 검정실루엣, y-540로 하단740 노출), 원경=2021_far(3748x960, y-100). worldWidth 3119(근경폭). 월드 50% 도달 시 원경(L0)만 모래 시그니처로 2021_far7로 교체. 플레이어 y466(발끝725).",
   "entities": [
     {
       "id": "bg_far",
-      "type": "2020a_far",
+      "type": "2021_far",
       "layer": 0,
-      "x": 0, "y": -334, "pw": 2433, "ph": 1280,
+      "x": 0, "y": -100, "pw": 3748, "ph": 960,
       "visible": true,
-      "asset": "2020a_far",
+      "asset": "2021_far",
       "assetCategory": "objects"
     },
     {
       "id": "bg_main",
-      "type": "2020long_near",
+      "type": "2021_near",
       "layer": 1,
-      "x": 0, "y": -516, "pw": 4896, "ph": 1280,
+      "x": 0, "y": -540, "pw": 3119, "ph": 1280,
       "visible": true,
-      "asset": "2020long_near",
+      "asset": "2021_near",
       "assetCategory": "objects"
     },
     {

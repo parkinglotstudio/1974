@@ -35,7 +35,7 @@ def quantize_scanline(rgba, max_colors, alpha_t=ALPHA_T):
     # 메디안컷 적응형 — 색 범위를 부피로 분할해 따뜻한 색/노을도 보존
     pal_img = rgb.quantize(colors=max_colors - 1, method=Image.MEDIANCUT, dither=Image.NONE)
     pal_raw = pal_img.getpalette()           # [r,g,b, r,g,b, ...]
-    ncol    = max_colors - 1
+    ncol    = min(max_colors - 1, len(pal_raw) // 3)
     # JSON 팔레트: 0=transparent, 1..ncol = 적응형 색 (quantize idx +1)
     palette = ['transparent']
     for i in range(ncol):
@@ -88,6 +88,90 @@ def quantize_scanline_soft(rgba, max_colors, fade_lo=0.25, fade_hi=0.85, abands=
             idx = len(palette); palette.append(key); key2idx[key] = idx
         scan[i] = idx
     return palette, scan
+
+
+def color_alpha_scanline(rgba, max_colors=96, abands=8, a_min=10):
+    """
+    근경용 (색 보존) — 색을 메디안컷으로 양자화해 **유지**하고, 파일 알파를 단계 양자화해 보존.
+    어두운 실루엣이지만 부분 디테일(불빛/하이라이트)이 살아남고, 가장자리 반투명도 유지.
+    팔레트 = transparent + #rrggbbaa (색×알파 조합). black_silhouette와 달리 검정 강제 안 함.
+    """
+    W, H = rgba.size
+    rgb  = rgba.convert('RGB')
+    pal_img = rgb.quantize(colors=max_colors, method=Image.MEDIANCUT, dither=Image.NONE)
+    pal_raw = pal_img.getpalette()
+    qcol = list(pal_img.getdata())
+    adata = [p[3] for p in rgba.getdata()]
+    palette = ['transparent']
+    key2idx = {}
+    scan = [0] * (W * H)
+    for i in range(W * H):
+        a0 = adata[i]
+        if a0 < a_min:
+            continue
+        aq = max(1, min(abands, round(a0 / 255 * abands)))
+        ab = round(aq / abands * 255)
+        ci = qcol[i]
+        r, g, b = pal_raw[ci*3], pal_raw[ci*3+1], pal_raw[ci*3+2]
+        key = f'#{r:02x}{g:02x}{b:02x}{ab:02x}'
+        idx = key2idx.get(key)
+        if idx is None:
+            idx = len(palette); palette.append(key); key2idx[key] = idx
+        scan[i] = idx
+    return palette, scan
+
+
+def fill_large_holes(rgba, a_min=10, min_area=700, fill_rgb=None):
+    """
+    근경용 — 배경제거로 구조물 '안쪽'에 뚫린 투명 구멍 중 **큰 것만** 불투명 채움.
+    (난간 틈 같은 작은 구멍은 살려서 도시 불빛이 비치는 깊이감 유지.)
+    바깥 배경(테두리에 연결된 투명)은 그대로 투명 유지.
+    반환: (수정된 RGBA, 채운 픽셀 수).
+    """
+    import numpy as np
+    from collections import deque
+    from PIL import ImageDraw
+    W, H = rgba.size
+    A = np.asarray(rgba.split()[3])
+    transp = A < a_min
+    if not transp.any():
+        return rgba, 0
+    # 바깥(테두리 연결 투명) = PIL floodfill (C, 빠름). 1px 투명 테두리로 패딩 후 코너에서 채움.
+    m = Image.new('L', (W + 2, H + 2), 255)
+    inner = Image.fromarray(np.where(transp, 255, 0).astype('uint8'))
+    m.paste(inner, (1, 1))
+    ImageDraw.floodfill(m, (0, 0), 128, thresh=0)
+    outside = (np.asarray(m)[1:H + 1, 1:W + 1] == 128)
+    holes = transp & ~outside
+    if not holes.any():
+        return rgba, 0
+    # 구멍 연결성분 라벨링(구멍만 → 적음) 후 면적 큰 것만 채움
+    ys, xs = np.nonzero(holes)
+    holeset = set(zip(xs.tolist(), ys.tolist()))
+    visited = set(); fillpts = []
+    for p in holeset:
+        if p in visited:
+            continue
+        comp = []; dq = deque([p]); visited.add(p)
+        while dq:
+            x, y = dq.popleft(); comp.append((x, y))
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                q = (x + dx, y + dy)
+                if q in holeset and q not in visited:
+                    visited.add(q); dq.append(q)
+        if len(comp) >= min_area:
+            fillpts.extend(comp)
+    if not fillpts:
+        return rgba, 0
+    # 채울 색 = 어두운 불투명 픽셀(구조물 몸통) 평균 — 구조와 자연스럽게 섞이게
+    if fill_rgb is None:
+        rgb = np.asarray(rgba.convert('RGB'))
+        dark = (A >= a_min) & (rgb.sum(2) < 120)
+        fill_rgb = tuple(int(v) for v in rgb[dark].mean(0)) if dark.any() else (10, 10, 14)
+    px = rgba.load(); fr, fg, fb = fill_rgb
+    for (x, y) in fillpts:
+        px[x, y] = (fr, fg, fb, 255)
+    return rgba, len(fillpts)
 
 
 def black_silhouette_scanline(rgba, abands=12, a_min=8):

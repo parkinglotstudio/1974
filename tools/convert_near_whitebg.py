@@ -41,23 +41,25 @@ def white_bg_to_silhouette(im):
             ImageDraw.floodfill(dil, (x, 1), 128, thresh=25)
     dilA = np.asarray(dil)
     sky = (dilA == 128) & (white == 255)             # 채워진 영역 ∩ 원래 흰색 = 진짜 하늘(전선·바닥틈 제외)
-    out = np.zeros(arr.shape, dtype=np.uint8)         # RGB=0(검정)
-    out[..., 3] = np.where(sky, 0, 255).astype(np.uint8)   # 하늘=투명, 나머지(바닥 포함)=불투명 검정
+    out = arr.copy()                                  # ⚠ 검은색 강제 대신 원본의 실제 색상(RGB)을 복사해 보존합니다!
+    out[..., 3] = np.where(sky, 0, arr[..., 3]).astype(np.uint8) # 하늘 영역만 투명으로 변환
     return Image.fromarray(out, 'RGBA')
 
 
 def main():
-    src = Image.open(SAMP / '2020-근경2_1.png')
-    sil = white_bg_to_silhouette(src)
-    sw, sh = sil.size
+    # 진짜 가로모드용 풀컬러 원본 이미지인 2020-근경3.png를 사용합니다.
+    src = Image.open(SAMP / '2020-근경3.png').convert('RGBA')
+    # 2020-근경3.png는 이미 알파 채널이 완벽히 투명 처리되어 있으므로 화이트백 변환 작업을 건너뜁니다.
+    sw, sh = src.size
     nh = max(1, round(sh * WORLD_W / sw))
-    strip = sil.resize((WORLD_W, nh), Image.LANCZOS)
+    strip = src.resize((WORLD_W, nh), Image.LANCZOS)
     canvas = Image.new('RGBA', (WORLD_W, WORLD_H), (0, 0, 0, 0))
-    canvas.paste(strip, (0, WORLD_H - nh), strip)        # 하단 배치
-    pal, scan = S.black_silhouette_scanline(canvas)
+    canvas.paste(strip, (0, WORLD_H - nh), strip)
+    # 검은 실루엣 대신, 원본 색상을 그대로 보존하기 위해 64색 적응형 메디안컷 양자화를 적용합니다.
+    pal, scan = S.quantize_scanline(canvas, max_colors=64)
     OUT.mkdir(parents=True, exist_ok=True)
     S.write_json(OUT / '2020long_near.json', WORLD_W, WORLD_H, pal, scan)
-    print(f'  2020long_near ({WORLD_W}x{WORLD_H}, pal {len(pal)}, 실루엣높이 {nh})  ← 2020-근경2_1.png')
+    print(f'  2020long_near ({WORLD_W}x{WORLD_H}, pal {len(pal)}, 실루엣높이 {nh})  ← 2020-근경3.png')
 
 
 if __name__ == '__main__':

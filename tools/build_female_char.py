@@ -106,6 +106,8 @@ def normalize_to_char_h(frames, per_frame=False):
     sc = CHAR_H / rh
     if per_frame:
         # run처럼 뻗은 포즈는 폭이 캔버스(149)를 넘어도 OK — 높이만 맞추고 폭은 캔버스에 중앙 클립
+        # (주의: 폭 기준 추가 클램프는 절대 넣지 말 것 — 5f0045a에서 이미 시도→키 절반로 축소되는
+        #  회귀 발생 확인됨. run 프레임 폭이 최대 722px(원본)로 캔버스 149px를 훨씬 초과하기 때문.)
         out = []
         for f, b in zip(frames, bbs):
             if not b:

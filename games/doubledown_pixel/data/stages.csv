@@ -1,0 +1,4 @@
+stage_id,mission_type,target_block_type,target_block_count,target_score,target_tile_count,moves_given,difficulty,star1,star2,star3,spawn_bias_pct,hammer_count,shuffle_count
+1,BLOCK_COLLECTION,BLOCK_04,90,,,42,easy,3000,7000,12000,70,3,2
+2,BLOCK_COLLECTION,BLOCK_04,130,,,38,normal,6000,14000,24000,60,2,2
+3,SCORE_TARGET,,,80000,,35,hard,24000,55000,80000,50,2,1

@@ -23,13 +23,19 @@ const FOG_ENABLED = false;     // 안개(절차적 + 드리프트 구름) ON/OFF
 // 전환 효과를 차례대로 순환 — 새로 만든 모래 생성형 3종 테스트
 const FX_LIST     = ['sand_top', 'sand_sides', 'wave'];
 
+// ── 원경(L0)만 모래 시그니처로 교체 (월드 중간 도달 시 1회) ────────────
+// 근경(L1)·캐릭터(L2)는 그대로 두고 원경만 2021_far(원경2) → 2021_far7(원경7)로 전환.
+const FAR_SWAP_ENABLED = true;
+const FAR_SWAP_AT      = 0.5;    // 월드 진행 50% 지점에서 트리거
+const FAR_SWAP_MS      = 1600;   // 원경 모래 전환 시간(ms)
+const FAR_SWAP_NEW     = '2021_far7';   // 교체 대상 원경 에셋
+const FAR_SWAP_OLD     = '2021_far';    // 시작 원경 에셋(씬에 로드됨)
+
 // ── SandScroll (모래 생성/소멸 스크롤) 프로토타입 파라미터 ───────────
 const SAND_ENABLED   = true;
 const CHAR_DISSOLVE_ENABLED = false; // 캐릭터 외곽 모래 중력낙하 디졸브 (요청: 가림)
 // ↓ let = CSV(fx_params.csv) 로드값으로 _loadConfig가 덮어씀. 숫자는 fallback 기본값.
 let   INTRO_MS       = 2200;  // ← intro.ms
-let   SAND_BAND_MAX  = 0.022; // ← sand.band_max
-let   SAND_GRAIN     = 4;     // ← sand.grain
 let   SAND_SETTLE_MS = 280;   // ← sand.settle_ms
 let   SAND_BUILDUP_MS = 2000; // ← sand.buildup_ms
 
@@ -61,6 +67,14 @@ export default class GolmokGame extends Scene {
         this._bgReady = false;
         this._timer   = 0;
         this._tr      = null;    // { t, effect, swapped, _pxOut, _pxIn }
+
+        // 원경(L0) 전용 모래 전환 상태 (근경/캐릭터 불변)
+        this._farSwap    = null;   // { t: 0~1 } 진행 중이면 객체
+        this._farSwapped = false;  // 1회 래치 (교체 완료)
+        this._far2Data   = null;   // 구 원경(원경2) 래스터 ImageData.data (전환 블렌드용)
+        this._far7Data   = null;   // 새 원경(원경7) 래스터 ImageData.data
+        this._far7Json   = null;   // 새 원경 스캔라인 JSON (전환 완료 시 엔티티로 교체)
+        this._farW = 0; this._farH = 0;
 
         // SandScroll 상태
         this._lastCamX = null;
@@ -135,6 +149,10 @@ export default class GolmokGame extends Scene {
         this._recoilT = 0; this._recoilDir = 0; this._muzzleFlash = 0; this._fireAcc = 110;
         this._loadGun();
         this._preload();
+        // 원경 교체 상태 리셋 — 씬 재진입/재시작 때마다 다시 동작하도록 (래치 풀기) + 데이터 미리 래스터
+        this._farSwap = null; this._farSwapped = false;
+        this._far2Data = this._far7Data = this._far7Json = null;
+        if (FAR_SWAP_ENABLED) this._prepareFarSwap();   // 원경 교체용 데이터 미리 래스터
         if (FOG_ENABLED) this._loadFog();
 
         this._intro = { t: 0 };   // 게임 진입 연출 시작 (배경 모래-생성 + 캐릭터 픽셀 모이기)
@@ -175,8 +193,6 @@ export default class GolmokGame extends Scene {
         BG_TRANS_MS   = N('bg.trans_ms',     BG_TRANS_MS);
         BG_MOTE_RATE  = N('bg.mote_rate',    BG_MOTE_RATE);
         INTRO_MS      = N('intro.ms',        INTRO_MS);
-        SAND_BAND_MAX = N('sand.band_max',   SAND_BAND_MAX);
-        SAND_GRAIN    = N('sand.grain',      SAND_GRAIN);
         SAND_SETTLE_MS= N('sand.settle_ms',  SAND_SETTLE_MS);
         SAND_BUILDUP_MS=N('sand.buildup_ms', SAND_BUILDUP_MS);
         SAND_FALL_RATE= N('sand.fall_rate',  SAND_FALL_RATE);
@@ -610,8 +626,6 @@ export default class GolmokGame extends Scene {
             case 'bg.trans_ms':      BG_TRANS_MS   = v; break;
             case 'bg.mote_rate':     BG_MOTE_RATE  = v; break;
             case 'intro.ms':         INTRO_MS      = v; break;
-            case 'sand.band_max':    SAND_BAND_MAX = v; break;
-            case 'sand.grain':       SAND_GRAIN    = v; break;
             case 'sand.settle_ms':   SAND_SETTLE_MS= v; break;
             case 'sand.buildup_ms':  SAND_BUILDUP_MS=v; break;
             case 'sand.fall_rate':   SAND_FALL_RATE= v; break;
@@ -787,6 +801,44 @@ export default class GolmokGame extends Scene {
         if (engine.layers.layers[0]) engine.layers.layers[0]._bloomReady = false;
     }
 
+    // ── 원경(L0) 전용 모래 전환 준비/적용 ───────────────────────────
+    // 구 원경(2021_far)·새 원경(2021_far7)을 각각 캔버스로 래스터해 ImageData를 1회 캐시.
+    // 전환 중 onRender가 이 배열만 읽어 블렌드 → 프레임당 getImageData(스톨) 없음.
+    async _prepareFarSwap() {
+        // 2021 원경 씬에서만 무장 — 다른 씬(가로 2020 등)에 2021 원경이 끼어들지 않도록.
+        const bgf = this.engine?.entities?.get?.('bg_far');
+        if ((bgf?._asset || bgf?.type) !== FAR_SWAP_OLD) return;
+        try {
+            const far7 = await fetch(`./pixels/objects/${FAR_SWAP_NEW}.json`, { cache: 'no-store' })
+                .then(r => r.ok ? r.json() : null);
+            if (!far7 || !far7.scanline) return;
+            let far2 = this._bgCache['2021']?.far;
+            if (!far2) far2 = await fetch(`./pixels/objects/${FAR_SWAP_OLD}.json`, { cache: 'no-store' })
+                .then(r => r.ok ? r.json() : null);
+            if (!far2 || !far2.scanline) return;
+            const cv2 = this._rasterBgCanvas(far2), cv7 = this._rasterBgCanvas(far7);
+            this._farW = far2.width; this._farH = far2.height;
+            this._far2Data = cv2.getContext('2d').getImageData(0, 0, cv2.width, cv2.height).data;
+            this._far7Data = cv7.getContext('2d').getImageData(0, 0, cv7.width, cv7.height).data;
+            this._far7Json = far7;
+        } catch (e) { console.warn('[golmok] far-swap prepare fail:', e); }
+    }
+
+    // 전환 완료 → 원경 엔티티를 새 원경(far7)으로 교체 + 정적 L0 재래스터.
+    _applyFar7(engine) {
+        const d = this._far7Json;
+        if (!d) return;
+        engine.entities.remove('bg_far');
+        const far = engine.entities.add('bg_far', {
+            x: 0, y: this._bgFarY ?? (this._bgY ?? 0), pw: d.width, ph: d.height,
+            layer: 0, visible: true, _scanline: d.scanline, _palette: d.palette,
+        });
+        if (far) { far.type = FAR_SWAP_NEW; far._asset = FAR_SWAP_NEW; far._assetCategory = 'objects'; }
+        this._bgTone = null;                                   // 톤 재샘플 → 림/조명 자동 재매칭
+        if (engine.layers.layers[0]) engine.layers.layers[0]._bloomReady = false;  // 원경 블룸 재빌드
+        this._far2Data = this._far7Data = this._far7Json = null;   // 전환 버퍼 해제
+    }
+
     // 원경(L0)의 밝은 영역 평균색 = 대표 톤. FX 톤(림 floor·key광)을 배경마다 자동 매칭하는 기준.
     // (근경 L1은 검은 실루엣이라 톤 샘플에 부적합 → 색이 있는 원경 L0을 샘플)
     _sampleBgTone(engine) {
@@ -957,6 +1009,23 @@ export default class GolmokGame extends Scene {
         if (CHAR_DISSOLVE_ENABLED) this._updateAmbientSand(dt);
         this._updateBgMotes(dt);
 
+        // ── 원경(L0)만 모래 시그니처로 교체: 월드 중간 도달 시 1회 ──
+        // 근경(L1)·캐릭터(L2)는 건드리지 않음. 진행/렌더는 카메라 무관, 인트로 끝난 뒤.
+        if (FAR_SWAP_ENABLED && this._bgReady && !this._intro && this._far7Data && !this._farSwapped) {
+            const span = Math.max(1, this._worldW - engine.gameWidth);
+            if (!this._farSwap && engine.cameraX >= span * FAR_SWAP_AT) {
+                this._farSwap = { t: 0 };
+            }
+            if (this._farSwap) {
+                this._farSwap.t += dt / FAR_SWAP_MS;
+                if (this._farSwap.t >= 1) {
+                    this._farSwap = null;
+                    this._farSwapped = true;
+                    this._applyFar7(engine);   // 원경 엔티티 → far7 교체 + L0 재래스터
+                }
+            }
+        }
+
         // ── 배경 순환 + 전환 ──────────────────────────────────────
         // CYCLE_ENABLED=false 동안 전체 순환/끝-도달 전환 비활성 (세로 4장 전환은 추후)
         if (!CYCLE_ENABLED || !this._bgReady) return;
@@ -991,6 +1060,63 @@ export default class GolmokGame extends Scene {
         if (player.x >= this._worldW - player.pw - 2) {
             this._tr = { t: 0, effect: 'sandburst', swapped: false };
         }
+    }
+
+    // composite 이전 (scenes.render) — 원경 전환 중 L0 캔버스에 모래 블렌드를 직접 그림.
+    // L0(원경)만 덮으므로 근경(L1)·캐릭터(L2)는 그대로. 정적 L0라 entities.render가 덮어쓰지 않음.
+    onRender(cameraX) {
+        if (!this._farSwap || !this._far2Data || !this._far7Data) return;
+        const e = this.engine;
+        const L0 = e.layers.getCanvas(0);
+        if (!L0) return;
+        const fw = this._farW, fh = this._farH;
+        const W = e.gameWidth | 0, H = e.gameHeight | 0;
+        const parallax = e.layers.layers[0]?.parallax ?? 0.30;
+        const maxSrc = Math.max(0, L0.width - W);
+        let srcX = Math.floor(cameraX * parallax);
+        if (srcX < 0) srcX = 0; else if (srcX > maxSrc) srcX = maxSrc;
+
+        // 가시 윈도우(W×H) 버퍼 재사용 — 프레임당 getImageData 없음(읽기 스톨 회피)
+        if (!this._farBufImg || this._farBufImg.width !== W || this._farBufImg.height !== H) {
+            const c = document.createElement('canvas'); c.width = W; c.height = H;
+            this._farBufCtx = c.getContext('2d');
+            this._farBufImg = this._farBufCtx.createImageData(W, H);
+        }
+        const od = this._farBufImg.data;
+        const d2 = this._far2Data, d7 = this._far7Data;
+        const NT = SAND_TONES_RGB.length;
+        const t = this._farSwap.t, tw = (t * 34) | 0;
+        // 원경 엔티티의 y 시프트(_bgFarY) 반영: L0 행 y ↔ 원경 행 (y - offY). (가로 y-100 등에서 세로위치 정합)
+        const offY = this._bgFarY || 0;
+        // 2단계: 전반(t<0.5) 구 원경 → 완전 모래, 후반(t≥0.5) 모래 → 새 원경. (두 그림이 겹쳐 보이지 않음)
+        const shown = t < 0.5 ? (1 - t / 0.5) : (t - 0.5) / 0.5;   // 1=그림 / 0=완전 모래
+        const sd = t >= 0.5 ? d7 : d2;
+        for (let y = 0; y < H; y++) {
+            const fyr = y - offY;
+            const fy = fyr < 0 ? 0 : fyr >= fh ? fh - 1 : fyr;
+            for (let x = 0; x < W; x++) {
+                const wx = srcX + x;
+                const fx = wx < fw ? wx : fw - 1;
+                const si = (fy * fw + fx) << 2;
+                const n = sandHash(wx >> 2, y >> 2);
+                const sweep = (x + y) / (W + H);          // 대각 스윕
+                const thr = sweep * 0.55 + n * 0.45;
+                let r, g, b;
+                if (shown > thr) {              // 그림 유지 (전반=구 원경, 후반=새 원경)
+                    r = sd[si]; g = sd[si + 1]; b = sd[si + 2];
+                } else {                        // 모래알 (시그니처)
+                    const sp = sandHash((wx >> 2) + tw, (y >> 2) - tw);
+                    if (sp > 0.93) { r = 255; g = 248; b = 224; }   // 반짝임
+                    else {
+                        const tc = SAND_TONES_RGB[(n * NT) | 0], f = 0.65 + sp * 0.55;
+                        r = Math.min(255, tc[0] * f) | 0; g = Math.min(255, tc[1] * f) | 0; b = Math.min(255, tc[2] * f) | 0;
+                    }
+                }
+                const oi = (y * W + x) << 2;
+                od[oi] = r; od[oi + 1] = g; od[oi + 2] = b; od[oi + 3] = 255;
+            }
+        }
+        L0.getContext('2d').putImageData(this._farBufImg, srcX, 0);
     }
 
     // composite/FX 이후 — 전환 오버레이 또는 SandScroll 가장자리 효과
@@ -1114,9 +1240,6 @@ export default class GolmokGame extends Scene {
             overlay = true;
             if (SHOW_FPS) this._drawFps(ctx, W);
             return;   // 전환 중엔 캐릭터 FX·근경림·모래알 스킵 (모래 스윕이 화면을 덮음 → 안 보이고 비용만 큼)
-        } else if (SAND_ENABLED && this._sandRamp > 0.01) {
-            this._renderSandScroll(ctx, W, H);
-            overlay = true;
         }
 
         // ── 게임 진입 인트로: 배경 모래-생성 + 캐릭터 픽셀 모이기 ──
@@ -1810,70 +1933,6 @@ export default class GolmokGame extends Scene {
             }
         }
         ctx.restore();
-    }
-
-    // ── SandScroll: 진행 방향 가장자리에서 배경이 모래로 생성/소멸 ──────
-    _renderSandScroll(ctx, W, H) {
-        const engine = this.engine;
-        const band = Math.round(W * SAND_BAND_MAX * this._sandRamp);  // 빌드업(걷기2초/달리기즉시)
-        if (band < 2) return;
-
-        const L1 = engine.layers.getCanvas(1);
-        if (!L1) return;
-        const lctx = L1.getContext('2d');
-        const cam  = Math.floor(engine.cameraX);
-
-        ctx.globalAlpha = 1;
-        // 진행 방향 = 선행(생성) / 반대 = 후행(소멸). 단, 그쪽에 월드가 더 있을 때만.
-        const dir = this._sandDir;
-        const leftRole  = dir > 0 ? 'trail' : 'lead';
-        const rightRole = dir > 0 ? 'lead'  : 'trail';
-        if (this._edgeActive('left'))  this._sandBand(ctx, lctx, cam, 0,        band, H, 'left',  leftRole);
-        if (this._edgeActive('right')) this._sandBand(ctx, lctx, cam, W - band, band, H, 'right', rightRole);
-    }
-
-    // 가장자리에서 이미지가 "검은 픽셀"로 갉아먹히며 생성/소멸 (검정만, 모래색 없음)
-    // side: 'left'|'right' / role: 'lead'(생성=빨리 채워짐) | 'trail'(소멸=검정 많이)
-    _sandBand(ctx, lctx, cam, x0, bw, H, side, role) {
-        let sx = cam + x0;
-        if (sx < 0) sx = 0;
-        const src = lctx.getImageData(sx, 0, bw, H);
-        const out = ctx.createImageData(bw, H);
-        const od  = out.data;
-        od.set(src.data);                                // 이미지 그대로 복사
-        const bwm = bw - 1;
-        const G   = SAND_GRAIN;
-        const isLead = role === 'lead';
-        const NT = SAND_TONES_RGB.length;
-        const sd = src.data;                              // 원본 이미지 픽셀
-
-        for (let ly = 0; ly < H; ly += G) {
-            for (let lx = 0; lx < bw; lx += G) {
-                const distOuter = (side === 'left') ? lx : (bwm - lx);
-                let f = bwm > 0 ? distOuter / bwm : 1;
-                f = f * f * (3 - 2 * f);                  // 0=바깥(가장자리), 1=안쪽(화면)
-                const wcx = ((sx + lx) / G) | 0, wcy = (ly / G) | 0;
-                const h   = sandHash(wcx, wcy);
-                // 셀마다 임계가 달라 순차 생성. 선행(생성)=바깥부터 빨리 / 후행(소멸)=늦게까지 모래.
-                // thr 범위 0~0.7 → f=1(안쪽)에서 모든 셀이 완성되어 화면과 이음새 없음.
-                const thr = isLead ? (h * 0.5) : (0.2 + h * 0.5);
-                let rev = (f - thr) / 0.30;               // 모래(0) → 이미지(1) 연속 블렌드
-                rev = rev <= 0 ? 0 : rev >= 1 ? 1 : rev * rev * (3 - 2 * rev);
-                if (rev >= 0.999) continue;               // 완전 이미지 → 원본 그대로
-                // 매질 = 검정만 (모래색·반짝임 미사용). rev: 0=검정 → 1=이미지. 검정 불투명도로 자연 침식
-                for (let dy = 0; dy < G && ly + dy < H; dy++) {
-                    const rowBase = (ly + dy) * bw;
-                    for (let dx = 0; dx < G && lx + dx < bw; dx++) {
-                        const oi = (rowBase + lx + dx) << 2;
-                        od[oi]     = (sd[oi]     * rev) | 0;
-                        od[oi + 1] = (sd[oi + 1] * rev) | 0;
-                        od[oi + 2] = (sd[oi + 2] * rev) | 0;
-                        od[oi + 3] = 255;
-                    }
-                }
-            }
-        }
-        ctx.putImageData(out, x0, 0);
     }
 
     // ── Convergence 픽셀 수렴/방산 (SceneManager 로직 이식) ──────────
