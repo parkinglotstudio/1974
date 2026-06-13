@@ -1752,6 +1752,11 @@
                      flex-direction:column;gap:6px;pointer-events:none;"></div>
                 <iframe id="runnerIframe" style="position:absolute;inset:0;width:100%;height:100%;border:none;display:none;z-index:15;background:#EDEBE4;" allow="autoplay"></iframe>
 
+                <!-- 스크립트 씬(UI) 프리뷰 컨트롤 — 펌프 로비 탭 전환 등 -->
+                <div id="uiPreviewPanel" style="display:none;position:absolute;top:8px;left:8px;z-index:20;
+                     flex-direction:column;gap:4px;background:rgba(26,26,24,0.85);
+                     border-radius:6px;padding:6px;pointer-events:auto;"></div>
+
                 <div class="flow-conn-panel" id="flowConnPanel">
                     <div class="flow-panel-title">연결 설정</div>
                     <div class="flow-panel-row">
@@ -6980,8 +6985,25 @@ async function main() {
 
         if (!engine._running) engine.start();
 
+        // 프리뷰 패널 초기화 (씬 전환마다 재구성)
+        const uiPanel = document.getElementById('uiPreviewPanel');
+        if (uiPanel) { uiPanel.style.display = 'none'; uiPanel.innerHTML = ''; }
+
         const scDef = window._currentProject?.scenes?.[sceneName];
-        if (scDef?.type === 'json' && scDef.src) {
+        if (scDef?.type === 'script' && scDef.script) {
+            // 스크립트 씬: 실제 Scene 클래스를 import 해서 캔버스에서 라이브로 실행
+            try {
+                const pid = window._currentProject?.id;
+                const mod = await import(`/games/${pid}/${scDef.script}`);
+                const SceneClass = mod.default;
+                const sceneInst = new SceneClass();
+                engine.scenes.register(sceneName, sceneInst);
+                engine.scenes._activate(sceneName);
+                _buildUiPreviewPanel(sceneName, sceneInst);
+            } catch (e) {
+                log(`스크립트 씬 로드 실패 (${scDef.script}): ${e.message}`, 'err');
+            }
+        } else if (scDef?.type === 'json' && scDef.src) {
             // JSON 씬: 저장 복원 or 파일 로드
             if (!_restoreSceneState(sceneName)) {
                 try {
@@ -7013,6 +7035,34 @@ async function main() {
         if (scLabel) scLabel.textContent = scDef?.src?.split('/').pop() ?? sceneName;
         log(`씬 전환: ${sceneName}`, 'info');
     };
+
+    // 스크립트 씬(UI) 프리뷰 패널 — 씬이 노출하는 탭/상태를 버튼으로 전환
+    function _buildUiPreviewPanel(sceneName, sceneInst) {
+        const panel = document.getElementById('uiPreviewPanel');
+        if (!panel) return;
+
+        const TABS = {
+            square_lobby: [
+                ['battle',    '전투'],
+                ['shop',      '상점'],
+                ['equip',     '장비'],
+                ['challenge', '도전'],
+                ['evolution', '진화'],
+            ],
+        };
+
+        const tabs = TABS[sceneName];
+        if (!tabs || typeof sceneInst._showTab !== 'function') return;
+
+        for (const [key, label] of tabs) {
+            const btn = document.createElement('button');
+            btn.className = 'hbtn';
+            btn.textContent = label;
+            btn.onclick = () => sceneInst._showTab(key);
+            panel.appendChild(btn);
+        }
+        panel.style.display = 'flex';
+    }
 
     // 헤더 버튼
     document.getElementById('btnSaveScene').addEventListener('click', saveScene);
