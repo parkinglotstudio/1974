@@ -7,6 +7,12 @@ export default class AssetLoader {
     constructor() {
         this._cache   = new Map(); // path → parsed JSON
         this._pending = new Map(); // path → Promise (in-flight 중복 방지)
+        this._base    = '';        // 상대 경로 앞에 붙일 베이스 (에디터에서 게임 폴더 지정용)
+    }
+
+    // 상대 경로(data/..., 절대/프로토콜 경로 제외) 앞에 붙일 베이스 경로 설정
+    setBase(base) {
+        this._base = base ?? '';
     }
 
     // 단일 에셋 로드. 캐시에 있으면 즉시 반환.
@@ -14,7 +20,8 @@ export default class AssetLoader {
         if (this._cache.has(path))   return this._cache.get(path);
         if (this._pending.has(path)) return this._pending.get(path);
 
-        const promise = fetch(path)
+        const url = (this._base && !/^([a-z]+:)?\//i.test(path)) ? this._base + path : path;
+        const promise = fetch(url)
             .then(r => {
                 if (!r.ok) throw new Error(`[AssetLoader] ${r.status} — ${path}`);
                 return r.json();

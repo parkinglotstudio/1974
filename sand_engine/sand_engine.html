@@ -2746,8 +2746,14 @@ function refreshLayerChildren() {
             el.appendChild(_makeEntityRow(e, false));
         }
 
+        // ── L3: UISystem 위젯 트리 (script 씬 UI 프리뷰) ─────────────
+        let uiRows = 0;
+        if (i === 3 && window._uiSceneInst?._def) {
+            uiRows = _appendUiWidgetRows(el, window._uiSceneInst._def, 0);
+        }
+
         // ── 빈 레이어 "(비어있음)" 표시 ──────────────────────────
-        if (all.length === 0) {
+        if (all.length === 0 && uiRows === 0) {
             const emptyMsg = document.createElement('div');
             emptyMsg.className = 'lci-empty-msg';
             emptyMsg.textContent = '(비어있음)';
@@ -2762,6 +2768,48 @@ function refreshLayerChildren() {
             if (resEl) resEl.textContent = `${lw}×${gh}`;
         }
     }
+}
+
+// UISystem 위젯 트리(JSON children) → 레이어 패널 행으로 재귀 렌더
+// 반환값 = 렌더된 행 개수 (0이면 "(비어있음)" 표시 유지)
+function _appendUiWidgetRows(parentEl, def, depth) {
+    let count = 0;
+    for (const child of def.children ?? []) {
+        const row = document.createElement('div');
+        row.className = 'layer-child-item lci-grouped'
+            + (window._uiSelectedWidgetId === child.id ? ' lci-selected' : '');
+        row.style.paddingLeft = `${22 + depth * 14}px`;
+        const label = child.id ?? child.type ?? '?';
+        const visible = child.visible !== false;
+        row.innerHTML = `
+            <span class="lci-status ${visible ? 'filled' : 'empty'}" title="${visible ? 'visible' : 'visible:false'}">${visible ? '●' : '○'}</span>
+            <span class="layer-child-icon lci-sprite">▣</span>
+            <span class="layer-child-name">${label}</span>
+            <span class="layer-child-size">${child.type ?? ''}</span>`;
+        row.addEventListener('click', () => {
+            window._uiSelectedWidgetId = child.id ?? null;
+            _highlightUiWidget(child.id);
+            refreshLayerChildren();
+        });
+        parentEl.appendChild(row);
+        count++;
+        count += _appendUiWidgetRows(parentEl, child, depth + 1);
+    }
+    return count;
+}
+
+// 선택한 UI 위젯의 실제 렌더 영역을 overlay 캔버스에 박스로 표시
+function _highlightUiWidget(id) {
+    if (!overlayCtx) return;
+    overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+    if (!id) return;
+    const item = window._uiSceneInst?.engine?.ui?._byId?.get(id);
+    if (!item) return;
+    overlayCtx.save();
+    overlayCtx.strokeStyle = '#C8922A';
+    overlayCtx.lineWidth = 2;
+    overlayCtx.strokeRect(item.x + 0.5, item.y + 0.5, item.w - 1, item.h - 1);
+    overlayCtx.restore();
 }
 
 function _makeEntityRow(e, grouped) {
@@ -6985,21 +7033,31 @@ async function main() {
 
         if (!engine._running) engine.start();
 
-        // 프리뷰 패널 초기화 (씬 전환마다 재구성)
+        // 프리뷰 패널 / UI 위젯 트리 초기화 (씬 전환마다 재구성)
         const uiPanel = document.getElementById('uiPreviewPanel');
         if (uiPanel) { uiPanel.style.display = 'none'; uiPanel.innerHTML = ''; }
+        window._uiSceneInst = null;
+        window._uiSelectedWidgetId = null;
+        if (overlayCtx) overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 
         const scDef = window._currentProject?.scenes?.[sceneName];
         if (scDef?.type === 'script' && scDef.script) {
             // 스크립트 씬: 실제 Scene 클래스를 import 해서 캔버스에서 라이브로 실행
             try {
                 const pid = window._currentProject?.id;
+                engine.assets.setBase(`/games/${pid}/`);
                 const mod = await import(`/games/${pid}/${scDef.script}`);
                 const SceneClass = mod.default;
                 const sceneInst = new SceneClass();
                 engine.scenes.register(sceneName, sceneInst);
                 engine.scenes._activate(sceneName);
+                // onEnter는 비동기로 data/*.json을 로드함 — _def 준비될 때까지 대기
+                for (let tries = 0; tries < 50 && !sceneInst._def; tries++) {
+                    await new Promise(r => setTimeout(r, 20));
+                }
+                window._uiSceneInst = sceneInst;
                 _buildUiPreviewPanel(sceneName, sceneInst);
+                refreshLayerChildren();
             } catch (e) {
                 log(`스크립트 씬 로드 실패 (${scDef.script}): ${e.message}`, 'err');
             }
@@ -7058,7 +7116,12 @@ async function main() {
             const btn = document.createElement('button');
             btn.className = 'hbtn';
             btn.textContent = label;
-            btn.onclick = () => sceneInst._showTab(key);
+            btn.onclick = () => {
+                sceneInst._showTab(key);
+                window._uiSelectedWidgetId = null;
+                if (overlayCtx) overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+                refreshLayerChildren();
+            };
             panel.appendChild(btn);
         }
         panel.style.display = 'flex';
