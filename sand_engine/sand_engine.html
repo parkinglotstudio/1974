@@ -2788,8 +2788,19 @@ function _appendUiWidgetRows(parentEl, def, depth) {
             <span class="layer-child-size">${child.type ?? ''}</span>`;
         row.addEventListener('click', () => {
             window._uiSelectedWidgetId = child.id ?? null;
+            const item = window._uiSceneInst?.engine?.ui?._byId?.get(child.id);
+            selectEntity({
+                id: child.id,
+                type: child.type,
+                layer: 3,
+                x: item?.x ?? child.x ?? 0,
+                y: item?.y ?? child.y ?? 0,
+                pw: item?.w ?? child.w ?? 0,
+                ph: item?.h ?? child.h ?? 0,
+                visible: child.visible !== false,
+                _uiWidget: true,
+            });
             _highlightUiWidget(child.id);
-            refreshLayerChildren();
         });
         parentEl.appendChild(row);
         count++;
