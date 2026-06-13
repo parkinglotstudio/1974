@@ -1,6 +1,6 @@
 {
   "note": "게임 레지스트리 — 각 게임은 games/<id>/ 한 폴더에 자급자족. 엔진(engine/)과 분리.",
-  "games": [
+  "projects": [
     {
       "id": "golmok",
       "name": "골목길의 하루",
@@ -10,11 +10,12 @@
       "entry": "games/golmok/index.html"
     },
     {
-      "id": "doubledown_pixel",
-      "name": "더블 다운 픽셀",
-      "icon": "♠",
-      "desc": "270×480 · 세로 9:16 · 매치-3",
-      "entry": "games/doubledown_pixel/index.html"
+      "id": "pump",
+      "name": "펌프",
+      "icon": "🟦",
+      "chapter": 0,
+      "desc": "540×960 · 세로 9:16 · 탑뷰 서바이버 (PRISM SQUAD 모래엔진 재구현)",
+      "entry": "games/pump/index.html"
     }
   ]
 }
