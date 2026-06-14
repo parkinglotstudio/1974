@@ -1,0 +1,190 @@
+{
+  "note": "전투 로비 — '게임 UI 설명 - 스퀘어.pdf' 레이아웃 패턴 참고: 하단 탭 = 풀스크린 페이지 전환(팝업 아님), 상단바/탭바 고정. 컨셉 = 모래(사막) 테마. 활성 탭 = gold 스킨.",
+  "children": [
+    { "type": "rect", "id": "bg", "x": 0, "y": 0, "w": 540, "h": 960, "bg": "#2C4E8C" },
+    { "type": "rect", "id": "bg_floor", "x": 0, "y": 620, "w": 540, "h": 340, "bg": "#27447A" },
+
+    { "type": "panel", "id": "topbar", "x": 0, "y": 0, "w": 540, "h": 84, "skin": "navy",
+      "children": [
+        { "type": "button", "id": "btn_menu", "x": 12, "y": 14, "w": 56, "h": 56, "skin": "slate", "label": "≡", "size": 22, "action": "menu" },
+        { "type": "button", "id": "btn_avatar", "x": 80, "y": 14, "w": 56, "h": 56, "skin": "blue", "action": "avatar" },
+        { "type": "label", "id": "lbl_player", "x": 148, "y": 16, "text": "PLAYER 1", "size": 11, "color": "#FFFFFF", "outline": "#16243E", "bold": true },
+        { "type": "label", "id": "lbl_lv", "x": 148, "y": 44, "text": "LV.1", "size": 11, "color": "#AFC4E8" },
+        { "type": "gauge", "id": "g_player_exp", "x": 192, "y": 46, "w": 70, "h": 12, "ratio": 0.1, "skin": "green" },
+
+        { "type": "panel", "id": "chip_energy", "x": 274, "y": 22, "w": 84, "h": 40, "skin": "navy",
+          "children": [
+            { "type": "rect", "x": 8, "y": 12, "w": 14, "h": 14, "bg": "#FFC23E" },
+            { "type": "label", "id": "lbl_energy", "x": 30, "y": 12, "text": "500", "size": 11, "color": "#FFFFFF", "outline": "#16243E" }
+          ] },
+        { "type": "panel", "id": "chip_gem", "x": 364, "y": 22, "w": 84, "h": 40, "skin": "navy",
+          "children": [
+            { "type": "rect", "x": 8, "y": 12, "w": 14, "h": 14, "bg": "#7EC8F2" },
+            { "type": "label", "id": "lbl_gem", "x": 30, "y": 12, "text": "500", "size": 11, "color": "#FFFFFF", "outline": "#16243E" }
+          ] },
+        { "type": "panel", "id": "chip_gold", "x": 452, "y": 22, "w": 84, "h": 40, "skin": "navy",
+          "children": [
+            { "type": "rect", "x": 8, "y": 12, "w": 14, "h": 14, "bg": "#F5D454" },
+            { "type": "label", "id": "lbl_gold", "x": 30, "y": 12, "text": "12.4K", "size": 11, "color": "#FFFFFF", "outline": "#16243E" }
+          ] }
+      ] },
+
+    { "type": "group", "id": "page_battle", "x": 0, "y": 0,
+      "children": [
+        { "type": "label", "id": "lbl_stage", "x": 270, "y": 150, "text": "1. 야생 거리", "size": 33, "color": "#FFFFFF", "outline": "#16243E", "outlineW": 3, "align": "center", "bold": true },
+        { "type": "label", "id": "lbl_best", "x": 270, "y": 204, "text": "최장 생존시간 --:--", "size": 11, "color": "#AFC4E8", "outline": "#16243E", "align": "center" },
+
+        { "type": "panel", "id": "stage_view", "x": 70, "y": 250, "w": 400, "h": 330, "skin": "cream",
+          "children": [
+            { "type": "label", "id": "lbl_stage_view", "x": 200, "y": 150, "text": "STAGE VIEW", "size": 11, "color": "#8A6A42", "align": "center", "bold": true }
+          ] },
+        { "type": "button", "id": "btn_stage_prev", "x": 14, "y": 384, "w": 52, "h": 62, "skin": "gold", "label": "<", "size": 22, "action": "stage_prev" },
+        { "type": "button", "id": "btn_stage_next", "x": 474, "y": 384, "w": 52, "h": 62, "skin": "gold", "label": ">", "size": 22, "action": "stage_next" },
+
+        { "type": "button", "id": "btn_reward", "x": 222, "y": 606, "w": 96, "h": 54, "skin": "purple", "label": "보상", "size": 22, "action": "chapter_reward" },
+
+        { "type": "button", "id": "btn_mult", "x": 50, "y": 706, "w": 140, "h": 120, "skin": "gold", "action": "cycle_mult",
+          "children": [
+            { "type": "label", "id": "lbl_mult", "x": 70, "y": 18, "text": "x1", "size": 33, "color": "#FFFFFF", "outline": "#7A4612", "align": "center", "bold": true },
+            { "type": "label", "x": 70, "y": 60, "text": "배수", "size": 11, "color": "#FFF3CC", "outline": "#7A4612", "align": "center" },
+            { "type": "label", "id": "lbl_mult_cost", "x": 70, "y": 86, "text": "번개 5 소모", "size": 11, "color": "#FFF3CC", "outline": "#7A4612", "align": "center" }
+          ] },
+        { "type": "button", "id": "btn_start", "x": 210, "y": 706, "w": 280, "h": 120, "skin": "green", "action": "start_game",
+          "children": [
+            { "type": "label", "x": 140, "y": 26, "text": "게임 시작", "size": 33, "color": "#FFFFFF", "outline": "#1E5418", "outlineW": 3, "align": "center", "bold": true },
+            { "type": "label", "id": "lbl_start_cost", "x": 140, "y": 76, "text": "번개 5 소모", "size": 11, "color": "#E2FFC8", "outline": "#1E5418", "align": "center" }
+          ] }
+      ] },
+
+    { "type": "group", "id": "page_shop", "x": 0, "y": 0, "visible": false,
+      "children": [
+        { "type": "label", "x": 270, "y": 116, "text": "모래 상점", "size": 33, "color": "#FFFFFF", "outline": "#16243E", "outlineW": 3, "align": "center", "bold": true },
+        { "type": "label", "x": 270, "y": 168, "text": "사막에서 캐낸 유물 — 골드로 구매", "size": 11, "color": "#AFC4E8", "outline": "#16243E", "align": "center" },
+
+        { "type": "button", "id": "shop_btn0", "x": 40, "y": 210, "w": 460, "h": 150, "skin": "cream", "action": "shop_buy_0",
+          "children": [
+            { "type": "rect", "x": 22, "y": 30, "w": 90, "h": 90, "bg": "#E8553C" },
+            { "type": "label", "id": "shop_name0", "x": 130, "y": 28, "text": "모래 부적", "size": 22, "color": "#5C4326", "bold": true },
+            { "type": "label", "id": "shop_desc0", "x": 130, "y": 64, "text": "공격력 +8%", "size": 13, "color": "#8A6A42" },
+            { "type": "panel", "id": "shop_price0", "x": 130, "y": 94, "w": 160, "h": 40, "skin": "gold",
+              "children": [
+                { "type": "label", "id": "shop_cost0", "x": 80, "y": 12, "text": "200G · 구매", "size": 13, "color": "#FFFFFF", "outline": "#7A4612", "align": "center", "bold": true }
+              ] }
+          ] },
+        { "type": "button", "id": "shop_btn1", "x": 40, "y": 380, "w": 460, "h": 150, "skin": "cream", "action": "shop_buy_1",
+          "children": [
+            { "type": "rect", "x": 22, "y": 30, "w": 90, "h": 90, "bg": "#3D8EDB" },
+            { "type": "label", "id": "shop_name1", "x": 130, "y": 28, "text": "질주 부츠", "size": 22, "color": "#5C4326", "bold": true },
+            { "type": "label", "id": "shop_desc1", "x": 130, "y": 64, "text": "이동속도 +10%", "size": 13, "color": "#8A6A42" },
+            { "type": "panel", "id": "shop_price1", "x": 130, "y": 94, "w": 160, "h": 40, "skin": "gold",
+              "children": [
+                { "type": "label", "id": "shop_cost1", "x": 80, "y": 12, "text": "200G · 구매", "size": 13, "color": "#FFFFFF", "outline": "#7A4612", "align": "center", "bold": true }
+              ] }
+          ] },
+        { "type": "button", "id": "shop_btn2", "x": 40, "y": 550, "w": 460, "h": 150, "skin": "cream", "action": "shop_buy_2",
+          "children": [
+            { "type": "rect", "x": 22, "y": 30, "w": 90, "h": 90, "bg": "#F5D454" },
+            { "type": "label", "id": "shop_name2", "x": 130, "y": 28, "text": "단단한 갑옷", "size": 22, "color": "#5C4326", "bold": true },
+            { "type": "label", "id": "shop_desc2", "x": 130, "y": 64, "text": "최대 HP +30", "size": 13, "color": "#8A6A42" },
+            { "type": "panel", "id": "shop_price2", "x": 130, "y": 94, "w": 160, "h": 40, "skin": "gold",
+              "children": [
+                { "type": "label", "id": "shop_cost2", "x": 80, "y": 12, "text": "200G · 구매", "size": 13, "color": "#FFFFFF", "outline": "#7A4612", "align": "center", "bold": true }
+              ] }
+          ] },
+        { "type": "label", "x": 270, "y": 730, "text": "전투에서 골드를 모아 유물을 수집하세요", "size": 11, "color": "#AFC4E8", "outline": "#16243E", "align": "center" }
+      ] },
+
+    { "type": "group", "id": "page_equip", "x": 0, "y": 0, "visible": false,
+      "children": [
+        { "type": "label", "x": 270, "y": 116, "text": "장비", "size": 33, "color": "#FFFFFF", "outline": "#16243E", "outlineW": 3, "align": "center", "bold": true },
+        { "type": "label", "x": 270, "y": 168, "text": "보유한 유물을 장착/해제", "size": 11, "color": "#AFC4E8", "outline": "#16243E", "align": "center" },
+
+        { "type": "button", "id": "equip_btn0", "x": 40, "y": 210, "w": 460, "h": 150, "skin": "slate", "action": "equip_toggle_0",
+          "children": [
+            { "type": "rect", "x": 22, "y": 30, "w": 90, "h": 90, "bg": "#E8553C" },
+            { "type": "label", "id": "equip_name0", "x": 130, "y": 28, "text": "모래 부적", "size": 22, "color": "#FFFFFF", "outline": "#16243E", "bold": true },
+            { "type": "label", "id": "equip_desc0", "x": 130, "y": 64, "text": "공격력 +8%", "size": 13, "color": "#AFC4E8" },
+            { "type": "label", "id": "equip_state0", "x": 130, "y": 100, "text": "미보유", "size": 14, "color": "#F5D454", "outline": "#16243E", "bold": true }
+          ] },
+        { "type": "button", "id": "equip_btn1", "x": 40, "y": 380, "w": 460, "h": 150, "skin": "slate", "action": "equip_toggle_1",
+          "children": [
+            { "type": "rect", "x": 22, "y": 30, "w": 90, "h": 90, "bg": "#3D8EDB" },
+            { "type": "label", "id": "equip_name1", "x": 130, "y": 28, "text": "질주 부츠", "size": 22, "color": "#FFFFFF", "outline": "#16243E", "bold": true },
+            { "type": "label", "id": "equip_desc1", "x": 130, "y": 64, "text": "이동속도 +10%", "size": 13, "color": "#AFC4E8" },
+            { "type": "label", "id": "equip_state1", "x": 130, "y": 100, "text": "미보유", "size": 14, "color": "#F5D454", "outline": "#16243E", "bold": true }
+          ] },
+        { "type": "button", "id": "equip_btn2", "x": 40, "y": 550, "w": 460, "h": 150, "skin": "slate", "action": "equip_toggle_2",
+          "children": [
+            { "type": "rect", "x": 22, "y": 30, "w": 90, "h": 90, "bg": "#F5D454" },
+            { "type": "label", "id": "equip_name2", "x": 130, "y": 28, "text": "단단한 갑옷", "size": 22, "color": "#FFFFFF", "outline": "#16243E", "bold": true },
+            { "type": "label", "id": "equip_desc2", "x": 130, "y": 64, "text": "최대 HP +30", "size": 13, "color": "#AFC4E8" },
+            { "type": "label", "id": "equip_state2", "x": 130, "y": 100, "text": "미보유", "size": 14, "color": "#F5D454", "outline": "#16243E", "bold": true }
+          ] },
+        { "type": "label", "x": 270, "y": 730, "text": "장착한 유물의 효과는 전투에 즉시 적용됩니다", "size": 11, "color": "#AFC4E8", "outline": "#16243E", "align": "center" }
+      ] },
+
+    { "type": "group", "id": "page_challenge", "x": 0, "y": 0, "visible": false,
+      "children": [
+        { "type": "label", "x": 270, "y": 116, "text": "도전", "size": 33, "color": "#FFFFFF", "outline": "#16243E", "outlineW": 3, "align": "center", "bold": true },
+        { "type": "label", "x": 270, "y": 168, "text": "미션을 완수하고 보상을 수령하세요", "size": 11, "color": "#AFC4E8", "outline": "#16243E", "align": "center" },
+
+        { "type": "button", "id": "mis_btn0", "x": 40, "y": 210, "w": 460, "h": 150, "skin": "green", "action": "mission_claim_0",
+          "children": [
+            { "type": "label", "id": "mis_name0", "x": 24, "y": 24, "text": "몬스터 20킬 처치", "size": 22, "color": "#FFFFFF", "outline": "#1E5418", "bold": true },
+            { "type": "gauge", "id": "mis_gauge0", "x": 24, "y": 66, "w": 300, "h": 18, "ratio": 0, "skin": "gold" },
+            { "type": "label", "id": "mis_state0", "x": 24, "y": 100, "text": "0/20 · 보상 50G", "size": 14, "color": "#E2FFC8", "outline": "#1E5418" }
+          ] },
+        { "type": "button", "id": "mis_btn1", "x": 40, "y": 380, "w": 460, "h": 150, "skin": "green", "action": "mission_claim_1",
+          "children": [
+            { "type": "label", "id": "mis_name1", "x": 24, "y": 24, "text": "몬스터 50킬 처치", "size": 22, "color": "#FFFFFF", "outline": "#1E5418", "bold": true },
+            { "type": "gauge", "id": "mis_gauge1", "x": 24, "y": 66, "w": 300, "h": 18, "ratio": 0, "skin": "gold" },
+            { "type": "label", "id": "mis_state1", "x": 24, "y": 100, "text": "0/50 · 보상 120G", "size": 14, "color": "#E2FFC8", "outline": "#1E5418" }
+          ] },
+        { "type": "button", "id": "mis_btn2", "x": 40, "y": 550, "w": 460, "h": 150, "skin": "green", "action": "mission_claim_2",
+          "children": [
+            { "type": "label", "id": "mis_name2", "x": 24, "y": 24, "text": "3분 생존", "size": 22, "color": "#FFFFFF", "outline": "#1E5418", "bold": true },
+            { "type": "gauge", "id": "mis_gauge2", "x": 24, "y": 66, "w": 300, "h": 18, "ratio": 0, "skin": "gold" },
+            { "type": "label", "id": "mis_state2", "x": 24, "y": 100, "text": "0/180 · 보상 150G", "size": 14, "color": "#E2FFC8", "outline": "#1E5418" }
+          ] },
+        { "type": "label", "x": 270, "y": 730, "text": "완료된 미션을 탭하면 골드를 받습니다", "size": 11, "color": "#AFC4E8", "outline": "#16243E", "align": "center" }
+      ] },
+
+    { "type": "group", "id": "page_evolution", "x": 0, "y": 0, "visible": false,
+      "children": [
+        { "type": "label", "x": 270, "y": 116, "text": "진화", "size": 33, "color": "#FFFFFF", "outline": "#16243E", "outlineW": 3, "align": "center", "bold": true },
+        { "type": "label", "x": 270, "y": 168, "text": "모래의 힘으로 영구 강화", "size": 11, "color": "#AFC4E8", "outline": "#16243E", "align": "center" },
+
+        { "type": "button", "id": "evo_btn0", "x": 40, "y": 210, "w": 460, "h": 150, "skin": "purple", "action": "talent_up_0",
+          "children": [
+            { "type": "label", "id": "evo_name0", "x": 24, "y": 24, "text": "공격 강화", "size": 22, "color": "#FFFFFF", "outline": "#4A1E6E", "bold": true },
+            { "type": "label", "id": "evo_desc0", "x": 24, "y": 64, "text": "레벨당 공격력 +4%", "size": 13, "color": "#EBD8FF" },
+            { "type": "gauge", "id": "evo_gauge0", "x": 24, "y": 94, "w": 220, "h": 18, "ratio": 0, "skin": "gold" },
+            { "type": "label", "id": "evo_state0", "x": 260, "y": 94, "text": "Lv.0/5 · 100G", "size": 14, "color": "#FFFFFF", "outline": "#4A1E6E", "bold": true }
+          ] },
+        { "type": "button", "id": "evo_btn1", "x": 40, "y": 380, "w": 460, "h": 150, "skin": "purple", "action": "talent_up_1",
+          "children": [
+            { "type": "label", "id": "evo_name1", "x": 24, "y": 24, "text": "생명 강화", "size": 22, "color": "#FFFFFF", "outline": "#4A1E6E", "bold": true },
+            { "type": "label", "id": "evo_desc1", "x": 24, "y": 64, "text": "레벨당 최대HP +10", "size": 13, "color": "#EBD8FF" },
+            { "type": "gauge", "id": "evo_gauge1", "x": 24, "y": 94, "w": 220, "h": 18, "ratio": 0, "skin": "gold" },
+            { "type": "label", "id": "evo_state1", "x": 260, "y": 94, "text": "Lv.0/5 · 100G", "size": 14, "color": "#FFFFFF", "outline": "#4A1E6E", "bold": true }
+          ] },
+        { "type": "button", "id": "evo_btn2", "x": 40, "y": 550, "w": 460, "h": 150, "skin": "purple", "action": "talent_up_2",
+          "children": [
+            { "type": "label", "id": "evo_name2", "x": 24, "y": 24, "text": "신속", "size": 22, "color": "#FFFFFF", "outline": "#4A1E6E", "bold": true },
+            { "type": "label", "id": "evo_desc2", "x": 24, "y": 64, "text": "레벨당 이동속도 +2%", "size": 13, "color": "#EBD8FF" },
+            { "type": "gauge", "id": "evo_gauge2", "x": 24, "y": 94, "w": 220, "h": 18, "ratio": 0, "skin": "gold" },
+            { "type": "label", "id": "evo_state2", "x": 260, "y": 94, "text": "Lv.0/5 · 100G", "size": 14, "color": "#FFFFFF", "outline": "#4A1E6E", "bold": true }
+          ] },
+        { "type": "label", "x": 270, "y": 730, "text": "강화 비용은 레벨마다 올라갑니다", "size": 11, "color": "#AFC4E8", "outline": "#16243E", "align": "center" }
+      ] },
+
+    { "type": "panel", "id": "tabbar", "x": 0, "y": 876, "w": 540, "h": 84, "skin": "navy",
+      "children": [
+        { "type": "button", "id": "tab_shop",      "x": 6,   "y": 6, "w": 100, "h": 72, "skin": "slate", "label": "상점", "size": 22, "action": "tab_shop" },
+        { "type": "button", "id": "tab_equip",     "x": 112, "y": 6, "w": 100, "h": 72, "skin": "slate", "label": "장비", "size": 22, "action": "tab_equip" },
+        { "type": "button", "id": "tab_battle",    "x": 218, "y": 2, "w": 104, "h": 80, "skin": "gold",  "label": "전투", "size": 22, "action": "tab_battle" },
+        { "type": "button", "id": "tab_challenge", "x": 328, "y": 6, "w": 100, "h": 72, "skin": "slate", "label": "도전", "size": 22, "action": "tab_challenge" },
+        { "type": "button", "id": "tab_evolution", "x": 434, "y": 6, "w": 100, "h": 72, "skin": "slate", "label": "진화", "size": 22, "action": "tab_evolution" }
+      ] }
+  ]
+}

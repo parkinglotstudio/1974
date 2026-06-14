@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+  <title>펌프</title>
+  <!-- 픽셀 한글 폰트 — PixelFont가 1순위로 사용 (미로드 시 시스템 폰트 fallback) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@latest/dist/galmuri.css">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#000; display:flex; align-items:center; justify-content:center;
+           height:100vh; overflow:hidden; }
+    canvas { display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#000;
+             touch-action:none; }
+  </style>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+<script type="module" src="main.js"></script>
+</body>
+</html>

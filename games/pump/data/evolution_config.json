@@ -1,0 +1,18 @@
+{
+  "_note": "evolution_config.csv 1:1 포팅 — 진화 탭, 노드 1회 획득형(보유 시 effectValue 영구 적용). branch0=메인 8노드 직선 체인, branch1=메인 3/5/7노드에서 분기되는 사이드 노드. cost = baseCost + order * costPerOrder.",
+  "baseCost": 200,
+  "costPerOrder": 100,
+  "nodes": [
+    { "id": 1,   "order": 1, "branch": 0, "name": "방어 강화",   "title": "방어",   "desc": "받는 피해를 줄입니다.",            "icon": "🛡️", "abilityType": "armor",    "effectValue": 0.05, "prereq": 0 },
+    { "id": 2,   "order": 2, "branch": 0, "name": "체력 증가",   "title": "체력",   "desc": "체력이 세면 파워도 셉니다.",        "icon": "❤️", "abilityType": "hp",       "effectValue": 40,   "prereq": 1 },
+    { "id": 3,   "order": 3, "branch": 0, "name": "공격력 강화", "title": "힘",     "desc": "적의 얼굴을 강타합니다.",          "icon": "💪", "abilityType": "power",    "effectValue": 0.06, "prereq": 2 },
+    { "id": 4,   "order": 4, "branch": 0, "name": "고기 보급",   "title": "체력",   "desc": "최대 체력을 추가로 올립니다.",      "icon": "🍖", "abilityType": "hp",       "effectValue": 50,   "prereq": 3 },
+    { "id": 5,   "order": 5, "branch": 0, "name": "방패 강화",   "title": "방어",   "desc": "추가 피해감소를 얻습니다.",        "icon": "🛡️", "abilityType": "armor",    "effectValue": 0.05, "prereq": 4 },
+    { "id": 6,   "order": 6, "branch": 0, "name": "맹공 본능",   "title": "힘",     "desc": "공격 계수를 더 크게 올립니다.",      "icon": "⚔️", "abilityType": "power",    "effectValue": 0.08, "prereq": 5 },
+    { "id": 7,   "order": 7, "branch": 0, "name": "강철 의지",   "title": "체력",   "desc": "후반 생존용 체력을 확보합니다.",    "icon": "❤️", "abilityType": "hp",       "effectValue": 80,   "prereq": 6 },
+    { "id": 8,   "order": 8, "branch": 0, "name": "쾌속 기동",   "title": "기동",   "desc": "이동속도를 올려 회피를 강화합니다.", "icon": "👟", "abilityType": "speed",    "effectValue": 0.06, "prereq": 7 },
+    { "id": 101, "order": 3, "branch": 1, "name": "포식자",     "title": "포식자", "desc": "처치 시 확률적으로 HP를 회복합니다.", "icon": "🍴", "abilityType": "predator", "effectValue": 0.15, "prereq": 3 },
+    { "id": 102, "order": 5, "branch": 1, "name": "각성",       "title": "각성",   "desc": "모든 스킬의 쿨타임을 단축합니다.",   "icon": "⚡", "abilityType": "cooldown", "effectValue": 0.10, "prereq": 5 },
+    { "id": 103, "order": 7, "branch": 1, "name": "고출력 자석", "title": "고출력 자석", "desc": "드롭 수집 반경을 크게 늘립니다.", "icon": "🧲", "abilityType": "magnet",   "effectValue": 0.40, "prereq": 7 }
+  ]
+}

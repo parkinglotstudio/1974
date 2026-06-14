@@ -1,0 +1,33 @@
+{
+  "id": "pump",
+  "name": "펌프",
+  "version": "0.1",
+  "chapter": 0,
+  "resolution": {
+    "width": 540,
+    "height": 960
+  },
+  "aspectLabel": "세로 9:16",
+  "palette": "palettes/palette_square.json",
+  "layers": {
+    "0": { "name": "원경", "parallax": 0.3 },
+    "1": { "name": "근경", "parallax": 1 },
+    "2": { "name": "게임", "parallax": 1 },
+    "3": { "name": "UI",   "parallax": 0 }
+  },
+  "scenes": {
+    "square_lobby": {
+      "type": "script",
+      "script": "scripts/LobbyScene.js",
+      "label": "전투 로비"
+    },
+    "square_play": {
+      "type": "script",
+      "script": "scripts/PlayScene.js",
+      "label": "인게임 (스텁)"
+    }
+  },
+  "defaultScene": "square_lobby",
+  "mainScene": "square_lobby",
+  "assetBase": "./pixels"
+}

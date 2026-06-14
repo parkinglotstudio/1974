@@ -1,0 +1,28 @@
+{
+  "note": "인게임 HUD (스텁) — zone은 xlsx 스퀘어 시트 6.인게임 기준. 톤 = 로얄매치 결(skin 램프).",
+  "children": [
+    { "type": "panel", "id": "hud_top", "x": 0, "y": 0, "w": 540, "h": 40, "skin": "navy",
+      "children": [
+        { "type": "rect", "x": 10, "y": 13, "w": 12, "h": 12, "bg": "#FFC23E" },
+        { "type": "label", "id": "lbl_energy", "x": 28, "y": 11, "text": "0", "size": 11, "color": "#FFFFFF", "outline": "#16243E" },
+        { "type": "label", "id": "lbl_stage_name", "x": 270, "y": 10, "text": "S1 · 야생 거리", "size": 11, "color": "#FFFFFF", "outline": "#16243E", "align": "center", "bold": true },
+        { "type": "rect", "x": 480, "y": 13, "w": 12, "h": 12, "bg": "#F5D454" },
+        { "type": "label", "id": "lbl_gold", "x": 498, "y": 11, "text": "10", "size": 11, "color": "#FFFFFF", "outline": "#16243E" }
+      ] },
+
+    { "type": "button", "id": "btn_pause", "x": 12, "y": 52, "w": 56, "h": 56, "skin": "slate", "label": "II", "size": 22, "action": "pause" },
+    { "type": "label", "id": "lbl_timer", "x": 270, "y": 50, "text": "00:00", "size": 44, "color": "#FFFFFF", "outline": "#16243E", "outlineW": 3, "align": "center", "bold": true },
+    { "type": "panel", "id": "chip_kills", "x": 440, "y": 52, "w": 88, "h": 56, "skin": "navy",
+      "children": [
+        { "type": "label", "id": "lbl_kills", "x": 44, "y": 17, "text": "K 0", "size": 22, "color": "#FFFFFF", "outline": "#16243E", "align": "center", "bold": true }
+      ] },
+
+    { "type": "panel", "id": "chip_lv", "x": 12, "y": 116, "w": 60, "h": 30, "skin": "navy",
+      "children": [
+        { "type": "label", "id": "lbl_lv", "x": 30, "y": 7, "text": "LV.1", "size": 11, "color": "#FFFFFF", "outline": "#16243E", "align": "center" }
+      ] },
+    { "type": "gauge", "id": "g_exp", "x": 80, "y": 124, "w": 448, "h": 16, "ratio": 0, "skin": "green" },
+
+    { "type": "label", "id": "lbl_hint", "x": 270, "y": 900, "text": "코어 게임 스텁 — 정지 버튼으로 로비 복귀", "size": 11, "color": "#AFC4E8", "outline": "#16243E", "align": "center" }
+  ]
+}

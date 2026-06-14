@@ -1,0 +1,28 @@
+{
+  "note": "이벤트 제외 — 로비 메타 시스템(상점/장비/도전/진화) 단순화 데이터. tang의 equipment/talent/mission/stage_config 참고 수치.",
+  "equipment": [
+    { "id": "weapon",         "name": "모래 권총",   "icon": "🔫", "grade": "LEGEND", "statType": "power", "effectPerLevel": 0.06, "maxLevel": 10, "baseCost": 300, "costScale": 1.5 },
+    { "id": "weapon_shotgun", "name": "모래 산탄총", "icon": "💥", "grade": "EPIC",   "statType": "power", "effectPerLevel": 0.05, "maxLevel": 10, "baseCost": 250, "costScale": 1.5 },
+    { "id": "weapon_drill",   "name": "모래 드릴건", "icon": "🌀", "grade": "EPIC",   "statType": "power", "effectPerLevel": 0.05, "maxLevel": 10, "baseCost": 250, "costScale": 1.5 },
+    { "id": "necklace",       "name": "모래 목걸이", "icon": "📿", "grade": "EPIC",   "statType": "power", "effectPerLevel": 0.04, "maxLevel": 10, "baseCost": 250, "costScale": 1.5 },
+    { "id": "gloves",         "name": "모래 장갑",   "icon": "🧤", "grade": "RARE",   "statType": "power", "effectPerLevel": 0.03, "maxLevel": 10, "baseCost": 200, "costScale": 1.4 },
+    { "id": "armor",          "name": "모래 갑옷",   "icon": "🛡️", "grade": "EPIC",   "statType": "hp",    "effectPerLevel": 20,   "maxLevel": 10, "baseCost": 250, "costScale": 1.5 },
+    { "id": "belt",           "name": "모래 벨트",   "icon": "🎗️", "grade": "RARE",   "statType": "hp",    "effectPerLevel": 15,   "maxLevel": 10, "baseCost": 200, "costScale": 1.4 },
+    { "id": "boots",          "name": "모래 부츠",   "icon": "👟", "grade": "RARE",   "statType": "speed", "effectPerLevel": 0.03, "maxLevel": 10, "baseCost": 200, "costScale": 1.4 }
+  ],
+  "shopBoxes": [
+    { "id": "resource", "icon": "📦", "name": "군 자원상자", "desc": "무작위 장비 +1Lv", "cost": 150, "pulls": 1 },
+    { "id": "defense",  "icon": "🎁", "name": "지구 방위 보급품", "desc": "무작위 장비 +1Lv ×2", "cost": 400, "pulls": 2 },
+    { "id": "elite",    "icon": "👑", "name": "정예 보급함", "desc": "무작위 장비 +1Lv ×4", "cost": 900, "pulls": 4 }
+  ],
+  "missions": [
+    { "id": "c1", "desc": "도전 1-1 · 노말", "stageId": "s1", "difficulty": 1, "enemyHpMult": 1.0, "enemyDmgMult": 1.0,  "reward": 80,  "prereq": null },
+    { "id": "c2", "desc": "도전 1-2 · 하드", "stageId": "s1", "difficulty": 2, "enemyHpMult": 1.4, "enemyDmgMult": 1.25, "reward": 160, "prereq": "c1" },
+    { "id": "c3", "desc": "도전 1-3 · 헬",   "stageId": "s1", "difficulty": 3, "enemyHpMult": 1.9, "enemyDmgMult": 1.55, "reward": 280, "prereq": "c2" }
+  ],
+  "stages": [
+    { "id": "s1", "name": "1. 야생 거리",   "hpMult": 1.0, "speedMult": 1.0,  "dmgMult": 1.0,  "spawnIntervalScale": 1.00, "maxEnemiesScale": 1.00, "unlockCost": 0 },
+    { "id": "s2", "name": "2. 갈림길 공원", "hpMult": 1.2, "speedMult": 1.05, "dmgMult": 1.10, "spawnIntervalScale": 0.96, "maxEnemiesScale": 1.10, "unlockCost": 300 },
+    { "id": "s3", "name": "3. 한밤 시장",   "hpMult": 1.4, "speedMult": 1.10, "dmgMult": 1.20, "spawnIntervalScale": 0.92, "maxEnemiesScale": 1.20, "unlockCost": 800 }
+  ]
+}
