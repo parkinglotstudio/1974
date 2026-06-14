@@ -40,6 +40,7 @@ import FogSystem             from './fx/FogSystem.js';
 import VignetteSystem        from './fx/VignetteSystem.js';
 import FXSystem              from './fx/FXSystem.js';
 import DitherEngine          from './assets/DitherEngine.js';
+import UISystem              from './ui/UISystem.js';
 
 export default class SandEngine {
     /**
@@ -71,6 +72,7 @@ export default class SandEngine {
         this.sound       = new SoundManager();
         this.seq         = new Sequencer();
         this.text        = new TextRenderer(this.layers, this.palette_mgr);
+        this.ui          = new UISystem(this.layers, this.palette_mgr, gameWidth, gameHeight);
 
         // ── FX 시스템 (Phase 4~5) ────────────────────────────────────
         this.glow        = new GlowSystem(gameWidth, gameHeight);
@@ -157,6 +159,7 @@ export default class SandEngine {
         this.text.update(dt);
         this.lighting.update(dt);           // LightingSystem — 깜빡임 상태 갱신
         this.fx.update(dt);                 // FXSystem — flash/shake/colorShift 타이머
+        this.ui.update(this.input, dt);     // UI 히트테스트 먼저 — 소비 시 pointer.consumed=true
     }
 
     _render() {
@@ -172,6 +175,9 @@ export default class SandEngine {
 
         // 텍스트 렌더
         this.text.render();
+
+        // UI 렌더 (L3 버퍼 — dirty 시에만 재래스터)
+        this.ui.render();
 
         // shake 오프셋 적용 후 레이어 합성 → 메인 캔버스
         const shake = this.fx.getShakeOffset();
@@ -300,6 +306,7 @@ export default class SandEngine {
         this.scale.update(window.innerWidth, window.innerHeight, this.canvas);
         this.layers.resize(this.gameWidth, this.gameHeight);
         this.entities.resize(this.gameWidth, this.gameHeight);
+        this.ui.resize(this.gameWidth, this.gameHeight);
         // FX 시스템 리사이즈 동기화
         this.glow.resize(this.gameWidth, this.gameHeight);
         this.lighting.resize(this.gameWidth, this.gameHeight);

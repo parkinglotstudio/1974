@@ -21,7 +21,8 @@ import PlayScene  from './scripts/PlayScene.js';
 
     engine.scenes.register('square_lobby', new LobbyScene());
     engine.scenes.register('square_play',  new PlayScene());
-    engine.scenes.change('square_lobby', 'none');
+    const startScene = new URLSearchParams(location.search).get('scene') || 'square_lobby';
+    engine.scenes.change(startScene, 'none');
     engine.start();
 
     // 픽셀 한글 폰트(Galmuri) 로드 완료 시 UI 재래스터

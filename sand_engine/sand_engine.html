@@ -697,7 +697,7 @@
             white-space: nowrap;
             pointer-events: none;
         }
-        .live-artboard.selected .ab-scene-name { color: #C8922A; }
+        .live-artboard.selected .ab-scene-name { color: #C8922A; font-weight: bold; }
         /* 인라인 ▶ 버튼 */
         .ab-label-play {
             font-size: 8px; padding: 1px 6px;
@@ -709,6 +709,16 @@
         }
         .ab-label-play:hover { background: #2A3A2A; border-color: #5A8A5A; color: #7FE07F; }
         .live-artboard.ab-playing .ab-label-play { display: none; }
+        /* 선택된 씬에는 항상 눈에 띄는 큰 ▶ 플레이 버튼 표시 */
+        .live-artboard.selected .ab-label-play {
+            font-size: 11px; padding: 3px 12px;
+            background: #1A4A1A; border: 1px solid #3A8A3A;
+            color: #7FE07F; font-weight: bold;
+            box-shadow: 0 0 0 1px rgba(58,138,58,.4);
+        }
+        .live-artboard.selected .ab-label-play:hover {
+            background: #2A6A2A; border-color: #7FE07F; color: #C8FFC8;
+        }
         /* ── 프레임 ── */
         .live-artboard-frame {
             position: relative; overflow: hidden;
@@ -719,11 +729,13 @@
         }
         .live-artboard.selected > .live-artboard-frame {
             border-color: #C8922A;
-            box-shadow: 0 0 0 2px rgba(200,146,42,.3), 0 4px 20px rgba(0,0,0,.5);
+            border-width: 2.5px;
+            box-shadow: 0 0 0 4px rgba(200,146,42,.35), 0 0 24px rgba(200,146,42,.4), 0 4px 20px rgba(0,0,0,.5);
         }
         .live-artboard.ab-playing > .live-artboard-frame {
             border-color: #3A8A3A;
-            box-shadow: 0 0 0 2px rgba(58,138,58,.35), 0 4px 20px rgba(0,0,0,.4);
+            border-width: 2.5px;
+            box-shadow: 0 0 0 4px rgba(58,138,58,.35), 0 0 24px rgba(58,138,58,.4), 0 4px 20px rgba(0,0,0,.4);
         }
         /* 아트보드 배경 */
         .live-ab-bg {
@@ -745,12 +757,13 @@
             z-index: 2;
         }
         .ab-stop-btn {
-            position: absolute; top: 5px; right: 5px;
-            background: rgba(10,10,10,.75); border: 1px solid #444;
-            color: #999; font-size: 8px;
+            position: absolute; top: 6px; right: 6px;
+            background: rgba(74,26,26,.9); border: 1px solid #8A3A3A;
+            color: #FF8A80; font-size: 10px; font-weight: bold;
             font-family: 'JetBrains Mono', monospace;
-            padding: 2px 6px; border-radius: 3px;
+            padding: 4px 10px; border-radius: 4px;
             cursor: pointer; z-index: 30; display: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,.5);
         }
         .live-artboard.ab-playing .ab-stop-btn { display: block; }
         .ab-stop-btn:hover { background: #2A1A1A; border-color: #FF8A80; color: #FF8A80; }
@@ -7472,8 +7485,8 @@ function _initFramePositions(gw, gh) {
     });
     // 캔버스 크기: 전체 씬 누적 폭 기준 (+ 여유 공간)
     const frameAreaW = cursorX - FRAME_GAP + FRAME_PAD_X;
-    const totalW = Math.min(CANVAS_LIMIT, Math.max(frameAreaW + gw * 4, frameAreaW + 1200));
-    const totalH = top + maxH + maxH * 4 + FRAME_PAD_Y;
+    const totalW = Math.min(CANVAS_LIMIT, frameAreaW);
+    const totalH = top + maxH + FRAME_PAD_Y;
     workCanvas.width  = totalW;
     workCanvas.height = totalH;
     window._workW = totalW;
@@ -7807,11 +7820,16 @@ function _drawSceneFrame(ctx, engine, name, fx, fy, gw, gh) {
     // 씬 비포함 엔티티 렌더링 삭제됨 (draw 함수 맨 밑에서 통합 렌더링)
 
     // ── 프레임 테두리 ─────────────────────────────────────────
-    if (isActive) { ctx.shadowColor = '#C8922A'; ctx.shadowBlur = 14; }
+    if (isActive) {
+        ctx.shadowColor = '#C8922A'; ctx.shadowBlur = 24;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#C8922A';
+        ctx.strokeRect(fx - 2, fy - 2, gw + 4, gh + 4);
+        ctx.shadowBlur = 0;
+    }
     ctx.strokeStyle = isActive ? '#C8922A' : '#3A3A36';
     ctx.lineWidth   = isActive ? 2 : 1;
     ctx.strokeRect(fx, fy, gw, gh);
-    ctx.shadowBlur  = 0;
 
     // ── 엔티티 수 뱃지 (우하단) ──────────────────────────────
     const cnt = isActive

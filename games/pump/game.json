@@ -17,14 +17,14 @@
   },
   "scenes": {
     "square_lobby": {
-      "type": "script",
-      "script": "scripts/LobbyScene.js",
-      "label": "전투 로비"
+      "type": "live",
+      "label": "전투 로비",
+      "liveEntry": "games/pump/index.html?scene=square_lobby"
     },
     "square_play": {
-      "type": "script",
-      "script": "scripts/PlayScene.js",
-      "label": "인게임 (스텁)"
+      "type": "live",
+      "label": "인게임 (스텁)",
+      "liveEntry": "games/pump/index.html?scene=square_play"
     }
   },
   "defaultScene": "square_lobby",
