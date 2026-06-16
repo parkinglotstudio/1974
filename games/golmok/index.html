@@ -35,12 +35,16 @@
                  display:flex; align-items:center; justify-content:center; }
     #pad #atk  { width:92px; height:92px; font-size:18px; background:rgba(150,50,50,.6); border-color:rgba(255,140,140,.5); }
     #pad #atk:active { background:rgba(210,70,70,.85); }
+    #pad .atks { display:flex; gap:10px; }
+    #pad #skill  { width:92px; height:92px; font-size:18px; background:rgba(140,70,190,.6); border-color:rgba(200,150,255,.5); }
+    #pad #skill:active { background:rgba(170,90,230,.85); }
 
     /* 세로 모드: 컨트롤 작게 + 반투명 */
     #pad.portrait { opacity:.42; bottom:12px; padding:0 14px; }
     #pad.portrait .move { gap:10px; }
     #pad.portrait .btn { width:48px; height:48px; font-size:20px; }
-    #pad.portrait #atk { width:60px; height:60px; font-size:13px; }
+    #pad.portrait #atk, #pad.portrait #skill { width:60px; height:60px; font-size:13px; }
+    #pad.portrait .atks { gap:8px; }
   </style>
 </head>
 <body>
@@ -65,7 +69,10 @@
       <button class="btn" id="left">◀</button>
       <button class="btn" id="right">▶</button>
     </div>
-    <button id="atk">공격</button>
+    <div class="atks">
+      <button id="atk">공격</button>
+      <button id="skill">마법</button>
+    </div>
   </div>
 </div>
 
@@ -120,6 +127,16 @@
   atkBtn.addEventListener('pointerleave', stopAtk);
   atkBtn.addEventListener('pointercancel', stopAtk);
   atkBtn.addEventListener('contextmenu', e => e.preventDefault());
+
+  // 마법 스킬(G): CustomEvent로 게임 모듈에 전달 — GolmokGame.onEnter에서 golmok:skill:start/end 수신
+  const skillBtn = document.getElementById('skill');
+  const fireSkill = (e) => { e.preventDefault(); window.dispatchEvent(new CustomEvent('golmok:skill:start')); skillBtn.classList.add('on'); };
+  const stopSkill = (e) => { if(e) e.preventDefault(); window.dispatchEvent(new CustomEvent('golmok:skill:end')); skillBtn.classList.remove('on'); };
+  skillBtn.addEventListener('pointerdown',  fireSkill);
+  skillBtn.addEventListener('pointerup',    stopSkill);
+  skillBtn.addEventListener('pointerleave', stopSkill);
+  skillBtn.addEventListener('pointercancel', stopSkill);
+  skillBtn.addEventListener('contextmenu', e => e.preventDefault());
 
   // ── 화면 정지/재생 (스크린샷용 — 엔진 루프 멈춰서 마지막 프레임 고정) ──
   const freezeBtn = document.getElementById('btnFreeze');

@@ -1,0 +1,5 @@
+# golmok 발사체(미사일) 테이블 — 타입 1개 = 1행
+# speed: px/sec(직선 비행 속도, 화면 끝까지). size: 발사체 픽셀 크기. color: 발사체/트레일 색(hex).
+# range: 사거리(px, 타겟 탐지 최대거리). edge_margin: 화면 끝 도달 판정 여유(px).
+id,speed,size,color,range,edge_margin,notes
+missile01,1400,4,#fff2b0,500,40,기본 사격 미사일 - 직선 고속

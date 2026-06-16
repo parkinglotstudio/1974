@@ -1,0 +1,6 @@
+# golmok 피격 타겟(허수아비 등) 테이블 — 타겟 1개 = 1행
+# asset/assetCategory: pixels/<category>/<asset>.json. pw/ph: 스프라이트 크기.
+# spawn_x,spawn_y: 배치 좌표(월드). hp: 피격 가능 횟수(0=무한). hit_ms: 피격 시 픽셀무브(흩어짐→재조립) 시간(ms).
+# scatter_min/max: 피격 시 픽셀이 흩어지는 거리 범위(px).
+id,asset,assetCategory,pw,ph,spawn_x,spawn_y,hp,hit_ms,scatter_min,scatter_max,notes
+target01,scarecrow,objects,84,164,420,776,0,280,18,64,"허수아비 - 사격 연습 타겟(고정, hp0=무한)"

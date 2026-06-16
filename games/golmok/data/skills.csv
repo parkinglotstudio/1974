@@ -1,0 +1,7 @@
+# golmok 스킬(마법) 테이블 — 스킬 1개 = 1행
+# key: 키보드 바인딩(단일 문자, 대소문자 무관).
+# asset/assetCategory: pixels/<category>/<asset>.json (ch01_gun.json과 동일 포맷, 멀티프레임+stateDef).
+# state_start/state_loop/state_end: stateDef 상의 상태명 — 준비(구슬 모으기)/루프(캐스팅 유지)/마무리(되돌리기).
+# wave_color1/2: 루프 단계 화면 모래파도 색(hex). wave_density: 0~1, 파도 입자 밀도.
+id,key,asset,assetCategory,state_start,state_loop,state_end,wave_color1,wave_color2,wave_density,notes
+skill01,g,ch01_magic,characters,cast_start,cast_loop,cast_end,#ff6ed2,#6ec8ff,0.35,"마법 일반 스킬1 - 캐스팅 포즈(준비/루프/마무리) + 루프 화면 모래파도"

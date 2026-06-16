@@ -1,5 +1,5 @@
 import SandEngine   from '../../engine/SandEngine.js';
-import GolmokGame   from './scripts/GolmokGame.js?v=sandfx2';   // 메인 씬 컨트롤러(이동 + 시그니처 FX) — ?v 캐시버스트
+import GolmokGame   from './scripts/GolmokGame.js?v=runfix2';   // 메인 씬 컨트롤러(이동 + 시그니처 FX) — ?v 캐시버스트
 import TitleScene   from './scripts/TitleScene.js';
 import ResultScene  from './scripts/ResultScene.js';
 import { loadCsvTable, loadParamTable } from '../../engine/data/Csv.js';  // 게임 데이터(CSV) 로더
@@ -203,16 +203,21 @@ async function init() {
     // 엔진=로직, 게임 데이터=CSV. 씬/게임 코드는 상수 대신 이 테이블에서 값을 읽는다.
     // (실패해도 게임은 코드 내 fallback 기본값으로 동작)
     try {
-        const [maps, characters, animations, fx] = await Promise.all([
+        const [maps, characters, animations, fx, targets, projectiles, skills] = await Promise.all([
             loadCsvTable('./data/maps.csv'),
             loadCsvTable('./data/characters.csv'),
             loadCsvTable('./data/animations.csv'),
             loadParamTable('./data/fx_params.csv'),
+            loadCsvTable('./data/targets.csv'),
+            loadCsvTable('./data/projectiles.csv'),
+            loadCsvTable('./data/skills.csv'),
         ]);
-        game._engine.data = { maps, characters, animations, fx };
+        game._engine.data = { maps, characters, animations, fx, targets, projectiles, skills };
         console.log('[golmok] data tables loaded:',
             maps.all().length, 'maps,', characters.all().length, 'chars,',
-            animations.all().length, 'anims,', fx.keys().length, 'fx params');
+            animations.all().length, 'anims,', fx.keys().length, 'fx params,',
+            targets.all().length, 'targets,', projectiles.all().length, 'projectiles,',
+            skills.all().length, 'skills');
     } catch (e) {
         console.warn('[golmok] data table load failed — using code defaults:', e);
         game._engine.data = null;
