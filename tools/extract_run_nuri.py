@@ -22,10 +22,10 @@ GIF_SRC   = ROOT / 'games/golmok/samples/1990 여성뛰는 모습.gif'
 OUT_DIR   = ROOT / 'games/nuri/pixels/characters'
 OUT_FILE  = OUT_DIR / 'ch01_player_run.json'
 
-PLAYER_W   = 200
-PLAYER_H   = 340
+PLAYER_W   = 155
+PLAYER_H   = 265
 BOTTOM_PAD = 4
-GROUND_Y   = PLAYER_H - BOTTOM_PAD - 1   # = 335
+GROUND_Y   = PLAYER_H - BOTTOM_PAD - 1   # = 260
 ALPHA_T    = G.ALPHA_T   # 24
 MAX_COLORS = 200
 FPS        = 20

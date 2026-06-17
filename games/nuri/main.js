@@ -1,5 +1,5 @@
 import SandEngine from '../../engine/SandEngine.js';
-import NuriGame   from './scripts/NuriGame.js?v=2.4';
+import NuriGame   from './scripts/NuriGame.js?v=2.7';
 import { loadCsvTable, loadParamTable } from '../../engine/data/Csv.js';
 
 // ── flat 1D → [[x,y,idx], ...] ──────────────────────────────

@@ -1,15 +1,18 @@
-// NuriGame.js — 누리 / NURI  v2.4
-// 조이스틱 달리기(200x340 run entity) + 모래시계 PixelStream + 오비터
+// NuriGame.js — 누리 / NURI  v2.7
+// 조이스틱 달리기 + 모래시계 PixelStream + 오비터
 
 import { Scene } from '../../../engine/scene/SceneManager.js';
 
-const HOLD_THRESHOLD = 300;
-const PM_DURATION    = 700;
-const WAIST_SCALE    = 0.05;
-const FLASH_MS       = 200;
-const IDLE_FOOT_ROW  = 256;   // ch01_player.json GROUND_Y (fix_run_frames.py)
-const RUN_FOOT_ROW   = 335;   // ch01_player_run.json GROUND_Y (extract_run_nuri.py)
-const RUN_SPEED      = 160;   // px/s
+const HOLD_THRESHOLD    = 300;
+const PM_DURATION       = 700;
+const WAIST_SCALE       = 0.05;
+const FLASH_MS          = 200;
+const CHAR_SCALE        = 0.5;                            // 전체 캐릭터 렌더 배율
+const RAW_IDLE_FOOT_ROW = 256;                            // ch01_player.json 원본 GROUND_Y
+const RAW_RUN_FOOT_ROW  = 260;                            // ch01_player_run.json 원본 GROUND_Y
+const IDLE_FOOT_ROW     = Math.round(RAW_IDLE_FOOT_ROW * CHAR_SCALE);  // 128
+const RUN_FOOT_ROW      = Math.round(RAW_RUN_FOOT_ROW  * CHAR_SCALE);  // 130
+const RUN_SPEED         = 160;   // px/s
 
 export default class NuriGame extends Scene {
     constructor() { super('nuri_main'); }
@@ -21,6 +24,17 @@ export default class NuriGame extends Scene {
         this._player = engine.entities.get('nuri_player')
                     ?? engine.entities.getAll?.()[0]
                     ?? null;
+
+        // 아이들 엔티티 CHAR_SCALE 적용 (rawPw/rawPh 저장 후 pw/ph 축소, y 재조정)
+        if (this._player && !this._player._rawPw) {
+            const p = this._player;
+            p._rawPw = p.pw;
+            p._rawPh = p.ph;
+            const origFootY = p.y + RAW_IDLE_FOOT_ROW;
+            p.pw = Math.round(p.pw * CHAR_SCALE);
+            p.ph = Math.round(p.ph * CHAR_SCALE);
+            p.y  = origFootY - IDLE_FOOT_ROW;
+        }
 
         this._pointerDown  = false;
         this._holdStart    = 0;
@@ -57,14 +71,18 @@ export default class NuriGame extends Scene {
             const r = await fetch('./pixels/characters/ch01_player_run.json', { cache: 'no-store' });
             if (!r.ok) { console.warn('[nuri] ch01_player_run.json not found'); return; }
             const data = await r.json();
+            const scaledW = Math.round(data.width  * CHAR_SCALE);
+            const scaledH = Math.round(data.height * CHAR_SCALE);
             this._runEntity = engine.entities.add('nuri_run', {
-                x: 0, y: -1000, pw: data.width, ph: data.height,
+                x: 0, y: -1000, pw: scaledW, ph: scaledH,
                 layer: 2, visible: false,
                 frames: data.frames,
                 _palette: data.palette,
                 stateDef: data.stateDef,
             });
-            console.log(`[nuri] run entity: ${data.width}x${data.height}, ${data.frames.length} frames`);
+            this._runEntity._rawPw = data.width;
+            this._runEntity._rawPh = data.height;
+            console.log(`[nuri] run entity: ${scaledW}x${scaledH} (raw ${data.width}x${data.height}), ${data.frames.length} frames`);
         } catch (e) {
             console.warn('[nuri] run entity load error:', e);
         }
@@ -77,10 +95,17 @@ export default class NuriGame extends Scene {
         if (jL && jR) {
             const setL = v => { this._joy.left  = v; jL.classList.toggle('held', v); };
             const setR = v => { this._joy.right = v; jR.classList.toggle('held', v); };
-            ['pointerdown','pointerup','pointerleave','pointercancel'].forEach(ev => {
-                jL.addEventListener(ev, e => { e.preventDefault(); setL(ev === 'pointerdown'); });
-                jR.addEventListener(ev, e => { e.preventDefault(); setR(ev === 'pointerdown'); });
-            });
+            const bind = (btn, setFn) => {
+                btn.addEventListener('pointerdown', e => {
+                    e.preventDefault();
+                    btn.setPointerCapture(e.pointerId);
+                    setFn(true);
+                });
+                btn.addEventListener('pointerup',     e => { e.preventDefault(); setFn(false); });
+                btn.addEventListener('pointercancel', e => { e.preventDefault(); setFn(false); });
+            };
+            bind(jL, setL);
+            bind(jR, setR);
         }
         this._onKeyDown = e => {
             if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') this._joy.left  = true;
@@ -164,10 +189,10 @@ export default class NuriGame extends Scene {
         this._runDir   = dir;
         this._landing  = false;   // 착지 타이머 취소
 
-        // run entity 위치: idle entity bottom 맞춤
-        re.y    = p.y + p.ph - re.ph;
+        // run entity 위치: 발 행 기준 맞춤 (캔버스 높이 오차 제거)
+        re.y    = (p.y + IDLE_FOOT_ROW) - RUN_FOOT_ROW;
         re.x    = p.x + Math.round((p.pw - re.pw) / 2);
-        re.flipX = dir < 0;
+        re.flipX = dir > 0;
         re.visible = true;
 
         if (re.asm) { re.asm.setState('run'); re.asm.restart(); }
@@ -182,9 +207,9 @@ export default class NuriGame extends Scene {
 
         this._runState = 'stopping';
 
-        // idle entity 위치: run entity bottom 맞춤
+        // idle entity 위치: 발 행 기준 맞춤
         p.x     = re.x + Math.round((re.pw - p.pw) / 2);
-        p.y     = re.y + re.ph - p.ph;
+        p.y     = (re.y + RUN_FOOT_ROW) - IDLE_FOOT_ROW;
         p.flipX = re.flipX;
         p.visible = true;
 
@@ -256,7 +281,7 @@ export default class NuriGame extends Scene {
                     const newDir = goRight ? 1 : -1;
                     if (newDir !== this._runDir) {
                         this._runDir = newDir;
-                        if (re) re.flipX = newDir < 0;
+                        if (re) re.flipX = newDir > 0;
                     }
                     if (re) {
                         const maxX = this._W - re.pw;
@@ -369,11 +394,15 @@ export default class NuriGame extends Scene {
         const pal = entity._palette ?? [];
         if (!pixels.length) return;
 
-        const pw = entity.pw, ph = entity.ph;
-        if (!this._entBuf || this._entBuf.width !== pw || this._entBuf.height !== ph) {
+        const rawPw = entity._rawPw ?? entity.pw;
+        const rawPh = entity._rawPh ?? entity.ph;
+        const dpw   = entity.pw;
+        const dph   = entity.ph;
+
+        if (!this._entBuf || this._entBuf.width !== rawPw || this._entBuf.height !== rawPh) {
             this._entBuf        = document.createElement('canvas');
-            this._entBuf.width  = pw;
-            this._entBuf.height = ph;
+            this._entBuf.width  = rawPw;
+            this._entBuf.height = rawPh;
             this._entBufCtx     = this._entBuf.getContext('2d');
             this._palCache      = null;
             this._palCacheRef   = null;
@@ -386,18 +415,19 @@ export default class NuriGame extends Scene {
             });
         }
         const eCtx    = this._entBufCtx;
-        const imgData = eCtx.createImageData(pw, ph);
+        const imgData = eCtx.createImageData(rawPw, rawPh);
         const d       = imgData.data;
         const flip    = entity.flipX ?? false;
         for (const [px, py, idx] of pixels) {
             const rgb = this._palCache[idx];
             if (!rgb) continue;
-            const xi  = flip ? pw - 1 - px : px;
-            const off = (py * pw + xi) * 4;
+            const xi  = flip ? rawPw - 1 - px : px;
+            const off = (py * rawPw + xi) * 4;
             d[off]=rgb[0]; d[off+1]=rgb[1]; d[off+2]=rgb[2]; d[off+3]=255;
         }
         eCtx.putImageData(imgData, 0, 0);
-        ctx.drawImage(this._entBuf, entity.x, entity.y);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(this._entBuf, entity.x, entity.y, dpw, dph);
     }
 
     // ── 픽셀 추출 ──────────────────────────────────────────────
@@ -407,12 +437,16 @@ export default class NuriGame extends Scene {
             : (entity._pixels ?? []);
         const pal = entity._palette ?? [];
         const out = [];
-        const ox = entity.x, oy = entity.y, pw = entity.pw;
+        const ox    = entity.x, oy = entity.y;
+        const rawPw = entity._rawPw ?? entity.pw;
+        const sc    = entity.pw / rawPw;   // = CHAR_SCALE
         for (const [px, py, idx] of pixels) {
             const hex = pal[idx];
             if (!hex || hex === 'transparent') continue;
-            const cx = flip ? ox + pw - 1 - px : ox + px;
-            out.push([cx, oy + py,
+            const rawX = flip ? rawPw - 1 - px : px;
+            const cx = ox + Math.round(rawX * sc);
+            const cy = oy + Math.round(py   * sc);
+            out.push([cx, cy,
                 parseInt(hex.slice(1,3), 16),
                 parseInt(hex.slice(3,5), 16),
                 parseInt(hex.slice(5,7), 16)]);
