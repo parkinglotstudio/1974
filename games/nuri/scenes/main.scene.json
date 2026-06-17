@@ -1,0 +1,18 @@
+{
+  "id": "nuri_main",
+  "resolution": { "width": 960, "height": 540 },
+  "bounds": { "x": 0, "y": 0, "width": 960, "height": 540 },
+  "entities": [
+    {
+      "id": "nuri_player",
+      "asset": "ch01_player",
+      "assetCategory": "characters",
+      "x": 200,
+      "y": 230,
+      "pw": 149,
+      "ph": 259,
+      "layer": 2,
+      "visible": true
+    }
+  ]
+}

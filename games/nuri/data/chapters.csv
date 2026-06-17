@@ -1,0 +1,8 @@
+# 누리 챕터 테이블 — 각 챕터 = 한국 역사의 한 시대
+# palette_sepia: 기억 선명 색, palette_cyan: 기억 흐릿 색
+id,name_ko,name_en,era,palette_key,keyword,bg_asset,notes
+ch01,골목길,Alley,1974,sepia_warm,산업화 골목길,,
+ch02,거리,Street,1980s,neon_cold,민주화 거리,,
+ch03,접속,Connect,1990s,cyan_digital,IMF 나우누리,,
+ch04,광장,Square,2000s,digital_green,인터넷 광장,,
+ch05,기억합니다,Remember,2010s,ash_grey,세월호,,

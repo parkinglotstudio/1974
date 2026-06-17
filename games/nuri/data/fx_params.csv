@@ -1,0 +1,15 @@
+# 누리 FX 파라미터 — 기억 상태별 색감
+key,value,notes
+lighting_ambient,#1a0f00,세피아 어두운 앰비언트
+lighting_key_color,#ffd080,따뜻한 키라이트 (기억 선명)
+lighting_key_x,480,
+lighting_key_y,200,
+lighting_key_r,400,
+glow_threshold,130,
+vignette_strength,0.50,
+vignette_preset,warm,
+pixelmove_color1,#c4a882,세피아 픽셀무브 색1
+pixelmove_color2,#ffecd2,세피아 픽셀무브 색2
+ecg_color,#c4a882,ECG 심전도 선 색
+ecg_height,40,ECG 영역 높이(px)
+hp_layer_count,4,배경 HP 레이어 수

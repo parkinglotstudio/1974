@@ -16,6 +16,14 @@
       "chapter": 0,
       "desc": "540×960 · 세로 9:16 · 탑뷰 서바이버 (PRISM SQUAD 모래엔진 재구현)",
       "entry": "games/pump/index.html"
+    },
+    {
+      "id": "nuri",
+      "name": "누리",
+      "icon": "🌊",
+      "chapter": 1,
+      "desc": "960×540 · Ch.1 · 횡스크롤 액션 RPG (Thread PixelMove)",
+      "entry": "games/nuri/index.html"
     }
   ]
 }

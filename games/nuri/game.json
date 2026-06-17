@@ -1,0 +1,27 @@
+{
+  "id": "nuri",
+  "name": "누리",
+  "nameEn": "NURI",
+  "subtitle": "잊혀져선 안 되는 것들",
+  "version": "0.1",
+  "resolution": {
+    "width": 960,
+    "height": 540
+  },
+  "layers": {
+    "0": { "name": "원경",   "parallax": 0.15 },
+    "1": { "name": "중경",   "parallax": 0.60 },
+    "2": { "name": "게임",   "parallax": 1.00 },
+    "3": { "name": "전경",   "parallax": 1.40 }
+  },
+  "scenes": {
+    "nuri_main": {
+      "type": "json",
+      "src": "scenes/main.scene.json",
+      "label": "메인"
+    }
+  },
+  "defaultScene": "nuri_main",
+  "mainScene": "nuri_main",
+  "assetBase": "./pixels"
+}
