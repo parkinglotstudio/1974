@@ -3,6 +3,19 @@
     "w": 1080,
     "h": 1920
   },
+  "camera": {
+    "mode": "forward",
+    "lockRatio": 0.45
+  },
+  "rooms": {
+    "s1": [
+      { "label": "진입로",   "h": 1440, "clear": { "type": "kills",   "value": 12 } },
+      { "label": "좁은 길",   "h": 1440, "clear": { "type": "kills",   "value": 22 } },
+      { "label": "광장",     "h": 1920, "clear": { "type": "survive", "value": 35 } },
+      { "label": "정비실",   "h": 720,  "clear": { "type": "timer",   "value": 3 } },
+      { "label": "보스방",   "h": 1920, "clear": { "type": "boss" } }
+    ]
+  },
   "map": {
     "gridInterval": 60
   },

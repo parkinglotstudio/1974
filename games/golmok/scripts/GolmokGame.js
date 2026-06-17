@@ -152,6 +152,7 @@ export default class GolmokGame extends Scene {
         this._muzzleP = []; this._tracers = []; this._casings = [];   // 발사 임팩트 FX
         this._recoilT = 0; this._recoilDir = 0; this._muzzleFlash = 0; this._fireAcc = 110;
         this._initPixelMoveTest();   // 픽셀무브 테스트: 네모↔동그라미 픽셀 모핑 (캐릭터 앞)
+        this._initOrbits();          // 궤도 오비터 초기화 (5개 도형이 캐릭터 주변 공전)
         this._loadGun();
         this._loadTargets();        // 피격 타겟(허수아비 등, targets.csv) 로드
         this._skillRow = null; this._magic = null; this._magicAnim = null; this._magicAnchor = null;
@@ -736,6 +737,83 @@ export default class GolmokGame extends Scene {
         if (this._pmTest) this._pmTest.time += dt / 1000;
     }
 
+    // ── 궤도 오비터 초기화 ────────────────────────────────────────
+    // 정규화 형태 포인트: 정사각형 둘레(−0.5~0.5) ↔ 원 둘레(반경 0.56)
+    _initOrbits() {
+        const N = 24;
+        const sq = [], ci = [];
+        for (let i = 0; i < N; i++) {
+            const d = (i / N) * 4;
+            let x, y;
+            if (d < 1)      { x = d;          y = 0; }
+            else if (d < 2) { x = 1;          y = d - 1; }
+            else if (d < 3) { x = 1 - (d-2);  y = 1; }
+            else            { x = 0;          y = 1 - (d-3); }
+            sq.push([x - 0.5, y - 0.5]);
+            const ang = (i / N) * Math.PI * 2;
+            ci.push([Math.cos(ang) * 0.56, Math.sin(ang) * 0.56]);
+        }
+        this._orbitPts = { sq, ci };
+        // 5개 오비터: 초기 각도·속도·궤도 반경·크기·모프 위상 다양하게
+        this._orbits = [
+            { angle: 0,              angVel: 0.45, rx: 65, ry: 22, size: 26, morphT: 0.0, morphSpeed: 1.5 },
+            { angle: Math.PI * 0.4,  angVel: 0.38, rx: 58, ry: 19, size: 20, morphT: 1.4, morphSpeed: 2.0 },
+            { angle: Math.PI * 0.8,  angVel: 0.52, rx: 70, ry: 25, size: 22, morphT: 2.8, morphSpeed: 1.7 },
+            { angle: Math.PI * 1.2,  angVel: 0.41, rx: 62, ry: 21, size: 28, morphT: 4.2, morphSpeed: 1.3 },
+            { angle: Math.PI * 1.6,  angVel: 0.47, rx: 68, ry: 23, size: 18, morphT: 5.6, morphSpeed: 2.2 },
+        ];
+    }
+
+    _updateOrbits(dt) {
+        if (!this._orbits) return;
+        for (const orb of this._orbits) {
+            orb.angle = (orb.angle + orb.angVel * dt / 1000) % (Math.PI * 2);
+            orb.morphT += orb.morphSpeed * dt / 1000;
+        }
+    }
+
+    // frontPass=true → sin>0(앞) 오비터 / false → sin≤0(뒤) 오비터
+    // 뒷 오비터는 _renderCharReveal 이전에 그려야 캐릭터가 위에서 가린다
+    _renderOrbits(ctx, frontPass) {
+        const T = this._orbits, pts = this._orbitPts, p = this._player;
+        if (!T || !pts || !p) return;
+        const cx = (p.x - this.engine.cameraX) + p.pw / 2;
+        const cy = p.y + (p.ph || 200) * 0.38;   // 상체 중심
+
+        // 뒤→앞 정렬 (렌더 순서를 깊이에 맞게)
+        const sorted = [...T].sort((a, b) => Math.sin(a.angle) - Math.sin(b.angle));
+
+        ctx.save();
+        for (const orb of sorted) {
+            const sa = Math.sin(orb.angle);
+            if ((sa > 0) !== frontPass) continue;
+
+            const ox = cx + Math.cos(orb.angle) * orb.rx;
+            const oy = cy + sa * orb.ry;
+
+            // 뎁스 스케일: 뒤(sa=-1)=0.65, 앞(sa=+1)=1.0
+            const scale = 0.65 + 0.35 * (sa + 1) / 2;
+            const sz    = orb.size * scale;
+            const alpha = frontPass ? 0.88 : 0.60;
+
+            // 네모↔동그라미 모프 (smoothstep)
+            const phase = (Math.sin(orb.morphT) + 1) / 2;
+            const morph = phase * phase * (3 - 2 * phase);
+
+            ctx.globalAlpha = alpha;
+            ctx.globalCompositeOperation = 'lighter';
+            const N = pts.sq.length;
+            for (let i = 0; i < N; i++) {
+                const s = pts.sq[i], c = pts.ci[i];
+                const px = ox + (s[0] + (c[0] - s[0]) * morph) * sz;
+                const py = oy + (s[1] + (c[1] - s[1]) * morph) * sz;
+                ctx.fillStyle = (i % 2 === 0) ? 'rgb(255,110,210)' : 'rgb(110,200,255)';
+                ctx.fillRect(px | 0, py | 0, 3, 3);
+            }
+        }
+        ctx.restore();
+    }
+
     // 픽셀무브 테스트 렌더 — 캐릭터 앞쪽에 네모↔동그라미 핑크/시안 픽셀 모핑 (계속 루프)
     _renderPixelMoveTest(ctx) {
         const T = this._pmTest, p = this._player;
@@ -1244,6 +1322,7 @@ export default class GolmokGame extends Scene {
         }
         this._updateFiringFx(dt);   // 발사 파티클(머즐버스트/트레이서/탄피)·반동·글로우 갱신 (비행 중엔 항상)
         this._updatePixelMoveTest(dt);   // 픽셀무브 테스트(네모↔동그라미) 시간 진행
+        this._updateOrbits(dt);          // 궤도 오비터 각도·모프 진행
         this._updateMissiles(dt);        // 미사일형 발사체(포물선) 진행 → 도달 시 타겟 피격
 
         // 피격 타겟 픽셀무브(흩어짐↔재조립) 진행
@@ -1565,6 +1644,9 @@ export default class GolmokGame extends Scene {
         // 발밑 그림자 (항상, 캐릭터 아래) — 정지=픽셀 깨짐 / 이동=블러 모션
         this._drawShadow(ctx);
 
+        // 뒤쪽 오비터 — 캐릭터 FX(_renderCharReveal)가 위에서 다시 그려 가리는 효과
+        this._renderOrbits(ctx, false);
+
         // 캐릭터 본체 — 공격(총) 중엔 총에 낮밤 다크닝, 전환 중엔 픽셀무브, 아니면 일반 캐릭터 FX.
         const gunActive = this._attacking && this._gun && this._gun.visible;
         if (this._pmBlend) {
@@ -1585,6 +1667,7 @@ export default class GolmokGame extends Scene {
         this._renderMissiles(ctx);        // 미사일형 발사체(포물선) 렌더
         this._renderMagicWave(ctx);       // 마법 스킬(G) 루프 — 화면 전체 모래파도 글로우
         this._renderPixelMoveTest(ctx);   // 픽셀무브 테스트(네모↔동그라미) — 캐릭터 앞
+        this._renderOrbits(ctx, true);    // 앞쪽 오비터 — 캐릭터 위에 렌더
 
         // 피격 타겟 흩어짐↔재조립 렌더 (entity.visible=false 동안 대체 렌더)
         for (const tg of this._targets) {

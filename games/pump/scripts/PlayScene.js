@@ -71,6 +71,28 @@ export default class PlayScene extends Scene {
         // 월드는 화면보다 크고, 카메라가 플레이어를 따라간다
         this._bounds = { w: this._cfg.world?.w ?? W, h: this._cfg.world?.h ?? H };
         this._grid = this._cfg.map?.gridInterval ?? 60;
+
+        // ── 카메라 락-포워드 구간(rooms) 설정 ──
+        this._camMode = this._cfg.camera?.mode ?? 'follow';
+        this._camLockRatio = this._cfg.camera?.lockRatio ?? 0.45;
+        // 아래(시작)에서 위(보스)로 전진 — room[0]이 월드 최하단
+        const roomsCfg = this._cfg.rooms?.[this.stageId];
+        if (roomsCfg?.length) {
+            const totalH = roomsCfg.reduce((sum, r) => sum + r.h, 0);
+            let y = totalH;
+            this._rooms = roomsCfg.map(r => {
+                const yEnd = y; y -= r.h; const yStart = y;
+                return { ...r, yStart, yEnd, cleared: false };
+            });
+            this._bounds.h = totalH;
+            this._roomIdx = 0;
+            this._roomKills = 0;
+            this._roomTimer = 0;
+            this._gateY = this._rooms[0].yStart; // 현재 구간 상단(전진 방향) 경계
+        } else {
+            this._rooms = null;
+            this._gateY = null;
+        }
         const ctrl = this._cfg.control ?? {};
         this._joyRadius = (ctrl.joystickMaxDist ?? 40) * (ctrl.scale ?? 1.75);
         this._joyKnob   = (ctrl.joystickKnobDiameter ?? 40) / 2 * (ctrl.scale ?? 1.75);
@@ -114,8 +136,12 @@ export default class PlayScene extends Scene {
         this._dmgReduce  = bonus.dmgReduce;
         this._magnetMult = bonus.magnetMult;
         this._lifesteal  = bonus.lifesteal;
-        this.player  = new PlayerEntity(playerCfg, this._bounds.w / 2, this._bounds.h / 2);
+        const startY = this._rooms ? this._bounds.h - 80 : this._bounds.h / 2;
+        this.player  = new PlayerEntity(playerCfg, this._bounds.w / 2, startY);
+        if (this._rooms) this._cam = { x: 0, y: Math.max(0, this._bounds.h - H) };
         this.enemies = new EnemySpawner(enemyCfg, bossCfg, this._cfg.difficulty, this._cfg.elements?.list, waves);
+        // 락-포워드: 보스는 보스방 진입 전까지 스폰하지 않음
+        if (this._rooms) this.enemies._bossTimer = Infinity;
         this.skills  = new SkillRunner(this._cfg.skills, this._cfg.elements, bonus.dmgMult, this._cfg.skillLevelScale, bonus.cooldownMult);
         this.xpDrops = new XpDrops(this._cfg.drop, this._cfg.level);
         this._joy = { active: false, ox: 0, oy: 0, vx: 0, vy: 0 };
@@ -138,7 +164,7 @@ export default class PlayScene extends Scene {
                 engine.scenes.transitionTo('square_lobby', { effect: 'dither', duration: 600 });
             }
         };
-        engine.ui.set('lbl_stage_name', { text: this.stageName });
+        engine.ui.set('lbl_stage_name', { text: this._rooms ? `${this.stageName} · ${this._rooms[0].label}` : this.stageName });
         engine.ui.set('lbl_lv',    { text: `LV.${this.xpDrops.level}` });
         engine.ui.set('lbl_kills', { text: 'K 0' });
         engine.ui.set('g_exp',     { ratio: 0 });
@@ -198,6 +224,7 @@ export default class PlayScene extends Scene {
             this.player.maxHp = newMaxHp;
         }
         this._updateCamera();
+        this._clampPlayerToView();
 
         // 적은 카메라 가시 영역 가장자리 바깥에서 스폰
         const view = { x: this._cam.x, y: this._cam.y, w: this.engine.gameWidth, h: this.engine.gameHeight };
@@ -225,8 +252,11 @@ export default class PlayScene extends Scene {
                 }
             }
             this._kills += killed.length;
+            this._roomKills += killed.length;
             this.engine.ui.set('lbl_kills', { text: `K ${this._kills}` });
         }
+
+        this._updateRoom(sec_dt);
 
         const { leveledUp, collected } = this.xpDrops.tick(sec_dt, this.player, this.skills.expMult, this._magnetMult);
         for (const d of collected) {
@@ -259,12 +289,54 @@ export default class PlayScene extends Scene {
         }
     }
 
-    /** 카메라 — 플레이어 중앙 추적, 월드 경계 클램프 */
+    /** 카메라 — 플레이어 추적, 월드 경계 클램프. forward 모드는 Y가 후퇴하지 않음 */
     _updateCamera() {
         const W = this.engine.gameWidth;
         const H = this.engine.gameHeight;
         this._cam.x = Math.max(0, Math.min(this._bounds.w - W, this.player.x - W / 2));
-        this._cam.y = Math.max(0, Math.min(this._bounds.h - H, this.player.y - H / 2));
+        if (this._camMode === 'forward') {
+            // 전진 = 위로(Y 감소) — 카메라 y는 감소만 가능 (후진 불가)
+            const lockY = H * this._camLockRatio;
+            let camY = Math.max(0, this.player.y - lockY);
+            camY = Math.min(this._cam.y, camY);
+            this._cam.y = Math.min(camY, this._bounds.h - H);
+        } else {
+            this._cam.y = Math.max(0, Math.min(this._bounds.h - H, this.player.y - H / 2));
+        }
+    }
+
+    /** 플레이어 위치를 화면/게이트 범위 내로 제한 (forward 모드 — 후진/게이트 통과 방지) */
+    _clampPlayerToView() {
+        if (this._camMode !== 'forward') return;
+        const r = this.player.radius;
+        let minY = this._cam.y + r;
+        if (this._gateY != null) minY = Math.max(minY, this._gateY + r);
+        const maxY = Math.min(this._cam.y + this.engine.gameHeight - r, this._bounds.h - r);
+        this.player.y = Math.max(minY, Math.min(this.player.y, maxY));
+    }
+
+    /** 구간(room) 클리어 판정 + 게이트 갱신 */
+    _updateRoom(sec_dt) {
+        if (!this._rooms) return;
+        const room = this._rooms[this._roomIdx];
+        if (!room || room.cleared) return;
+        this._roomTimer += sec_dt;
+        const c = room.clear;
+        let cleared = false;
+        if (c.type === 'kills')   cleared = this._roomKills >= c.value;
+        else if (c.type === 'survive') cleared = this._roomTimer >= c.value;
+        else if (c.type === 'timer')   cleared = this._roomTimer >= c.value;
+        else if (c.type === 'boss')    cleared = this._bossKilled;
+        if (!cleared) return;
+
+        room.cleared = true;
+        this._roomIdx++;
+        this._roomKills = 0;
+        this._roomTimer = 0;
+        const next = this._rooms[this._roomIdx];
+        this._gateY = next ? next.yStart : null;
+        if (next?.clear.type === 'boss') this.enemies._bossTimer = 1.5; // 보스방 진입 → 보스 즉시 등장
+        if (next) this.engine.ui.set('lbl_stage_name', { text: `${this.stageName} · ${next.label}` });
     }
 
     /** 레벨업 카드 영역 (i = 0~2) */
@@ -419,6 +491,17 @@ export default class PlayScene extends Scene {
             if (by >= 0)            c.fillRect(0, by, W, 3);
             if (bx + bw <= W)       c.fillRect(bx + bw - 3, 0, 3, H);
             if (by + bh <= H)       c.fillRect(0, by + bh - 3, W, 3);
+
+            // 구간 게이트 — 클리어 전까지 통과 불가 벽
+            if (this._gateY != null) {
+                const gy = this._gateY - cam.y;
+                if (gy >= 0 && gy <= H) {
+                    c.fillStyle = pal[8] ?? '#E8553C';
+                    c.globalAlpha = 0.6;
+                    for (let x = 0; x < W; x += 16) c.fillRect(x, gy - 2, 10, 4);
+                    c.globalAlpha = 1;
+                }
+            }
         }
 
         // 게임 객체 (L2) — 월드 좌표를 카메라만큼 평행이동해서 그림

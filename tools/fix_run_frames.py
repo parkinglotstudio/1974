@@ -1,8 +1,8 @@
 """
-ch01_player.json 의 run 상태(frames 107-118) 재생성.
-뒷발 잘림 현상 수정: 기존 torso-center 정렬 대신 발 우선 오프셋으로 재중심.
-소스: games/golmok/samples/1990 여성뛰는 모습.gif
-기존 팔레트 재사용(idle/walk/run_stop 프레임 변경 없음).
+ch01_player.json run 프레임 재생성 v3
+- 발 스팬 기반 균일 스케일: 가장 넓은 프레임도 양발이 PLAYER_W 안에 들어오도록 자동 계산
+- 최하단 픽셀 → GROUND_Y 고정(상하 튀김 방지)
+- 발 중심 수평 배치(프레임 간 수평 튀김 방지)
 """
 import json, sys
 from pathlib import Path
@@ -11,101 +11,134 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).parent))
 import gif_to_sprite as G
 
-ROOT    = Path(__file__).resolve().parent.parent
-SAMP    = ROOT / 'games/golmok/samples'
-OUT_F   = ROOT / 'games/golmok/pixels/characters/ch01_player.json'
+ROOT      = Path(__file__).resolve().parent.parent
+SAMP      = ROOT / 'games/golmok/samples'
+OUT_F     = ROOT / 'games/golmok/pixels/characters/ch01_player.json'
 
 PLAYER_W   = 149
 PLAYER_H   = 259
-CHAR_H     = 255
 BOTTOM_PAD = 2
+GROUND_Y   = PLAYER_H - BOTTOM_PAD - 1   # 256 — 발이 항상 이 y에 닿음
 ALPHA_T    = 24
+FOOT_FRAC  = 0.20   # 하단 20%를 '발 영역'으로 정의
+CANVAS_MARGIN = 4   # 양쪽 여백
 
 
-def _feet_cx(img):
+def _foot_span(img):
+    """scaled 이미지의 하단 FOOT_FRAC 픽셀 x 범위 반환 (lo, hi)."""
     px = img.load(); W, H = img.size
-    y0 = max(0, int(H * 0.88)); sx = n = 0
-    for y in range(y0, H):
+    y0 = int(H * (1.0 - FOOT_FRAC))
+    xs = [x for y in range(y0, H) for x in range(W) if px[x, y][3] > ALPHA_T]
+    if not xs:
+        # fallback: 전체 픽셀 중 최하단 30%
+        y0 = int(H * 0.70)
+        xs = [x for y in range(y0, H) for x in range(W) if px[x, y][3] > ALPHA_T]
+    return (min(xs), max(xs)) if xs else (W // 4, W * 3 // 4)
+
+
+def _lowest_y(img):
+    """이미지에서 불투명 픽셀의 최하단 y 반환."""
+    px = img.load(); W, H = img.size
+    for y in range(H - 1, -1, -1):
         for x in range(W):
             if px[x, y][3] > ALPHA_T:
-                sx += x; n += 1
-    return (sx / n) if n else W / 2.0
+                return y
+    return H - 1
 
 
-def _torso_cx(img):
-    px = img.load(); W, H = img.size
-    y_end = int(H * 0.70); sx = n = 0
-    for y in range(0, y_end):
-        for x in range(W):
-            if px[x, y][3] > ALPHA_T:
-                sx += x; n += 1
-    return (sx / n) if n else W / 2.0
+def compute_scale(raw_frames):
+    """
+    1차: CHAR_H(255) 기준 스케일 계산
+    2차: 그 스케일에서 최대 발 스팬이 PLAYER_W - CANVAS_MARGIN 초과하면 축소
+    """
+    bbs = [f.getbbox() for f in raw_frames]
+    heights = [b[3] - b[1] for b in bbs if b]
+    rh = max(heights)
+    sc_h = 255 / rh
+    print(f'  높이 기준 스케일: {sc_h:.4f}  (max bbox_h={rh})')
+
+    max_foot_span = 0
+    for f, bb in zip(raw_frames, bbs):
+        if not bb:
+            continue
+        c = f.crop(bb)
+        tw = max(1, round(c.width * sc_h))
+        th = max(1, round(c.height * sc_h))
+        scaled = c.resize((tw, th), Image.NEAREST)
+        lo, hi = _foot_span(scaled)
+        span = hi - lo
+        print(f'    frame {raw_frames.index(f)}: scaled {tw}x{th}, foot_span={span} ({lo}~{hi})')
+        if span > max_foot_span:
+            max_foot_span = span
+
+    target = PLAYER_W - CANVAS_MARGIN
+    if max_foot_span > target:
+        sc_final = sc_h * (target / max_foot_span)
+        print(f'  발 스팬 {max_foot_span}px > {target}px → 스케일 축소: {sc_h:.4f} → {sc_final:.4f}')
+    else:
+        sc_final = sc_h
+        print(f'  발 스팬 {max_foot_span}px ≤ {target}px → 축소 불필요')
+
+    return sc_final
 
 
-def paste_foot_priority(scaled_img):
-    """발(하단 12%) 우선 중심 — 뒷발이 캔버스 내 유지되도록 오프셋 조정."""
-    W, H = scaled_img.size
-    bb = scaled_img.getbbox()
+def paste_grounded(f, sc):
+    """
+    스케일 적용 후 캔버스에 배치:
+      y: 최하단 픽셀 → GROUND_Y
+      x: 발 중심 → PLAYER_W / 2  (± 클램프)
+    """
+    bb = f.getbbox()
     if not bb:
-        cv = Image.new('RGBA', (PLAYER_W, PLAYER_H), (0,0,0,0))
-        return cv
+        return Image.new('RGBA', (PLAYER_W, PLAYER_H), (0, 0, 0, 0))
 
-    # 1) 몸통 기반 초기 오프셋
-    tc = _torso_cx(scaled_img)
-    x = round(PLAYER_W / 2 - tc)
+    c = f.crop(bb)
+    tw = max(1, round(c.width * sc))
+    th = max(1, round(c.height * sc))
+    scaled = c.resize((tw, th), Image.NEAREST)
 
-    # 2) 발 픽셀의 캔버스 내 범위 확인
-    px = scaled_img.load()
-    y_foot_top = max(0, int(H * 0.88))
-    foot_xs = [cx for cy in range(y_foot_top, H) for cx in range(W) if px[cx, cy][3] > ALPHA_T]
+    # ── Y: 최하단 픽셀을 GROUND_Y에 고정 ─────────────────────────────
+    ly = _lowest_y(scaled)
+    y_off = GROUND_Y - ly
 
-    if foot_xs:
-        foot_min = min(foot_xs) + x   # 캔버스 공간의 뒷발 최소 x
-        foot_max = max(foot_xs) + x   # 캔버스 공간의 앞발 최대 x
-        # 3) 발이 캔버스 밖이면 클램프
-        if foot_min < 0:
-            x -= foot_min              # 오른쪽으로 밀어서 뒷발 표시
-        if foot_max > PLAYER_W - 1:
-            x -= (foot_max - (PLAYER_W - 1))   # 왼쪽으로 밀어서 앞발 표시
+    # ── X: 발 중심을 PLAYER_W / 2에 배치 ─────────────────────────────
+    lo, hi = _foot_span(scaled)
+    foot_cx = (lo + hi) / 2
+    x_off = round(PLAYER_W / 2 - foot_cx)
 
-    # 4) 전체 bbox도 가능한 한 캔버스 내 유지(클램프)
-    px_min_all = bb[0] + x
-    px_max_all = bb[2] - 1 + x
-    if px_min_all < 0:
-        x -= px_min_all
-    if px_max_all > PLAYER_W - 1:
-        x -= (px_max_all - (PLAYER_W - 1))
+    # 발 범위가 캔버스를 벗어나면 균등 클램프
+    canvas_lo = lo + x_off
+    canvas_hi = hi + x_off
+    if canvas_lo < 0 and canvas_hi > PLAYER_W - 1:
+        # 양쪽 다 넘침 → 발 중심 고정(어쩔 수 없음)
+        pass
+    elif canvas_lo < 0:
+        x_off -= canvas_lo
+    elif canvas_hi > PLAYER_W - 1:
+        x_off -= canvas_hi - (PLAYER_W - 1)
 
-    y = PLAYER_H - H - BOTTOM_PAD
-    cv = Image.new('RGBA', (PLAYER_W, PLAYER_H), (0,0,0,0))
-    cv.paste(scaled_img, (x, max(0, y)), scaled_img)
+    cv = Image.new('RGBA', (PLAYER_W, PLAYER_H), (0, 0, 0, 0))
+    cv.paste(scaled, (x_off, max(0, y_off)), scaled)
     return cv
 
 
 def nearest_palette_idx(r, g, b, pal_rgb):
-    """기존 팔레트(RGB 튜플 배열)에서 가장 가까운 색 인덱스 반환 (idx+1 = JSON 팔레트 기준)."""
     best = 0; best_d = 1e18
     for i, (pr, pg, pb) in enumerate(pal_rgb):
-        d = (r-pr)**2 + (g-pg)**2 + (b-pb)**2
+        d = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2
         if d < best_d:
             best_d = d; best = i
-    return best + 1   # idx0=transparent
+    return best + 1
 
 
 def main():
-    # ── 기존 JSON 로드 ──────────────────────────────────────────────
     data = json.loads(OUT_F.read_text(encoding='utf-8'))
-    palette = data['palette']   # palette[0]='transparent', palette[1..] = '#rrggbb'
-    run_state = data['stateDef']['states']['run']
-    run_frame_indices = run_state['frames']    # [107..118]
-    print(f'run frames: {run_frame_indices}')
+    palette = data['palette']
+    run_frame_indices = data['stateDef']['states']['run']['frames']
+    print(f'run frame indices: {run_frame_indices}')
 
-    # 팔레트를 RGB 튜플로 변환 (idx0 skip)
-    pal_rgb = []
-    for h in palette[1:]:
-        pal_rgb.append((int(h[1:3],16), int(h[3:5],16), int(h[5:7],16)))
+    pal_rgb = [(int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16)) for h in palette[1:]]
 
-    # ── GIF 로드 + 디키 + 클린 ──────────────────────────────────────
     gif_path = SAMP / '1990 여성뛰는 모습.gif'
     im = Image.open(gif_path)
     raw_frames = []
@@ -114,52 +147,40 @@ def main():
         raw_frames.append(G.clean_blobs(G.dekey(im.convert('RGBA'))))
     print(f'gif frames: {len(raw_frames)}')
 
-    # ── 높이 정규화 (CHAR_H 기준 균일 스케일) ──────────────────────
-    bbs = [f.getbbox() for f in raw_frames]
-    heights = [b[3]-b[1] for b in bbs if b]
-    rh = max(heights)
-    sc = CHAR_H / rh
-    print(f'scale={sc:.4f} (rh={rh})')
+    sc = compute_scale(raw_frames)
+    print(f'\n최종 스케일: {sc:.4f}')
 
-    scaled = []
-    for f, b in zip(raw_frames, bbs):
-        if not b:
-            scaled.append(Image.new('RGBA', (1, CHAR_H), (0,0,0,0))); continue
-        c = f.crop(b)
-        tw = max(1, round(c.width * sc))
-        th = max(1, round(c.height * sc))
-        scaled.append(c.resize((tw, th), Image.NEAREST))
-        print(f'  scaled frame: {tw}x{th}')
+    pasted = [paste_grounded(f, sc) for f in raw_frames]
 
-    # ── 발 우선 정렬 → 149x259 캔버스 ─────────────────────────────
-    pasted = [paste_foot_priority(f) for f in scaled]
+    # ── 결과 확인 ─────────────────────────────────────────────────────
+    print('\n[배치 결과]')
+    for i, cv in enumerate(pasted):
+        px = cv.load()
+        xs = [x for y in range(PLAYER_H) for x in range(PLAYER_W) if px[x, y][3] > ALPHA_T]
+        ys = [y for y in range(PLAYER_H) for x in range(PLAYER_W) if px[x, y][3] > ALPHA_T]
+        if xs and ys:
+            print(f'  frame {i}: x[{min(xs)},{max(xs)}] y[{min(ys)},{max(ys)}]  bottom={max(ys)}')
 
-    # ── 기존 팔레트로 양자화 (최근접 색 매핑) ──────────────────────
+    # ── 팔레트 양자화 ──────────────────────────────────────────────────
     new_pixel_frames = []
     for cv in pasted:
-        px = cv.load(); W, H = cv.size
+        pxd = cv.load()
         pixels = []
-        for y in range(H):
-            for x in range(W):
-                r, g, b, a = px[x, y]
+        for y in range(PLAYER_H):
+            for x in range(PLAYER_W):
+                r, g, b, a = pxd[x, y]
                 if a < ALPHA_T:
                     continue
-                idx = nearest_palette_idx(r, g, b, pal_rgb)
-                pixels.append([x, y, idx])
+                pixels.append([x, y, nearest_palette_idx(r, g, b, pal_rgb)])
         new_pixel_frames.append({'pixels': pixels})
 
-    # bbox 확인
-    for i, pf in enumerate(new_pixel_frames):
-        xs = [p[0] for p in pf['pixels']]; ys = [p[1] for p in pf['pixels']]
-        print(f'  run frame {i}: bbox x[{min(xs)},{max(xs)}] y[{min(ys)},{max(ys)}] n={len(pf["pixels"])}')
-
-    # ── JSON에 덮어쓰기 (run 프레임만) ──────────────────────────────
+    # ── JSON 덮어쓰기 (run 프레임만) ──────────────────────────────────
     for json_idx, frame_data in zip(run_frame_indices, new_pixel_frames):
         data['frames'][json_idx] = frame_data
 
     OUT_F.write_text(json.dumps(data), encoding='utf-8')
     print(f'\n완료: {OUT_F}')
-    print('run 프레임만 교체, 팔레트/idle/walk/run_stop 변경 없음.')
+    print(f'scale={sc:.4f}, 팔레트/idle/walk/run_stop 변경 없음.')
 
 
 if __name__ == '__main__':
