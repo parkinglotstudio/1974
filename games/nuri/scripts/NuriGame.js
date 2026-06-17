@@ -7,11 +7,11 @@ const HOLD_THRESHOLD    = 300;
 const PM_DURATION       = 700;
 const WAIST_SCALE       = 0.05;
 const FLASH_MS          = 200;
-const CHAR_SCALE        = 0.5;                            // 전체 캐릭터 렌더 배율
+const CHAR_SCALE        = 1.0;                            // 전체 캐릭터 렌더 배율
 const RAW_IDLE_FOOT_ROW = 256;                            // ch01_player.json 원본 GROUND_Y
 const RAW_RUN_FOOT_ROW  = 260;                            // ch01_player_run.json 원본 GROUND_Y
-const IDLE_FOOT_ROW     = Math.round(RAW_IDLE_FOOT_ROW * CHAR_SCALE);  // 128
-const RUN_FOOT_ROW      = Math.round(RAW_RUN_FOOT_ROW  * CHAR_SCALE);  // 130
+const IDLE_FOOT_ROW     = Math.round(RAW_IDLE_FOOT_ROW * CHAR_SCALE);  // 256
+const RUN_FOOT_ROW      = Math.round(RAW_RUN_FOOT_ROW  * CHAR_SCALE);  // 260
 const RUN_SPEED         = 160;   // px/s
 
 export default class NuriGame extends Scene {
@@ -47,6 +47,9 @@ export default class NuriGame extends Scene {
         this._runState  = 'idle';   // 'idle' | 'running' | 'stopping'
         this._runDir    = 1;
         this._joy       = { left: false, right: false };
+
+        this._dustParticles = [];
+        this._dustAcc       = 0;
 
         this._initOrbits();
         this._loadRunEntity(engine);
@@ -165,8 +168,12 @@ export default class NuriGame extends Scene {
             return [d[0] + dx, d[1], d[2], d[3], d[4]];
         });
 
+        // 거리 비례 duration (최소 350ms ~ 최대 1000ms, 기준 거리 = 화면 폭)
+        const dist = Math.abs(dx);
+        const dur  = Math.max(350, Math.min(1000, dist / this._W * 1400));
+
         p.visible = false;
-        this._startPixelMoveBlend(src, dst, PM_DURATION, () => {
+        this._startPixelMoveBlend(src, dst, dur, () => {
             p.x       = dstX;
             p.visible = true;
             if (p.asm) {
@@ -243,6 +250,7 @@ export default class NuriGame extends Scene {
         const p = this._player;
         if (p?.asm) { p.asm.tick(now); p._frameIdx = p.asm.getCurrentFrame(); }
         this._updateOrbits(dt);
+        this._updateDust(dt);
 
         // run_stop → idle 타이머 (클릭 이동 & 조이스틱 정지 공통)
         if (this._landing && this._landingTimer !== undefined) {
@@ -312,9 +320,19 @@ export default class NuriGame extends Scene {
         if (this._pmBlend) {
             this._renderPixelMove(ctx, this._pmBlend);
         } else if (activeEnt?.visible !== false) {
-            this._renderOrbits(ctx, false, activeEnt);
-            this._drawEntity(ctx, activeEnt);
-            this._renderOrbits(ctx, true, activeEnt);
+            if (isRunning) {
+                this._buildEntBuf(re);
+                this._renderOrbits(ctx, false, re);
+                this._renderDust(ctx);
+                this._renderTrail(ctx, re);
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(this._entBuf, re.x, re.y, re.pw, re.ph);
+                this._renderOrbits(ctx, true, re);
+            } else {
+                this._renderOrbits(ctx, false, activeEnt);
+                this._drawEntity(ctx, activeEnt);
+                this._renderOrbits(ctx, true, activeEnt);
+            }
         }
     }
 
@@ -386,18 +404,16 @@ export default class NuriGame extends Scene {
     }
 
     // ── 엔티티 렌더 ────────────────────────────────────────────
-    _drawEntity(ctx, entity) {
-        if (!entity) return;
+    _buildEntBuf(entity) {
+        if (!entity) return false;
         const pixels = entity._frames
             ? (entity._frames[entity._frameIdx ?? 0]?.pixels ?? [])
             : (entity._pixels ?? []);
         const pal = entity._palette ?? [];
-        if (!pixels.length) return;
+        if (!pixels.length) return false;
 
         const rawPw = entity._rawPw ?? entity.pw;
         const rawPh = entity._rawPh ?? entity.ph;
-        const dpw   = entity.pw;
-        const dph   = entity.ph;
 
         if (!this._entBuf || this._entBuf.width !== rawPw || this._entBuf.height !== rawPh) {
             this._entBuf        = document.createElement('canvas');
@@ -426,8 +442,93 @@ export default class NuriGame extends Scene {
             d[off]=rgb[0]; d[off+1]=rgb[1]; d[off+2]=rgb[2]; d[off+3]=255;
         }
         eCtx.putImageData(imgData, 0, 0);
+        return true;
+    }
+
+    _drawEntity(ctx, entity) {
+        if (!this._buildEntBuf(entity)) return;
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(this._entBuf, entity.x, entity.y, dpw, dph);
+        ctx.drawImage(this._entBuf, entity.x, entity.y, entity.pw, entity.ph);
+    }
+
+    // 달리기 중 진행 반대 방향으로 옅어지는 푸른 잔광 트레일 (가산 합성)
+    _renderTrail(ctx, entity) {
+        if (!this._entBuf) return;
+        const N    = 5;
+        const STEP = 7;
+        const dir  = this._runDir;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.globalCompositeOperation = 'lighter';
+        for (let k = N; k >= 1; k--) {
+            const ox = -dir * k * STEP;
+            ctx.globalAlpha = (1 - k / (N + 1)) * 0.38;
+            ctx.drawImage(this._entBuf, entity.x + ox, entity.y, entity.pw, entity.ph);
+        }
+        ctx.restore();
+    }
+
+    // 달리기 중 발밑에서 모래 입자가 뒤로 흩날리는 시그니처 효과
+    _updateDust(dt) {
+        const dtSec = dt / 1000;
+        const re = this._runEntity;
+        const isRunning = this._runState === 'running' && re?.visible;
+
+        if (isRunning && this._entBuf) {
+            const buf = this._entBuf;
+            const bCtx = this._entBufCtx;
+            const rawPw = re._rawPw ?? re.pw;
+            const rawPh = re._rawPh ?? re.ph;
+            const sc = re.pw / rawPw;
+            const footY = re.y + RUN_FOOT_ROW;
+
+            this._dustAcc += 18 * dtSec;
+            while (this._dustAcc >= 1) {
+                this._dustAcc -= 1;
+                // 발 근처 하단 20% 구역에서 랜덤 픽셀 샘플
+                const lx = (Math.random() * rawPw) | 0;
+                const ly = (rawPh * 0.78 + Math.random() * rawPh * 0.22) | 0;
+                let imgData;
+                try { imgData = bCtx.getImageData(lx, ly, 1, 1).data; } catch(e) { break; }
+                if (imgData[3] < 16) continue;
+                const r = Math.min(255, imgData[0] + 30);
+                const g = Math.min(255, imgData[1] + 20);
+                const b = Math.min(255, imgData[2] + 10);
+                this._dustParticles.push({
+                    x: re.x + lx * sc,
+                    y: re.y + ly * sc,
+                    vx: (Math.random() - 0.5) * 20 - this._runDir * 35,
+                    vy: (Math.random() * 6 - 8),
+                    age: 0,
+                    maxlife: 0.4 + Math.random() * 0.5,
+                    r, g, b,
+                });
+            }
+        }
+
+        const H = this._H;
+        for (let i = this._dustParticles.length - 1; i >= 0; i--) {
+            const q = this._dustParticles[i];
+            q.vy += 120 * dtSec;
+            q.x  += q.vx * dtSec;
+            q.y  += q.vy * dtSec;
+            q.age += dtSec;
+            if (q.age >= q.maxlife || q.y > H + 4) this._dustParticles.splice(i, 1);
+        }
+    }
+
+    _renderDust(ctx) {
+        const G = 2;
+        ctx.save();
+        for (const p of this._dustParticles) {
+            const t = p.age / p.maxlife;
+            const a = (t > 0.6 ? (1 - (t - 0.6) / 0.4) : 1) * 0.75;
+            if (a <= 0.03) continue;
+            ctx.globalAlpha = a;
+            ctx.fillStyle = `rgb(${p.r},${p.g},${p.b})`;
+            ctx.fillRect(((p.x / G) | 0) * G, ((p.y / G) | 0) * G, G, G);
+        }
+        ctx.restore();
     }
 
     // ── 픽셀 추출 ──────────────────────────────────────────────
@@ -556,23 +657,11 @@ export default class NuriGame extends Scene {
                     bpy = p.sy + (gpy - p.sy) * t;
                     px = bpx | 0; py = bpy | 0;
                 } else if (trav < 0.75) {
-                    const st     = ease((trav - 0.25) / 0.50);
-                    const ecgVal = this._ecg(st * p.ecgFreq + p.ecgPhase);
-                    const disp   = ecgVal * 14 + p.transP * 0.01;
+                    const st = ease((trav - 0.25) / 0.50);
                     bpx = gpx + (rpx - gpx) * st;
                     bpy = gpy + (rpy - gpy) * st;
-                    px  = (bpx - b.sinA * disp) | 0;
-                    py  = (bpy + b.cosA * disp) | 0;
-                    const spike = Math.min(1, Math.abs(ecgVal));
-                    const sr2 = Math.min(255, (p.sr + spike * 140) | 0);
-                    const sg2 = Math.min(255, (p.sg + spike * 180) | 0);
-                    const sb2 = Math.min(255, (p.sb + spike * 255) | 0);
-                    if (px >= 0 && px < W && py >= 0 && py < H) {
-                        const o2 = (py * W + px) * 4;
-                        const a2 = (180 + spike * 75) | 0;
-                        if (a2 > d[o2+3]) { d[o2]=sr2; d[o2+1]=sg2; d[o2+2]=sb2; d[o2+3]=a2; }
-                    }
-                    continue;
+                    px  = bpx | 0;
+                    py  = bpy | 0;
                 } else {
                     const raw = (trav - 0.75) / 0.25;
                     const t = raw * raw * raw;
