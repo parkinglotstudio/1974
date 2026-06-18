@@ -1,0 +1,246 @@
+{
+  "jump_start": {
+    "frames": [
+      {
+        "file": "jump_start_0.png",
+        "duration_ms": 70,
+        "width": 808,
+        "height": 704
+      },
+      {
+        "file": "jump_start_1.png",
+        "duration_ms": 70,
+        "width": 808,
+        "height": 704
+      },
+      {
+        "file": "jump_start_2.png",
+        "duration_ms": 70,
+        "width": 808,
+        "height": 704
+      }
+    ],
+    "bbox": [
+      392,
+      0,
+      1200,
+      704
+    ],
+    "src_size": [
+      1280,
+      720
+    ]
+  },
+  "jump_loop": {
+    "frames": [
+      {
+        "file": "jump_loop_0.png",
+        "duration_ms": 70,
+        "width": 786,
+        "height": 618
+      },
+      {
+        "file": "jump_loop_1.png",
+        "duration_ms": 70,
+        "width": 786,
+        "height": 618
+      }
+    ],
+    "bbox": [
+      414,
+      22,
+      1200,
+      640
+    ],
+    "src_size": [
+      1280,
+      720
+    ]
+  },
+  "jump_land": {
+    "frames": [
+      {
+        "file": "jump_land_0.png",
+        "duration_ms": 70,
+        "width": 1088,
+        "height": 714
+      },
+      {
+        "file": "jump_land_1.png",
+        "duration_ms": 70,
+        "width": 1088,
+        "height": 714
+      },
+      {
+        "file": "jump_land_2.png",
+        "duration_ms": 70,
+        "width": 1088,
+        "height": 714
+      },
+      {
+        "file": "jump_land_3.png",
+        "duration_ms": 70,
+        "width": 1088,
+        "height": 714
+      },
+      {
+        "file": "jump_land_4.png",
+        "duration_ms": 70,
+        "width": 1088,
+        "height": 714
+      },
+      {
+        "file": "jump_land_5.png",
+        "duration_ms": 70,
+        "width": 1088,
+        "height": 714
+      },
+      {
+        "file": "jump_land_6.png",
+        "duration_ms": 70,
+        "width": 1088,
+        "height": 714
+      },
+      {
+        "file": "jump_land_7.png",
+        "duration_ms": 70,
+        "width": 1088,
+        "height": 714
+      },
+      {
+        "file": "jump_land_8.png",
+        "duration_ms": 70,
+        "width": 1088,
+        "height": 714
+      },
+      {
+        "file": "jump_land_9.png",
+        "duration_ms": 70,
+        "width": 1088,
+        "height": 714
+      },
+      {
+        "file": "jump_land_10.png",
+        "duration_ms": 70,
+        "width": 1088,
+        "height": 714
+      }
+    ],
+    "bbox": [
+      112,
+      0,
+      1200,
+      714
+    ],
+    "src_size": [
+      1280,
+      720
+    ]
+  },
+  "arrive_loop": {
+    "frames": [
+      {
+        "file": "arrive_loop_0.png",
+        "duration_ms": 70,
+        "width": 502,
+        "height": 671
+      },
+      {
+        "file": "arrive_loop_1.png",
+        "duration_ms": 70,
+        "width": 502,
+        "height": 671
+      },
+      {
+        "file": "arrive_loop_2.png",
+        "duration_ms": 70,
+        "width": 502,
+        "height": 671
+      },
+      {
+        "file": "arrive_loop_3.png",
+        "duration_ms": 70,
+        "width": 502,
+        "height": 671
+      },
+      {
+        "file": "arrive_loop_4.png",
+        "duration_ms": 70,
+        "width": 502,
+        "height": 671
+      },
+      {
+        "file": "arrive_loop_5.png",
+        "duration_ms": 70,
+        "width": 502,
+        "height": 671
+      },
+      {
+        "file": "arrive_loop_6.png",
+        "duration_ms": 70,
+        "width": 502,
+        "height": 671
+      }
+    ],
+    "bbox": [
+      322,
+      27,
+      824,
+      698
+    ],
+    "src_size": [
+      1280,
+      720
+    ]
+  },
+  "new_land": {
+    "frames": [
+      {
+        "file": "new_land_0.png",
+        "duration_ms": 70,
+        "width": 496,
+        "height": 712
+      },
+      {
+        "file": "new_land_1.png",
+        "duration_ms": 70,
+        "width": 496,
+        "height": 712
+      },
+      {
+        "file": "new_land_2.png",
+        "duration_ms": 70,
+        "width": 496,
+        "height": 712
+      },
+      {
+        "file": "new_land_3.png",
+        "duration_ms": 70,
+        "width": 496,
+        "height": 712
+      },
+      {
+        "file": "new_land_4.png",
+        "duration_ms": 70,
+        "width": 496,
+        "height": 712
+      },
+      {
+        "file": "new_land_5.png",
+        "duration_ms": 70,
+        "width": 496,
+        "height": 712
+      }
+    ],
+    "bbox": [
+      314,
+      4,
+      810,
+      716
+    ],
+    "src_size": [
+      1280,
+      720
+    ]
+  }
+}

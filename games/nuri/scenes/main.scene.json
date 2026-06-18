@@ -1,14 +1,29 @@
 {
   "id": "nuri_main",
-  "resolution": { "width": 960, "height": 540 },
-  "bounds": { "x": 0, "y": 0, "width": 960, "height": 540 },
+  "resolution": { "width": 1760, "height": 740 },
+  "bounds": { "worldWidth": 3119, "worldHeight": 740 },
+  "layers": [
+    { "id": "L0", "parallax": 0.30, "children": [] },
+    { "id": "L1", "parallax": 1.00, "children": [] },
+    { "id": "L2", "parallax": 1.00, "children": [] },
+    { "id": "L3", "parallax": 1.40, "children": [] }
+  ],
   "entities": [
+    {
+      "id": "bg_far",
+      "type": "2021_far",
+      "layer": 0,
+      "x": 0, "y": -100, "pw": 3748, "ph": 960,
+      "visible": true,
+      "asset": "2021_far",
+      "assetCategory": "objects"
+    },
     {
       "id": "nuri_player",
       "asset": "ch01_player",
       "assetCategory": "characters",
-      "x": 200,
-      "y": 230,
+      "x": 196,
+      "y": 469,
       "pw": 149,
       "ph": 259,
       "layer": 2,

@@ -5,8 +5,8 @@
   "subtitle": "잊혀져선 안 되는 것들",
   "version": "0.1",
   "resolution": {
-    "width": 960,
-    "height": 540
+    "width": 1760,
+    "height": 740
   },
   "layers": {
     "0": { "name": "원경",   "parallax": 0.15 },

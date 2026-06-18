@@ -1,0 +1,50 @@
+{
+  "aerial_move": [
+    {
+      "id": "pull",
+      "gif": "jump_start",
+      "frameDur": 70,
+      "size": 1.0,
+      "anchor": "foot",
+      "loop": false,
+      "nextTrigger": "frameEnd"
+    },
+    {
+      "id": "fly",
+      "gif": "jump_loop",
+      "frameDur": 70,
+      "size": 1.0,
+      "anchor": "foot",
+      "loop": true,
+      "nextTrigger": "arrived"
+    },
+    {
+      "id": "arrive_loop",
+      "gif": "arrive_loop",
+      "frameDur": 70,
+      "size": 1.0,
+      "anchor": "foot",
+      "loop": false,
+      "nextTrigger": "frameEnd"
+    },
+    {
+      "id": "arrive_end",
+      "gif": "jump_land",
+      "frameDur": 70,
+      "size": 1.0,
+      "anchor": "foot",
+      "loop": false,
+      "impact": true,
+      "nextTrigger": "frameEnd"
+    },
+    {
+      "id": "land",
+      "gif": "new_land",
+      "frameDur": 70,
+      "size": 1.0,
+      "anchor": "foot",
+      "loop": false,
+      "nextTrigger": "frameEnd"
+    }
+  ]
+}

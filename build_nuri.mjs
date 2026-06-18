@@ -51,8 +51,8 @@ for (const d of ['scenes', 'data']) {
   if (existsSync(`${SRC}/${d}`)) cpSync(`${SRC}/${d}`, `${OUT}/${d}`, { recursive: true });
 }
 
-// 4) pixels/ 전체 복사 (characters만)
-for (const d of ['characters']) {
+// 4) pixels/ 복사 (characters + objects)
+for (const d of ['characters', 'objects']) {
   const p = `${SRC}/pixels/${d}`;
   if (existsSync(p)) cpSync(p, `${OUT}/pixels/${d}`, { recursive: true });
 }

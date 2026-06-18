@@ -1,5 +1,5 @@
 import SandEngine from '../../engine/SandEngine.js';
-import NuriGame   from './scripts/NuriGame.js?v=2.7';
+import NuriGame   from './scripts/NuriGame.js?v=3.0';
 import { loadCsvTable, loadParamTable } from '../../engine/data/Csv.js';
 
 // ── flat 1D → [[x,y,idx], ...] ──────────────────────────────
@@ -93,12 +93,14 @@ async function init() {
 
     // CSV 데이터 로드
     try {
-        const [chapters, characters, fx] = await Promise.all([
+        const [chapters, characters, fx, messages, ammoLevels] = await Promise.all([
             loadCsvTable('./data/chapters.csv'),
             loadCsvTable('./data/characters.csv'),
             loadParamTable('./data/fx_params.csv'),
+            loadCsvTable('./data/messages.csv'),
+            loadCsvTable('./data/ammo_levels.csv'),
         ]);
-        engine.data = { chapters, characters, fx };
+        engine.data = { chapters, characters, fx, messages, ammoLevels };
         console.log('[nuri] data loaded:', chapters.all().length, 'chapters,', characters.all().length, 'chars');
     } catch (e) {
         console.warn('[nuri] data load failed:', e);
