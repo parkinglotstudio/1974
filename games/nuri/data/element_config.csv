@@ -1,0 +1,15 @@
+# 원소 설정 — 격자 파동(Lateral Grid Wave) 스킬 시스템
+# behavior  : 비행 중 거동 핸들러 키 (straight | homing) — 전 원소 homing(유도탄) 통일
+# detonate  : 사거리 도달 자폭 효과 핸들러 키 (knockback | fire_ground | guardian | none)
+# on_hit    : 적 적중 시 효과 핸들러 키 (chain | none)
+# pierce    : 관통 규칙 (always=항상 | tier=강파동·필살융합만)
+# params    : 핸들러 파라미터 (key=val 쌍을 ; 로 구분)
+#   fixedDmg=1 → 충전율(길이)에 따른 데미지 스케일링 무시, dmg_wave_base 고정값만 사용
+#               (길이는 탄막 개수에만 영향, 발당 데미지는 동일)
+#   sizeMult/speedMult → 투사체 크기·속도 배율 (기본 1, 전역 charge_config 값에 곱)
+id,name_ko,symbol,color,behavior,detonate,on_hit,pierce,params
+na,나트륨,Na,#FFD93D,homing,knockback,none,tier,radius=75;knockback=80;dmgMult=0.8;turn=0.05;turnStrong=0.15;fixedDmg=1;sizeMult=0.5;speedMult=2
+fe,철,Fe,#A2A8D3,homing,none,none,always,turn=0.05;turnStrong=0.15
+o,산소,O,#FF5722,homing,fire_ground,none,tier,radius=35;radiusStrong=65;tick=0.35;tickStrong=0.8;duration=3;turn=0.05;turnStrong=0.15
+ca,칼슘,Ca,#00E676,homing,none,chain,tier,maxChain=3;maxChainStrong=6;range=150;dmgMult=0.6;turn=0.05;turnStrong=0.15
+mg,마그네슘,Mg,#E040FB,homing,guardian,none,tier,hp=3;speed=0.04;size=8;radiusMin=40;radiusMax=70;turn=0.05;turnStrong=0.15

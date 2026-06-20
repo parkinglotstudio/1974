@@ -36,25 +36,45 @@
       {
         "file": "jump_loop_0.png",
         "duration_ms": 70,
-        "width": 786,
-        "height": 618
+        "width": 478,
+        "height": 648
       },
       {
         "file": "jump_loop_1.png",
         "duration_ms": 70,
-        "width": 786,
-        "height": 618
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_loop_2.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_loop_3.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_loop_4.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_loop_5.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_loop_6.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
       }
-    ],
-    "bbox": [
-      414,
-      22,
-      1200,
-      640
-    ],
-    "src_size": [
-      1280,
-      720
     ]
   },
   "jump_land": {
@@ -241,6 +261,214 @@
     "src_size": [
       1280,
       720
+    ]
+  },
+  "jump_prep": {
+    "frames": [
+      {
+        "file": "jump_prep_0.png",
+        "duration_ms": 70,
+        "width": 784,
+        "height": 692
+      },
+      {
+        "file": "jump_prep_1.png",
+        "duration_ms": 70,
+        "width": 784,
+        "height": 692
+      },
+      {
+        "file": "jump_prep_2.png",
+        "duration_ms": 70,
+        "width": 784,
+        "height": 692
+      }
+    ]
+  },
+  "land3": {
+    "frames": [
+      {
+        "file": "land3_0.png",
+        "duration_ms": 70,
+        "width": 1064,
+        "height": 688
+      },
+      {
+        "file": "land3_1.png",
+        "duration_ms": 70,
+        "width": 1064,
+        "height": 688
+      },
+      {
+        "file": "land3_2.png",
+        "duration_ms": 70,
+        "width": 1064,
+        "height": 688
+      },
+      {
+        "file": "land3_3.png",
+        "duration_ms": 70,
+        "width": 1064,
+        "height": 688
+      },
+      {
+        "file": "land3_4.png",
+        "duration_ms": 70,
+        "width": 1064,
+        "height": 688
+      },
+      {
+        "file": "land3_5.png",
+        "duration_ms": 70,
+        "width": 1064,
+        "height": 688
+      },
+      {
+        "file": "land3_6.png",
+        "duration_ms": 70,
+        "width": 1064,
+        "height": 688
+      },
+      {
+        "file": "land3_7.png",
+        "duration_ms": 70,
+        "width": 1064,
+        "height": 688
+      }
+    ]
+  },
+  "jump_rise": {
+    "frames": [
+      {
+        "file": "jump_rise_0.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_1.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_2.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_3.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_4.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_5.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_6.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_7.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_8.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_9.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_10.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_11.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_12.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_13.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      },
+      {
+        "file": "jump_rise_14.png",
+        "duration_ms": 70,
+        "width": 478,
+        "height": 648
+      }
+    ]
+  },
+  "land_new": {
+    "frames": [
+      {
+        "file": "land_new_0.png",
+        "duration_ms": 70,
+        "width": 472,
+        "height": 688
+      },
+      {
+        "file": "land_new_1.png",
+        "duration_ms": 70,
+        "width": 472,
+        "height": 688
+      },
+      {
+        "file": "land_new_2.png",
+        "duration_ms": 70,
+        "width": 472,
+        "height": 688
+      },
+      {
+        "file": "land_new_3.png",
+        "duration_ms": 70,
+        "width": 472,
+        "height": 688
+      },
+      {
+        "file": "land_new_4.png",
+        "duration_ms": 70,
+        "width": 472,
+        "height": 688
+      },
+      {
+        "file": "land_new_5.png",
+        "duration_ms": 70,
+        "width": 472,
+        "height": 688
+      }
     ]
   }
 }

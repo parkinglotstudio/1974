@@ -1,0 +1,16 @@
+# 크리쳐 데이터 테이블 — 적(enemy)·NPC 공용 스탯 블록
+# kind         : npc | enemy
+# ai           : (enemy) seek_core=코어로 직진 추적 | idle=정지
+#                (npc)   idle=정지 | patrol=좌우 배회(미사용 시 무시)
+# hp           : 체력 (npc는 보통 0=무적 처리)
+# speed_min/max: 프레임(60fps) 기준 이동속도 랜덤 범위
+# size         : 충돌/렌더 반경(px)
+# color        : 칠 색상(hex)
+# contact_dmg  : 플레이어 접촉 시 즉시 피해(0=침식 효과만, 펌프/체력 시스템 연동 전 임시)
+# spawn_weight : _spawnEnemy 가중치 랜덤 픽 비중 (kind=enemy 행끼리 합산 기준), npc는 무시
+# elite        : 1=엘리트(체력바 색상/이펙트 크기 분기), npc는 무시
+# dialogue_id  : (npc) MessageSystem/대화 트리거 키, 없으면 빈칸
+# notes        : 설명
+id,kind,name_ko,ai,hp,speed_min,speed_max,size,color,contact_dmg,spawn_weight,elite,dialogue_id,notes
+cell_basic,enemy,망각세포,seek_core,38,0.8,1.4,12,#C8102E,0,92,0,,코어로 몰려드는 기본 적
+cell_elite,enemy,망각세포(엘리트),seek_core,220,0.4,0.7,22,#C8102E,0,8,1,,체력 높고 느린 엘리트 변종

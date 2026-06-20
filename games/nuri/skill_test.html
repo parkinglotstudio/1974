@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>NURI — GridWaveSystem 구조 검증 하니스</title>
+<style>
+  body { margin:0; background:#0b0c10; color:#cbd5e1; font-family:system-ui,sans-serif; }
+  header { padding:10px 16px; border-bottom:1px solid #1e293b; display:flex; gap:14px; align-items:center; }
+  h1 { font-size:14px; color:#22d3ee; margin:0; font-weight:700; }
+  .pill { font-size:11px; background:#064e3b; color:#34d399; padding:2px 8px; border-radius:6px; }
+  main { display:flex; gap:14px; padding:14px; flex-wrap:wrap; }
+  canvas { background:#12131a; border:1px solid #1e293b; border-radius:10px; cursor:crosshair; image-rendering:auto; }
+  .panel { background:#0f172a; border:1px solid #1e293b; border-radius:10px; padding:12px; min-width:200px; font-size:12px; }
+  select,button { background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:6px 8px; font-size:12px; cursor:pointer; }
+  .slots { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin:10px 0; }
+  .slot { aspect-ratio:1; border:1px solid #334155; border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; }
+  .row { display:flex; gap:6px; margin:8px 0; }
+  .hint { font-size:11px; color:#64748b; line-height:1.5; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NURI · GridWaveSystem 구조 검증</h1>
+  <span class="pill">🛡️ 무적 모드</span>
+  <span id="status" class="hint">로딩 중…</span>
+</header>
+<main>
+  <canvas id="cv" width="800" height="520"></canvas>
+  <div class="panel">
+    <div>활성 원소</div>
+    <select id="elemSel" style="width:100%;margin-top:4px;"></select>
+    <div class="slots" id="slots"></div>
+    <div class="row">
+      <button id="spawn5">👾 적 5</button>
+      <button id="spawnElite">💀 엘리트</button>
+    </div>
+    <div class="hint">
+      마우스 <b>홀드</b>로 충전 → 떼면 발사.<br>
+      가까이 조준=빠른 충전·적은 탄막 / 멀리=느린 충전·격자 탄막.<br>
+      <span id="dbg"></span>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import GridWaveSystem from './scripts/core/GridWaveSystem.js';
+
+// ── CSV 로더 ──────────────────────────────────────────────
+function parseCsv(text) {
+    const rows = text.split(/\r?\n/).filter(l => l.trim() && !l.trim().startsWith('#'));
+    const head = rows.shift().split(',').map(s => s.trim());
+    return rows.map(line => {
+        // params 컬럼에 콤마 없음 → 단순 split 가능
+        const cells = line.split(',');
+        const o = {}; head.forEach((h, i) => o[h] = (cells[i] ?? '').trim());
+        return o;
+    });
+}
+function parseParamTable(text) {
+    const o = {};
+    for (const r of parseCsv(text)) o[r.key] = r.value;
+    return o;
+}
+
+const status = document.getElementById('status');
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const W = 800, H = 520, CX = W / 2, CY = H / 2;
+
+let gws, slots = ['na','fe','o','ca','mg'];
+const ELEM_META = {};   // id → {color,name}
+
+// 게임측(하니스) 상태 — 적·보상·침식
+let enemies = [], rewards = [], carbon = [], popups = [];
+let mouse = { x: CX + 120, y: CY }, shake = 0, score = 0;
+
+async function boot() {
+    const [chargeTxt, elemTxt] = await Promise.all([
+        fetch('./data/charge_config.csv', {cache:'no-store'}).then(r=>r.text()),
+        fetch('./data/element_config.csv', {cache:'no-store'}).then(r=>r.text()),
+    ]);
+    const charge = parseParamTable(chargeTxt);
+    const elements = parseCsv(elemTxt);
+    gws = new GridWaveSystem({ charge, elements });
+    gws.setOrigin(CX, CY);
+    window.__gws = gws;   // 디버그 훅
+
+    const sel = document.getElementById('elemSel');
+    for (const el of elements) {
+        ELEM_META[el.id] = { color: el.color, name: el.name_ko };
+        const opt = document.createElement('option');
+        opt.value = el.id; opt.textContent = `${el.name_ko} (${el.symbol}) · ${el.behavior}/${el.detonate||el.on_hit}`;
+        sel.appendChild(opt);
+    }
+    drawSlots();
+    status.textContent = `✅ 로드됨 — 원소 ${elements.length}종`;
+    spawnGroup(6, false);
+    loop();
+}
+
+function drawSlots() {
+    const box = document.getElementById('slots'); box.innerHTML = '';
+    for (let i = 0; i < 5; i++) {
+        const d = document.createElement('div'); d.className = 'slot';
+        const id = slots[i];
+        if (id) { const c = ELEM_META[id].color; d.style.color = c; d.style.borderColor = c+'80'; d.style.background = c+'15'; d.textContent = id.toUpperCase(); }
+        else { d.textContent = '-'; d.style.color = '#475569'; }
+        box.appendChild(d);
+    }
+}
+
+// ── 입력 ──────────────────────────────────────────────────
+cv.addEventListener('mousemove', e => {
+    const r = cv.getBoundingClientRect();
+    mouse.x = (e.clientX - r.left) * (W / r.width);
+    mouse.y = (e.clientY - r.top) * (H / r.height);
+});
+cv.addEventListener('mousedown', e => { if (e.button===0) gws.beginCharge(); });
+cv.addEventListener('mouseup', e => {
+    if (e.button!==0 || !gws.isCharging) return;
+    gws.release(mouse, {
+        element: document.getElementById('elemSel').value,
+        slotCount: slots.filter(s=>s).length,
+        consume(cost) {
+            let granted = 0;
+            for (let i = slots.length-1; i>=0 && granted<cost; i--) if (slots[i]) { slots[i]=null; granted++; }
+            drawSlots(); return granted;
+        },
+        onEvent(type, data) {
+            if (type==='shake') shake = data.amount;
+            if (type==='popup') popups.push({ text:data.text, x:CX, y:CY-30, color:data.color, alpha:1 });
+        },
+    });
+});
+document.getElementById('spawn5').onclick = () => spawnGroup(5, false);
+document.getElementById('spawnElite').onclick = () => spawnGroup(1, true);
+
+// ── 적 (하니스 소유) ──────────────────────────────────────
+function spawnEnemy(elite) {
+    const a = Math.random()*Math.PI*2, rad = Math.max(W,H)*0.55;
+    enemies.push({ x:CX+Math.cos(a)*rad, y:CY+Math.sin(a)*rad,
+        speed: elite ? 0.12+Math.random()*0.1 : 0.25+Math.random()*0.2,
+        hp: elite?220:38, maxHp: elite?220:38, size: elite?22:12, color:'#C8102E', isElite:elite, flashTicks:0 });
+}
+function spawnGroup(n, elite){ for(let i=0;i<n;i++) spawnEnemy(elite); }
+
+const DROP = ['na','fe','o','ca','mg','na','fe','o'];
+function onDeath(e){
+    score += e.isElite?100:20;
+    const pick = DROP[Math.floor(Math.random()*DROP.length)];
+    rewards.push({ x:e.x, y:e.y, el:pick, color:ELEM_META[pick].color, speed:3.5 });
+    popups.push({ text:`+${e.isElite?100:20}`, x:e.x, y:e.y, color:'#fff', alpha:1 });
+}
+function fillSlot(id){ for(let i=0;i<slots.length;i++) if(!slots[i]){ slots[i]=id; drawSlots(); return; } }
+
+// ── 루프 ──────────────────────────────────────────────────
+function loop(){
+    gws.update(enemies);
+
+    // 적 AI · 사망 · 침식
+    for (let i=enemies.length-1;i>=0;i--){
+        const e = enemies[i];
+        const a = Math.atan2(CY-e.y, CX-e.x);
+        e.x += Math.cos(a)*e.speed; e.y += Math.sin(a)*e.speed;
+        if (e.flashTicks>0) e.flashTicks--;
+        if (Math.hypot(CX-e.x, CY-e.y) < e.size+16){
+            carbon.push({ x:e.x, y:e.y, size:e.isElite?35:18, alpha:1 }); enemies.splice(i,1); shake=6; continue;
+        }
+        if (e.hp<=0){ onDeath(e); enemies.splice(i,1); }
+    }
+    // 보상 흡수
+    for (let i=rewards.length-1;i>=0;i--){
+        const rp=rewards[i], dx=CX-rp.x, dy=CY-rp.y, d=Math.hypot(dx,dy);
+        if (d>10){ rp.x+=dx/d*rp.speed; rp.y+=dy/d*rp.speed; rp.speed+=0.25; }
+        else { fillSlot(rp.el); rewards.splice(i,1); }
+    }
+    for (let i=popups.length-1;i>=0;i--){ popups[i].y-=0.6; popups[i].alpha-=0.02; if(popups[i].alpha<=0) popups.splice(i,1); }
+    carbon.forEach(c=>{ if(c.alpha>0.45) c.alpha-=0.005; });
+    if (shake>0) shake*=0.85;
+
+    draw();
+    requestAnimationFrame(loop);
+}
+
+function draw(){
+    ctx.save();
+    if (shake>0.5) ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+    ctx.fillStyle='#12131a'; ctx.fillRect(0,0,W,H);
+    // 격자선
+    ctx.strokeStyle='rgba(0,188,212,0.035)';
+    for(let x=0;x<W;x+=40){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for(let y=0;y<H;y+=40){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    // 침식
+    for(const c of carbon){ ctx.fillStyle=`rgba(3,4,6,${c.alpha})`; ctx.fillRect(c.x-c.size/2,c.y-c.size/2,c.size,c.size); }
+
+    if (gws.isCharging) gws.renderAimGuide(ctx, mouse, document.getElementById('elemSel').value, gws.chargeRatioNow(mouse));
+
+    // 캐릭터
+    ctx.beginPath(); ctx.arc(CX,CY,15,0,Math.PI*2); ctx.fillStyle='#00BCD4'; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+
+    gws.render(ctx);
+
+    // 적
+    for(const e of enemies){
+        ctx.beginPath(); ctx.arc(e.x,e.y,e.size,0,Math.PI*2);
+        ctx.fillStyle = e.flashTicks>0?'#fff':e.color; ctx.fill();
+        ctx.fillStyle='#222'; ctx.fillRect(e.x-12, e.y-(e.isElite?20:15), 24, 3);
+        ctx.fillStyle = e.isElite?'#FFB300':'#00E676'; ctx.fillRect(e.x-12, e.y-(e.isElite?20:15), (e.hp/e.maxHp)*24, 3);
+    }
+    // 보상
+    for(const rp of rewards){ ctx.beginPath(); ctx.arc(rp.x,rp.y,7.5,0,Math.PI*2); ctx.fillStyle=rp.color; ctx.fill(); ctx.strokeStyle='#fff'; ctx.stroke(); }
+    // 팝업
+    for(const s of popups){ ctx.globalAlpha=s.alpha; ctx.fillStyle=s.color; ctx.font='bold 12px monospace'; ctx.textAlign='center'; ctx.fillText(s.text,s.x,s.y); ctx.globalAlpha=1; }
+
+    ctx.restore();
+
+    // 디버그
+    const pv = gws.computeParams(mouse);
+    document.getElementById('dbg').innerHTML =
+        `완충 ${(pv.chargeFullMs/1000).toFixed(2)}초 · 편측 ${pv.predictedMissiles}발 · 적 ${enemies.length} · 탄 ${gws.projectiles.length} · SCORE ${score}`;
+}
+
+boot().catch(e => status.textContent = '로드 실패: '+e);
+</script>
+</body>
+</html>

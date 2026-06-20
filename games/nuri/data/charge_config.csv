@@ -1,0 +1,32 @@
+# 격자 파동 충전·발사 튜닝 — 프로토타입(nuri_skill_prototype.html) 수치 기준
+# value 는 숫자(파서가 Number 변환). 색상 등 문자열은 별도 처리.
+key,value,note
+min_travel_dist,100,최소 사거리(조준축 길이) px
+max_travel_dist,1140,최대 사거리 px — 캔버스 폭 1760 기준, 탄막 간격 확장(+30%)
+charge_min_ms,300,근거리 완충 시간 (0.30초) — 이동/파동 분기(HOLD_THRESHOLD)와 동일
+charge_max_ms,1000,원거리 완충 시간 (1.00초) — 0.3~1초 사이 모든 사거리가 만충전(MAX)
+missile_min,1,최소 편측 탄막 수
+missile_max,10,최대 편측 탄막 수
+tier_hold_min,0.25,평타/파동 분기 (초) — 이 이상 홀드해야 파동
+tier_strong_ratio,0.7,강파동 충전 임계 (충전율)
+detonate_range_min,300,자폭 사거리 최소 px
+detonate_range_span,450,자폭 사거리 가변폭 (×충전율) px
+power_exponent,2,강파동 데미지 제곱 계수
+dmg_basic,15,평타 데미지(고정)
+dmg_wave_base,18,파동 기본 데미지
+dmg_wave_span,55,파동 가변 데미지 (×충전율^power)
+proj_speed_basic,8,평타 투사체 속도(px/frame)
+proj_speed_base,4,파동 기본 속도
+proj_speed_span,6,파동 가변 속도 (×충전율)
+proj_size_basic,4.5,평타 투사체 크기
+proj_size_base,7,파동 기본 크기
+proj_size_span,11,파동 가변 크기 (×충전율)
+cost_medium,1,중파동 슬롯 코스트
+cost_strong,2,강파동 슬롯 코스트
+cost_fusion,5,필살융합 슬롯 코스트
+fusion_dmg,180,필살융합 데미지(고정)
+fusion_range,360,필살융합 자폭 사거리
+fusion_size,22,필살융합 크기
+fusion_speed,8,필살융합 속도
+shake_strong,7,강파동 화면 흔들림
+shake_fusion,14,필살융합 화면 흔들림

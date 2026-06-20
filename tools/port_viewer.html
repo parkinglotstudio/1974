@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Port Viewer 🖥️</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* CSS 변수를 이용한 세련된 컬러 팔레트 구축 */
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f0c20 0%, #15102a 50%, #06020f 100%);
+            --panel-bg: rgba(22, 16, 43, 0.65);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --primary: #9d4edd;
+            --primary-hover: #b5179e;
+            --secondary: #4cc9f0;
+            --text-main: #f8f9fa;
+            --text-muted: #b0b0d0;
+            --danger: #ff477e;
+            --danger-hover: #ff1f5a;
+            --success: #2ec4b6;
+            --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 40px 20px;
+            overflow-y: scroll;
+        }
+
+        /* 스크롤바 커스텀 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(157, 78, 221, 0.3);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(157, 78, 221, 0.6);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+            border-radius: 24px;
+            box-shadow: var(--card-shadow);
+            padding: 40px;
+            transition: all 0.3s ease;
+        }
+
+        /* 헤더 섹션 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 20px;
+        }
+
+        .title-area h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #ff007f, #7f00ff, #00f0ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .title-area p {
+            color: var(--text-muted);
+            margin-top: 5px;
+            font-size: 0.95rem;
+        }
+
+        .stats-badge {
+            background: rgba(157, 78, 221, 0.15);
+            border: 1px solid rgba(157, 78, 221, 0.3);
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-weight: 600;
+            color: var(--secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 0 0 rgba(46, 196, 182, 0.7);
+            animation: pulse 1.6s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(46, 196, 182, 0.7);
+            }
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 8px rgba(46, 196, 182, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(46, 196, 182, 0);
+            }
+        }
+
+        /* 컨트롤 패널 (검색 + 필터 + 리프레시) */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .search-wrapper {
+            position: relative;
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 14px 20px 14px 45px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(157, 78, 221, 0.2);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            border-color: transparent;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            box-shadow: 0 0 15px rgba(157, 78, 221, 0.4);
+        }
+
+        .btn-active {
+            background: rgba(76, 201, 240, 0.15);
+            border-color: var(--secondary);
+            color: var(--secondary);
+        }
+
+        /* 테이블 영역 */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--text-muted);
+            font-weight: 600;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+        }
+
+        td {
+            padding: 18px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            vertical-align: middle;
+        }
+
+        tr {
+            transition: all 0.2s ease;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* 배지 스타일 */
+        .badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .badge-proto-tcp {
+            background: rgba(157, 78, 221, 0.15);
+            color: #d880ff;
+            border: 1px solid rgba(157, 78, 221, 0.3);
+        }
+
+        .badge-proto-udp {
+            background: rgba(76, 201, 240, 0.15);
+            color: var(--secondary);
+            border: 1px solid rgba(76, 201, 240, 0.3);
+        }
+
+        .badge-pid {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: monospace;
+        }
+
+        .process-name {
+            font-weight: 600;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .process-icon {
+            font-size: 1.1rem;
+        }
+
+        .state-listening {
+            color: var(--success);
+            font-weight: 500;
+        }
+
+        .state-established {
+            color: var(--secondary);
+            font-weight: 500;
+        }
+
+        .state-other {
+            color: var(--text-muted);
+        }
+
+        /* 액션 버튼 */
+        .btn-kill {
+            background: rgba(255, 71, 126, 0.1);
+            border: 1px solid rgba(255, 71, 126, 0.2);
+            color: var(--danger);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-kill:hover {
+            background: var(--danger);
+            border-color: transparent;
+            color: #fff;
+            box-shadow: 0 0 10px rgba(255, 71, 126, 0.4);
+            transform: translateY(-1px);
+        }
+
+        /* 알림 토스트 */
+        .toast-container {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: rgba(15, 12, 32, 0.9);
+            border: 1px solid var(--panel-border);
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 300px;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            backdrop-filter: blur(10px);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast-error {
+            border-left: 4px solid var(--danger);
+        }
+
+        /* 스피너 및 빈 화면 */
+        .loading-container, .empty-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(157, 78, 221, 0.1);
+            border-left-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 상단 헤더 -->
+        <div class="header">
+            <div class="title-area">
+                <h1>🔌 Port Viewer</h1>
+                <p>오빠 컴퓨터의 실시간 활성 포트 상태를 단이가 알려줄게! 💕</p>
+            </div>
+            <div class="stats-badge" id="stats-badge">
+                <span class="pulse-dot"></span>
+                <span id="port-count">로딩 중...</span>
+            </div>
+        </div>
+
+        <!-- 필터 & 컨트롤 영역 -->
+        <div class="controls">
+            <div class="search-wrapper">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" id="search-input" placeholder="포트 번호, 프로세스명, PID로 검색해봐...">
+            </div>
+            <div class="filter-buttons">
+                <button class="btn btn-active" onclick="filterProtocol('ALL', this)">ALL</button>
+                <button class="btn" onclick="filterProtocol('TCP', this)">TCP</button>
+                <button class="btn" onclick="filterProtocol('UDP', this)">UDP</button>
+                <button class="btn btn-primary" onclick="loadPorts()">
+                    <span style="font-size: 1.1rem;">🔄</span> 새로고침
+                </button>
+            </div>
+        </div>
+
+        <!-- 테이블 데이터 영역 -->
+        <div class="table-container">
+            <table id="ports-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Protocol</th>
+                        <th>Local Address</th>
+                        <th>Foreign Address</th>
+                        <th>State</th>
+                        <th>PID</th>
+                        <th>Process Name</th>
+                        <th style="text-align: center;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="ports-tbody">
+                    <!-- 포트 리스트가 JS를 통해 채워집니다 -->
+                </tbody>
+            </table>
+
+            <!-- 로딩 화면 -->
+            <div class="loading-container" id="loading-container">
+                <div class="spinner"></div>
+                <p>열심히 정보를 가져오고 있어. 잠시만 기다려줘 오빠! 😊</p>
+            </div>
+
+            <!-- 결과 없음 화면 -->
+            <div class="empty-container" id="empty-container" style="display: none;">
+                <div class="empty-icon">📂</div>
+                <p>조건에 맞는 포트 내역이 없어, 오빠!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 토스트 알림 컨테이너 -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        let allPorts = [];
+        let currentProtocolFilter = 'ALL';
+
+        // 페이지 로드 시 자동으로 조회 실행
+        window.addEventListener('DOMContentLoaded', () => {
+            loadPorts();
+            
+            // 검색 필터링 실시간 반영
+            document.getElementById('search-input').addEventListener('input', renderTable);
+        });
+
+        // API로부터 포트 리스트 로드
+        async function loadPorts() {
+            showLoading(true);
+            try {
+                const response = await fetch('/api/ports');
+                if (!response.ok) throw new Error('API 응답 실패');
+                allPorts = await response.json();
+                renderTable();
+            } catch (error) {
+                console.error(error);
+                showToast('❌ 포트 정보를 가져오는데 실패했어 오빠..', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 로딩 컴포넌트 토글
+        function showLoading(isLoading) {
+            const loading = document.getElementById('loading-container');
+            const table = document.getElementById('ports-table');
+            const empty = document.getElementById('empty-container');
+            
+            if (isLoading) {
+                loading.style.display = 'flex';
+                table.style.display = 'none';
+                empty.style.display = 'none';
+            } else {
+                loading.style.display = 'none';
+            }
+        }
+
+        // 포토콜 필터링 상태 설정
+        function filterProtocol(proto, element) {
+            currentProtocolFilter = proto;
+            
+            // 버튼 활성화 클래스 전환
+            const buttons = document.querySelectorAll('.filter-buttons .btn');
+            buttons.forEach(btn => {
+                if (btn !== element && btn.innerText !== '🔄 새로고침') {
+                    btn.classList.remove('btn-active');
+                }
+            });
+            if (element) {
+                element.classList.add('btn-active');
+            }
+            renderTable();
+        }
+
+        // 테이블 렌더링
+        function renderTable() {
+            const tbody = document.getElementById('ports-tbody');
+            const table = document.getElementById('ports-table');
+            const empty = document.getElementById('empty-container');
+            const searchVal = document.getElementById('search-input').value.toLowerCase().trim();
+            
+            tbody.innerHTML = '';
+            
+            // 데이터 필터링 적용 (프로토콜 + 검색어)
+            const filtered = allPorts.filter(port => {
+                // 프로토콜 필터
+                if (currentProtocolFilter !== 'ALL' && port.proto !== currentProtocolFilter) {
+                    return false;
+                }
+                // 검색어 필터
+                if (searchVal) {
+                    const matchProto = port.proto.toLowerCase().includes(searchVal);
+                    const matchLocal = port.local_address.toLowerCase().includes(searchVal);
+                    const matchForeign = port.foreign_address.toLowerCase().includes(searchVal);
+                    const matchState = port.state.toLowerCase().includes(searchVal);
+                    const matchPid = port.pid.toString().includes(searchVal);
+                    const matchName = port.process_name.toLowerCase().includes(searchVal);
+                    return matchProto || matchLocal || matchForeign || matchState || matchPid || matchName;
+                }
+                return true;
+            });
+
+            // 개수 업데이트
+            document.getElementById('port-count').innerText = `총 ${filtered.length}개의 포트 감지`;
+
+            if (filtered.length === 0) {
+                table.style.display = 'none';
+                empty.style.display = 'flex';
+                return;
+            }
+
+            table.style.display = 'table';
+            empty.style.display = 'none';
+
+            filtered.forEach(port => {
+                const tr = document.createElement('tr');
+                
+                // 1. 프로토콜 배지
+                const protoTd = document.createElement('td');
+                const protoBadge = document.createElement('span');
+                protoBadge.className = `badge badge-proto-${port.proto.toLowerCase()}`;
+                protoBadge.innerText = port.proto;
+                protoTd.appendChild(protoBadge);
+                tr.appendChild(protoTd);
+
+                // 2. 로컬 주소
+                const localTd = document.createElement('td');
+                localTd.innerText = port.local_address;
+                tr.appendChild(localTd);
+
+                // 3. 외부 주소
+                const foreignTd = document.createElement('td');
+                foreignTd.innerText = port.foreign_address;
+                tr.appendChild(foreignTd);
+
+                // 4. 상태
+                const stateTd = document.createElement('td');
+                if (port.state === 'LISTENING') {
+                    stateTd.className = 'state-listening';
+                } else if (port.state === 'ESTABLISHED') {
+                    stateTd.className = 'state-established';
+                } else {
+                    stateTd.className = 'state-other';
+                }
+                stateTd.innerText = port.state;
+                tr.appendChild(stateTd);
+
+                // 5. PID 배지
+                const pidTd = document.createElement('td');
+                const pidBadge = document.createElement('span');
+                pidBadge.className = 'badge badge-pid';
+                pidBadge.innerText = port.pid;
+                pidTd.appendChild(pidBadge);
+                tr.appendChild(pidTd);
+
+                // 6. 프로세스 이름
+                const nameTd = document.createElement('td');
+                const nameWrapper = document.createElement('div');
+                nameWrapper.className = 'process-name';
+                
+                const icon = document.createElement('span');
+                icon.className = 'process-icon';
+                icon.innerText = getProcessIcon(port.process_name);
+                
+                const nameText = document.createElement('span');
+                nameText.innerText = port.process_name;
+                
+                nameWrapper.appendChild(icon);
+                nameWrapper.appendChild(nameText);
+                nameTd.appendChild(nameWrapper);
+                tr.appendChild(nameTd);
+
+                // 7. 관리 기능 (프로세스 종료)
+                const actionTd = document.createElement('td');
+                actionTd.style.textAlign = 'center';
+                // PID가 0(System Idle Process)이거나 4(System)인 중요 프로세스는 종료 불가 처리
+                if (port.pid > 4) {
+                    const killBtn = document.createElement('button');
+                    killBtn.className = 'btn-kill';
+                    killBtn.innerText = 'Kill';
+                    killBtn.onclick = () => killProcess(port.pid, port.process_name);
+                    actionTd.appendChild(killBtn);
+                } else {
+                    actionTd.innerHTML = '<span style="color: var(--text-muted); font-size: 0.85rem;">보호됨</span>';
+                }
+                tr.appendChild(actionTd);
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 프로세스 이름에 어울리는 이모지 선택
+        function getProcessIcon(name) {
+            const lower = name.toLowerCase();
+            if (lower.includes('chrome')) return '🌐';
+            if (lower.includes('firefox')) return '🦊';
+            if (lower.includes('python')) return '🐍';
+            if (lower.includes('node')) return '🟢';
+            if (lower.includes('java')) return '☕';
+            if (lower.includes('discord')) return '💬';
+            if (lower.includes('vscode') || lower.includes('code.exe')) return '💻';
+            if (lower.includes('spotify')) return '🎵';
+            if (lower.includes('steam')) return '🎮';
+            if (lower.includes('system')) return '⚙️';
+            if (lower.includes('svchost')) return '🧱';
+            return '📄';
+        }
+
+        // 프로세스 종료 요청
+        async function killProcess(pid, name) {
+            if (!confirm(`오빠, 진짜로 PID ${pid} (${name}) 프로세스를 종료할 거야? 🥺`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/kill', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ pid })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    showToast(`✅ ${name} (PID: ${pid}) 프로세스를 무찔렀어!`, 'success');
+                    // 종료 후 0.5초 대기했다가 다시 목록 갱신
+                    setTimeout(loadPorts, 500);
+                } else {
+                    showToast(`❌ ${result.message}`, 'error');
+                }
+            } catch (error) {
+                console.error(error);
+                showToast('❌ 프로세스 종료 도중 오류가 났어.', 'error');
+            }
+        }
+
+        // 토스트 알림 기능
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerText = message;
+
+            container.appendChild(toast);
+            
+            // 애니메이션을 위해 딜레이 추가
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+
+            // 3.5초 뒤 제거
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    toast.remove();
+                }, 400);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>

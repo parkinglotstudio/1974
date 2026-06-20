@@ -4,22 +4,51 @@
 
 import { Scene }           from '../../../engine/scene/SceneManager.js';
 import { AnimPhasePlayer } from '../../../engine/anim/AnimPhasePlayer.js';
-
-const HOLD_THRESHOLD    = 500;   // 이동/파동 분기 임계값 (ms)
+import GridWaveSystem      from './core/GridWaveSystem.js';
+import MessageSystem       from './core/MessageSystem.js';
+import AmmoSystem          from './core/AmmoSystem.js';
+import { HOLD_THRESHOLD }  from './core/constants.js';
 
 // ── 공중 이동 물리 ──
-const GRAVITY           = 600;   // px/s²
+const GRAVITY           = 600;   // px/s² (구 상태머신용, 미사용)
+// deliver 단계: 도착 위치에서 캐릭터를 픽셀무브로 천천히 채움(조립)
+const FILL_MS           = 1300;  // ms — 픽셀 채우기 시간 (길수록 천천히 채워짐)
+const CHAIN_FILL_MS     = 380;   // ms — 공중 체이닝 시 빠른 픽셀 대시
+const FILL_RISE         = 0;     // px — 채우는 동안 떠오르는 높이 (0=떠오름 없음)
+const AERIAL_Y_OFFSET   = 0;     // px — 중심 정렬 후 미세조정용(+ 아래로 / - 위로)
+// rise 단계: 채운 뒤 루프 동작으로 부드럽게 살짝 떠오름 (중력 없음) — 2배 속도
+const RISE_VY           = 140;   // px/s — 떠오르는 속도
+const RISE_VX           = 160;   // px/s — 떠오를 때 전진
+// spin_fall 단계: 떠오른 뒤 정지프레임으로 회전하며 가속 낙하 — 2배 속도
+const FALL_GRAV         = 3600;  // px/s² — 낙하 중력 가속
+const FALL_VX           = 240;   // px/s — 낙하 중 전진 속도
+// 이동 동선 디버그 꼬리 (임시)
+const MOVE_TRAIL_ON     = true;
+const MOVE_TRAIL_MS     = 3000;  // 꼬리 유지 시간
+// 공중 GIF 공통 스케일 기준: standing 포즈(jump_prep) 소스 bbox 높이.
+// 모든 공중 GIF를 이 높이 기준 동일 스케일로 그려 idle 캐릭터 크기와 맞춤.
+// (값을 줄이면 캐릭터가 커지고, 키우면 작아짐)
+const AERIAL_REF_SRC_H  = 833;
+// 회전체(air_loop)에서 튀는 모래 파편 (톱니바퀴 금속 파편 느낌)
+const SPIN_SPARKS_ENABLED = false; // 스파크 파티클 on/off
+const SPIN_SPARK_RATE   = 480;   // 초당 생성 수
+const SPIN_SPARK_RADIUS = 50;    // 방출 림 반경(px)
+const SPIN_SPARK_VT     = 720;   // 접선 속도(회전 방향) 기준
+const SPIN_SPARK_VO     = 140;   // 바깥쪽 속도 기준
+const SPIN_SPARK_HOT    = 0.4;   // 흰열 코어 비율
 const AIR_HANG_MS       = 400;
 const LAND_MS           = 400;
 const PM_DURATION       = 700;
 const WAIST_SCALE       = 0.05;
 const FLASH_MS          = 200;
 const CHAR_SCALE        = 1.0;
+const CHAR_BRIGHTNESS   = 0.1;   // 캐릭터 밝기(1=원본, 0.1=90% 어둡게)
 const RAW_IDLE_FOOT_ROW = 256;
 const RAW_RUN_FOOT_ROW  = 260;
 const IDLE_FOOT_ROW     = Math.round(RAW_IDLE_FOOT_ROW * CHAR_SCALE);  // 128
 const RUN_FOOT_ROW      = Math.round(RAW_RUN_FOOT_ROW  * CHAR_SCALE);  // 130
-const RUN_SPEED         = 160;   // px/s
+const RUN_SPEED         = 160;   // px/s — fallback, characters.csv(move_speed)가 있으면 그 값 사용
+const RUN_FPS           = 20;    // fallback, characters.csv(run_fps)가 있으면 그 값 사용
 
 // ── 맵 / 카메라 ──
 const WORLD_WIDTH       = 3119;
@@ -28,7 +57,7 @@ const BG_FAR_H          = 960;
 const BG_FAR_Y          = -100;  // 배경 y 오프셋
 
 // ── 인트로 ──
-const INTRO_MS          = 2400;
+const INTRO_MS          = 600;
 const SAND_BASE         = [62, 52, 41];   // 모래 바탕색 RGB
 
 // 단순 해시 (골목길과 동일)
@@ -47,6 +76,11 @@ export default class NuriGame extends Scene {
         this._player = engine.entities.get('nuri_player')
                     ?? engine.entities.getAll?.()[0]
                     ?? null;
+
+        // 달리기 속도/애니 fps — characters.csv 값 사용 (없으면 fallback 상수)
+        const charRow   = engine.data?.characters?.byId('id', 'nuri_player');
+        this._runSpeed  = Number(charRow?.move_speed) || RUN_SPEED;
+        this._runFps    = Number(charRow?.run_fps)    || RUN_FPS;
 
         // 아이들 엔티티 CHAR_SCALE 적용 (rawPw/rawPh 저장 후 pw/ph 축소, y 재조정)
         if (this._player && !this._player._rawPw) {
@@ -99,32 +133,271 @@ export default class NuriGame extends Scene {
         this._seqDefs    = null;   // anim_sequences.json
         this._flyData    = null;   // { startX, endX, dur, elapsed, arrived }
         this._flyX       = null;   // 현재 fly lerp X (월드 좌표)
+        this._aerialState  = null; // null | 'rise' | 'spin_fall'
+        this._aerialDir    = 1;
+        this._fallVY       = 0;
+        this._aerialVel    = { x: 0, y: 0 };
+        this._spinFixedBlur   = false;
+        this._moveTrail    = []; // 디버그 꼬리 [{wx, wy, age}]
         this._impactParticles = [];
         this._shockRings      = [];
         this._landFlash       = null;
         this._spinPartAcc     = 0;
 
-        this._initMessages(engine);
-        this._initAmmoLevels(engine);
+        this.messages = new MessageSystem(engine);
+        this.ammo     = new AmmoSystem(this);
         this._loadRunEntity(engine);
         this._loadBgFar();
         this._loadAnimAssets();
         this._setupJoystick();
+        this._initSignatureFx(engine);
+        this._initCombat(engine);
 
         this._onDown = this._handleDown.bind(this);
         this._onUp   = this._handleUp.bind(this);
         this._onMove = this._handleMove.bind(this);
+        this._onMsg  = this._handleMessage.bind(this);
         engine.canvas.addEventListener('pointerdown', this._onDown);
         engine.canvas.addEventListener('pointermove', this._onMove);
         window.addEventListener('pointerup', this._onUp);
+        window.addEventListener('message', this._onMsg);   // 애니메이터 라이브 미리보기
     }
 
     onExit() {
         this.engine?.canvas.removeEventListener('pointerdown', this._onDown);
         this.engine?.canvas.removeEventListener('pointermove', this._onMove);
         window.removeEventListener('pointerup', this._onUp);
+        window.removeEventListener('message', this._onMsg);
         if (this._onKeyDown) window.removeEventListener('keydown', this._onKeyDown);
         if (this._onKeyUp)   window.removeEventListener('keyup',   this._onKeyUp);
+    }
+
+    // ── 애니메이터 에디터 라이브 미리보기 (postMessage) ──────────
+    //   nuri:reloadSeq — anim_sequences.json·meta 재로드 (저장 직후). demo:true 면 데모 이동
+    //   nuri:demoMove  — 데모 공중 이동 1회 실행
+    async _handleMessage(e) {
+        const m = e?.data;
+        if (!m || typeof m !== 'object') return;
+        if (m.type === 'nuri:reloadSeq') {
+            await this._loadAnimAssets();
+            console.log('[nuri] anim sequences reloaded (live preview)');
+            if (m.demo) this._demoAerial();
+        } else if (m.type === 'nuri:demoMove') {
+            this._demoAerial();
+        }
+    }
+
+    // 데모 공중 이동: 캐릭터 앞·위 지점으로 1회 (에디터 미리보기용)
+    _demoAerial() {
+        const p = this._player;
+        if (!p || this._seqPlayer?.isActive || this._pmBlend) return;
+        const dir = p.flipX ? -1 : 1;
+        this._startAerialMove({ x: p.x + dir * 140, y: p.y - 150 }, false);
+    }
+
+    // ── 모래엔진 시그니처 효과 (시간대 조명 + 캐릭터 림라이트) ──────
+    _initSignatureFx(engine) {
+        this._sigOn   = true;                            // 마스터 토글 (G 키)
+        this._todList = ['off', 'dusk', 'night', 'rain'];
+        this._todIdx  = 0;                               // 기본: off(배경 그대로) — T 키로 순환
+        // 캐릭터 림라이트 — 어두운 야경에서 실루엣을 차가운 달빛으로 분리
+        const rim = engine.rim;
+        if (rim) {
+            rim.enable();
+            rim.setColor('#9fc0ff');
+            rim.setWidth(2);
+            rim.setIntensity(0.6);
+            rim.setLightDir?.('top');
+        }
+        this._applyTimeOfDay();
+    }
+
+    _applyTimeOfDay() {
+        const L = this.engine?.lighting;
+        if (!L) return;
+        const tod = this._todList[this._todIdx];
+        if (tod === 'off') { L.disable(); return; }
+        L.enable();
+        L.setScenePreset(tod);
+    }
+
+    _cycleTimeOfDay() {
+        this._todIdx = (this._todIdx + 1) % this._todList.length;
+        this._applyTimeOfDay();
+        console.log('[nuri] time-of-day:', this._todList[this._todIdx]);
+    }
+
+    // ── 격자 파동 전투 (GridWaveSystem 통합) ───────────────────────
+    _initCombat(engine) {
+        this._activeElement = 'na';
+        this._enemies = [];
+        this._carbon  = [];
+        this._enemySpawnAcc = 0;
+        this._combatOn = true;          // C 키로 적 스폰 토글
+        this._gridWave = null;
+
+        const elemTbl = engine.data?.elements;
+        const chgTbl  = engine.data?.charge;
+        if (!elemTbl || !chgTbl) { console.warn('[nuri] combat data missing (element/charge config)'); return; }
+
+        // 크리쳐 테이블(적/NPC 공용) — kind=enemy 행만 스폰 풀로 사용
+        const creatureTbl = engine.data?.creatures;
+        this._enemyDefs = creatureTbl ? creatureTbl.filter('kind', 'enemy') : [];
+        this._enemyWeightSum = this._enemyDefs.reduce((s, r) => s + (Number(r.spawn_weight) || 0), 0);
+        // ParamTable → plain object (GridWaveSystem이 자체 Number 변환)
+        const charge = {};
+        for (const k of chgTbl.keys()) charge[k] = chgTbl.str(k);
+        this._gridWave = new GridWaveSystem({ charge, elements: elemTbl.all() });
+
+        // 하단 스킬 버튼이 호출할 수 있도록 전역 노출
+        window._nuri = this;
+        console.log('[nuri] combat ready — elements:', elemTbl.all().map(e => e.id).join(','));
+    }
+
+    setActiveElement(id) { if (this._gridWave?.elements[id]) this._activeElement = id; }
+    get activeElement() { return this._activeElement; }
+
+    // 캐릭터의 화면 좌표 중심 (UI/조준선 등 화면 고정 요소용)
+    _playerScreen() {
+        const p = this._player;
+        if (!p) return { x: this._W / 2, y: this._H / 2 };
+        return { x: p.x - this._cameraX + p.pw / 2, y: p.y + p.ph * 0.4 };
+    }
+
+    // 캐릭터의 맵(월드) 좌표 중심 — 적 스폰/추적·격자 파동 발사 원점은 전부 이 좌표계 사용
+    _playerWorld() {
+        const p = this._player;
+        if (!p) return { x: 0, y: this._H / 2 };
+        return { x: p.x + p.pw / 2, y: p.y + p.ph * 0.4 };
+    }
+
+    // 마우스(화면 좌표) → 월드 좌표 변환 — 조준 대상 계산용
+    _mouseWorld() {
+        if (!this._mousePos) return null;
+        return { x: this._mousePos.x + this._cameraX, y: this._mousePos.y };
+    }
+
+    // 파동 충전 중(phase 2) 실제 도달 거리(현재 충전율·원소별 사거리 반영) → 화면 좌표
+    // 이동 라인(AmmoSystem.renderAimLine)이 실제 발사 거리와 일치하도록 이 점을 목표로 그린다
+    _aimClampedScreen() {
+        const gw = this._gridWave;
+        const mouseWorld = this._mouseWorld();
+        if (!gw || !mouseWorld) return null;
+        const held = performance.now() - (this._holdStart ?? performance.now());
+        const full = gw.computeParams(mouseWorld, this._activeElement).chargeFullMs;
+        const ratio = Math.min(held / full, 1);
+        const pt = gw.displayPoint(mouseWorld, this._activeElement, ratio);
+        return { x: pt.x - this._cameraX, y: pt.y };
+    }
+
+    // 파동 발사 — held(ms) 만큼 충전된 격자 파동
+    _startWaveAttack(heldMs) {
+        const gw = this._gridWave;
+        if (!gw) return;
+        const origin = this._playerWorld();
+        gw.setOrigin(origin.x, origin.y);
+        const orbit = this.ammo.slots.filter(s => s.state === 'orbit');
+        gw.fire(heldMs / 1000, this._mouseWorld() ?? { x: origin.x + 120, y: origin.y }, {
+            element: this._activeElement,
+            slotCount: orbit.length,
+            consume: (cost) => {
+                let g = 0;
+                for (let i = orbit.length - 1; i >= 0 && g < cost; i--) {
+                    orbit[i].state = 'empty'; orbit[i].regenMs = 0; g++;
+                }
+                return g;
+            },
+            onEvent: (type, data) => {
+                if (type === 'shake') this.engine.fx?.shake({ intensity: data.amount, duration: 280, decay: 2 });
+                if (type === 'popup') this._showMessageText?.(data.text);
+            },
+        });
+    }
+
+    // 크리쳐 테이블(kind=enemy)에서 spawn_weight 가중치로 한 행 추첨
+    _pickEnemyDef() {
+        const defs = this._enemyDefs;
+        if (!defs?.length) return null;
+        let r = Math.random() * this._enemyWeightSum;
+        for (const def of defs) {
+            r -= Number(def.spawn_weight) || 0;
+            if (r <= 0) return def;
+        }
+        return defs[defs.length - 1];
+    }
+
+    _spawnEnemy(def = this._pickEnemyDef()) {
+        if (!def) return;
+        const o = this._playerWorld();
+        const a = Math.random() * Math.PI * 2, rad = Math.max(this._W, this._H) * 0.6;
+        const speedMin = Number(def.speed_min) || 0.8, speedMax = Number(def.speed_max) || 1.4;
+        const hp = Number(def.hp) || 1;
+        this._enemies.push({
+            defId: def.id, x: o.x + Math.cos(a) * rad, y: o.y + Math.sin(a) * rad,
+            speed: speedMin + Math.random() * (speedMax - speedMin),
+            hp, maxHp: hp,
+            size: Number(def.size) || 12, color: def.color || '#C8102E',
+            contactDmg: Number(def.contact_dmg) || 0,
+            isElite: def.elite === '1', flashTicks: 0,
+        });
+    }
+
+    _updateCombat(dt, now) {
+        const gw = this._gridWave;
+        if (!gw) return;
+        const o = this._playerWorld();
+        gw.setOrigin(o.x, o.y);
+
+        // 적 자동 스폰 (1.2초 간격, 최대 24, 종류는 creatures.csv spawn_weight로 추첨)
+        if (this._combatOn) {
+            this._enemySpawnAcc += dt;
+            if (this._enemySpawnAcc >= 1200) {
+                this._enemySpawnAcc = 0;
+                if (this._enemies.length < 24) this._spawnEnemy();
+            }
+        }
+
+        gw.update(this._enemies);
+
+        // 적 AI(코어 추적) · 사망 · 침식
+        const dtSec = dt / 1000;
+        for (let i = this._enemies.length - 1; i >= 0; i--) {
+            const e = this._enemies[i];
+            const a = Math.atan2(o.y - e.y, o.x - e.x);
+            const step = e.speed * dtSec * 60;        // 프레임 기준 속도 → dt 보정
+            e.x += Math.cos(a) * step; e.y += Math.sin(a) * step;
+            if (e.flashTicks > 0) e.flashTicks--;
+            if (Math.hypot(o.x - e.x, o.y - e.y) < e.size + 18) {
+                this._carbon.push({ x: e.x, y: e.y, size: e.isElite ? 35 : 18, alpha: 1 });
+                this._enemies.splice(i, 1); continue;
+            }
+            if (e.hp <= 0) this._enemies.splice(i, 1);
+        }
+        this._carbon.forEach(c => { if (c.alpha > 0.45) c.alpha -= 0.005 * dt / 16.67; });
+    }
+
+    // 모든 좌표는 맵(월드) 기준 — 카메라 오프셋만큼 translate 후 그려서 배경/캐릭터와 동일하게 스크롤
+    _renderCombat(ctx) {
+        const gw = this._gridWave;
+        if (!gw) return;
+        ctx.save();
+        ctx.translate(-this._cameraX, 0);
+        // 침식 블록
+        for (const c of this._carbon) {
+            ctx.fillStyle = `rgba(3,4,6,${c.alpha})`;
+            ctx.fillRect(c.x - c.size / 2, c.y - c.size / 2, c.size, c.size);
+        }
+        // 적 (코어로 몰려드는 망각세포)
+        for (const e of this._enemies) {
+            ctx.beginPath(); ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
+            ctx.fillStyle = e.flashTicks > 0 ? '#fff' : e.color; ctx.fill();
+            ctx.fillStyle = '#222'; ctx.fillRect(e.x - 12, e.y - (e.isElite ? 20 : 15), 24, 3);
+            ctx.fillStyle = e.isElite ? '#FFB300' : '#00E676';
+            ctx.fillRect(e.x - 12, e.y - (e.isElite ? 20 : 15), (e.hp / e.maxHp) * 24, 3);
+        }
+        // 파동 투사체·이펙트만 표시 (격자 가이드 점선은 제거 — 이동 라인 스타일로 단일화)
+        gw.render(ctx);
+        ctx.restore();
     }
 
     // ── 런 엔티티 비동기 로드 ─────────────────────────────────
@@ -172,6 +445,12 @@ export default class NuriGame extends Scene {
         this._onKeyDown = e => {
             if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') this._joy.left  = true;
             if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this._joy.right = true;
+            // F: 애니메이션 플로우 다이어그램 토글
+            if (e.key === 'f' || e.key === 'F') this._showFlow = !this._showFlow;
+            // T: 시간대(조명) 순환  /  G: 시그니처 효과  /  C: 적 스폰 토글
+            if (e.key === 't' || e.key === 'T') this._cycleTimeOfDay();
+            if (e.key === 'g' || e.key === 'G') this._sigOn = !this._sigOn;
+            if (e.key === 'c' || e.key === 'C') this._combatOn = !this._combatOn;
         };
         this._onKeyUp = e => {
             if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') this._joy.left  = false;
@@ -205,7 +484,7 @@ export default class NuriGame extends Scene {
         if (ent) {
             const cx = ent.x - this._cameraX + ent.pw / 2;
             const cy = ent.y + (ent.ph || 150) * 0.38;
-            this._lockAmmo(cx, cy);
+            this.ammo.lock(cx, cy);
         }
     }
 
@@ -217,20 +496,40 @@ export default class NuriGame extends Scene {
     _handleUp() {
         if (!this._pointerDown) return;
         this._pointerDown = false;
+
+        const held = performance.now() - this._holdStart;
         this._chargePhase = 0;
 
-        // 달리기 중·블렌드 중·공중 이동 중이면 취소
-        if (this._runState !== 'idle' || this._pmBlend || this._flyData || this._seqPlayer?.isActive) {
-            this._releaseAmmo();
+        // 공중 부양(rise/spin_fall) 중이면 체이닝 재이동 허용
+        const airborne = this._seqPlayer?.isActive &&
+                         (this._aerialState === 'rise' || this._aerialState === 'spin_fall');
+
+        // 달리기 중·블렌드 중·(부양 아닌)시퀀스 중이면 취소
+        if (this._runState !== 'idle' || this._pmBlend || this._flyData ||
+            (this._seqPlayer?.isActive && !airborne)) {
+            this.ammo.release();
             return;
         }
 
-        if (this._lockedSlot) {
-            this._consumeAmmo();
-            this._startMove(this._mousePos);
+        if (!this.ammo.lockedSlot) {
+            this.ammo.release();
+            this.messages.show('no_ammo');
+            return;
+        }
+
+        if (held < HOLD_THRESHOLD) {
+            // ── 0.5초 미만: 이동 ──
+            this.ammo.consume();
+            if (airborne) {
+                // 공중 부양 중 재이동: 도착 애니 생략, rise부터
+                this._startAerialMove(this._mousePos, true);
+            } else {
+                this._startMove(this._mousePos);
+            }
         } else {
-            this._releaseAmmo();
-            this._showMessage('no_ammo');
+            // ── 0.5초 이상: 격자 파동 공격 ──
+            this.ammo.release();
+            this._startWaveAttack(held);
         }
     }
 
@@ -244,14 +543,15 @@ export default class NuriGame extends Scene {
             this._groundY = p.y + IDLE_FOOT_ROW;
         }
 
-        // 목표가 캐릭터 머리 위 → 공중 이동
+        // 캐릭터 머리(상단)보다 위를 찍어야 공중 이동.
+        // 머리~발(키 전체) 높이 안쪽은 모두 지상 이동.
         const headY = p.y;
         if (targetPos.y < headY) {
             this._startAerialMove(targetPos);
             return;
         }
 
-        // ── 지상 이동 (기존 방식) ──
+        // ── 지상 이동: 수평 픽셀무브(모래시계) ──
         const src = this._pixelsScreen(p, p._frameIdx ?? 0, p.flipX ?? false);
         if (!src.length) return;
 
@@ -286,68 +586,281 @@ export default class NuriGame extends Scene {
         });
     }
 
-    // ── 공중 이동 ─────────────────────────────────────────────
-    // 4모션: pull → fly → arrive_loop → arrive_end → land
-    _startAerialMove(targetPos) {
+    // ── 공중 이동 (구조화) ────────────────────────────────────
+    // 4 phase: deliver(직선 픽셀무브) → rise(천천히 살짝 떠오름+B잔상) →
+    //          spin_fall(빠른 회전 낙하) → land(착지)
+    //   순서/전환은 anim_sequences.json + AnimPhasePlayer가 담당,
+    //   이 메서드는 각 phase 콜백에서 픽셀무브/물리만 연결.
+    //   chained=true: 공중 부양 중 재이동 — 도착 애니(채우기) 생략, 부양(rise)부터 시작.
+    _startAerialMove(targetPos, chained = false) {
         const p = this._player;
-        if (!p || this._pmBlend || this._flyData || this._seqPlayer?.isActive) return;
-        if (!this._animFrames || !this._seqDefs) return;
+        if (!p || this._pmBlend) return;
+        if (!chained && this._seqPlayer?.isActive) return;
+        if (!this._animFrames?.jump_loop || !this._seqDefs?.aerial_move) return;
+
+        this._spinFixedBlur = false;   // 회전은 A(속도 비례 블러)
 
         if (this._groundY === null) this._groundY = p.y + IDLE_FOOT_ROW;
 
-        const worldTX = targetPos.x + this._cameraX;
-        const dstX    = Math.max(0, Math.min(WORLD_WIDTH - p.pw, worldTX - p.pw / 2));
-        const newFlip = worldTX > p.x + p.pw / 2;
-        const dist    = Math.abs(dstX - p.x);
-        const flyDur  = Math.max(400, Math.min(1200, dist / this._W * 1600));
+        const worldTX  = targetPos.x + this._cameraX;
+        const dstX     = Math.max(0, Math.min(WORLD_WIDTH - p.pw, worldTX - p.pw / 2));
+        const newFlip  = worldTX > p.x + p.pw / 2;
+        // 도착 발높이: 캐릭터 "중심"이 마우스에 오도록 charHalf 만큼 아래로.
+        // (이전엔 발을 마우스에 둬서 전신이 커서 위로 떠 보였음)
+        const loopInfo = this._animFrames.jump_loop;
+        const aerScale = (p.ph / AERIAL_REF_SRC_H) * 0.9;
+        const charHalf = ((loopInfo.footRows[0] - loopInfo.topRows[0]) * 0.5 * aerScale) || 0;
+        const dstFootY = targetPos.y + charHalf + AERIAL_Y_OFFSET; // 중심=마우스, +오프셋 미세조정
+        const dstTopY  = dstFootY - IDLE_FOOT_ROW;
+        const dir      = newFlip ? 1 : -1;
+        const curFlip  = p.flipX;          // 체이닝 src(현재 떠있는 포즈) 캡처용
 
-        p.flipX   = newFlip;
+        this._aerialDir = dir;
+        this._fallVY    = 0;
+        this._aerialVel = { x: 0, y: 0 };
+        if (!this._seqPlayer) this._seqPlayer = new AnimPhasePlayer(this._seqDefs);
+
+        // deliver(픽셀무브) src — 지상이면 idle 포즈, 공중 체이닝이면 현재 떠있는 GIF 포즈.
+        // 둘 다 동일하게 deliver→rise→spin→land 구조를 탐 (픽셀무브가 항상 나옴).
+        let src;
+        if (chained) {
+            const gif = (this._seqPlayer?.isActive && this._seqPlayer.currentGif) || 'jump_loop';
+            const fi  = this._seqPlayer?.isActive ? this._seqPlayer.currentFrame : 0;
+            src = this._gifFramePixels(gif, fi, p.x, p.y + IDLE_FOOT_ROW, curFlip);
+            this._seqPlayer.stop();        // 진행 중 시퀀스 중단 후 새로 시작
+            this._aerialState = null;
+        } else {
+            src = this._pixelsScreen(p, p._frameIdx ?? 0, newFlip);
+        }
+        p.flipX = newFlip;
         p.visible = false;
 
-        // pull 단계: 아직 flyData 없음 (캐릭터 제자리 대기)
-        this._flyData = null;
-        this._flyX    = p.x;   // pull 중에는 현재 위치 고정
+        const dstSil = this._aerialDstSilhouette('jump_loop', dstX, dstFootY, newFlip);
+        if (!src.length || !dstSil.length) return;
+        const N    = src.length;
+        const step = dstSil.length / N;
+        const dst  = Array.from({ length: N }, (_, i) => dstSil[Math.round(i * step) % dstSil.length]);
+        const fillMs = chained ? CHAIN_FILL_MS : FILL_MS;   // 체이닝은 빠른 픽셀 대시
 
-        if (!this._seqPlayer) {
-            this._seqPlayer = new AnimPhasePlayer(this._seqDefs);
+        const callbacks = {
+            // ① 픽셀무브로 도착 위치까지 → 완료 시 rise로
+            onDeliver: () => {
+                this._startPixelMoveBlend(src, dst, fillMs, () => {
+                    p.x = dstX;
+                    p.y = dstTopY - FILL_RISE;
+                    this._seqPlayer?.notifyBlendDone();
+                }, true, FILL_RISE);
+            },
+            // ② 루프 동작으로 부드럽게 상승
+            onRise: () => { this._aerialState = 'rise'; },
+            // ③ 정지프레임 회전 + 가속 낙하
+            onSpinFall: () => { this._aerialState = 'spin_fall'; this._fallVY = 0; },
+            // ④ 데이터 기반 VFX 디스패치 (phase.fx 의 'enter' 효과)
+            onPhaseFX: (ph) => this._runPhaseFX(ph),
+            // ⑤ 시퀀스 끝 → 착지 포즈에서 idle로 픽셀 무브로 이어줌
+            onAppear: () => {
+                p.y = (this._groundY ?? (this._H - 20)) - IDLE_FOOT_ROW;
+                this._startLandToIdleBlend(p.flipX);
+            },
+            onDone: () => { this._aerialState = null; },
+        };
+
+        this._seqPlayer.start('aerial_move', this._animFrames, callbacks);
+    }
+
+    // 지정 GIF 1프레임의 불투명 픽셀 위치를 도착 지점(월드 좌표)에 배치해 반환.
+    // AnimPhasePlayer.render와 동일한 스케일/앵커(발 중심)로 맞춰 재조립이 GIF와 일치.
+    _aerialDstSilhouette(gifKey, dstX, dstFootY, flip, frameIdx = 0) {
+        const info = this._animFrames?.[gifKey];
+        const fi   = Math.min(frameIdx, (info?.imgs?.length ?? 1) - 1);
+        const img  = info?.imgs?.[fi];
+        const p    = this._player;
+        if (!img || !p) return [];
+
+        if (!this._imgReadCv) {
+            this._imgReadCv  = document.createElement('canvas');
+            this._imgReadCtx = this._imgReadCv.getContext('2d', { willReadFrequently: true });
+        }
+        const cv = this._imgReadCv, c = this._imgReadCtx;
+        cv.width = img.width; cv.height = img.height;
+        c.clearRect(0, 0, img.width, img.height);
+        c.drawImage(img, 0, 0);
+        let data;
+        try { data = c.getImageData(0, 0, img.width, img.height).data; } catch (e) { return []; }
+
+        // AnimPhasePlayer.render와 동일한 스케일(공중 GIF size 0.9)·발 앵커로 맞춰
+        // 채우기 완료 위치가 rise/spin 렌더와 정확히 일치(떠 보이지 않음).
+        const scale     = (p.ph / AERIAL_REF_SRC_H) * 0.9;
+        const footRow   = info.footRows ? info.footRows[fi] : img.height;
+        const dw        = img.width  * scale;
+        const footXWorld = dstX + p.pw / 2;
+        const xLeft     = footXWorld - dw / 2;
+        const yTop      = dstFootY - footRow * scale;  // 실제 발을 dstFootY에
+
+        const out    = [];
+        const STRIDE = 2;                              // 다운샘플 (입자 수 제한)
+        for (let py = 0; py < img.height; py += STRIDE) {
+            for (let px = 0; px < img.width; px += STRIDE) {
+                if (data[(py * img.width + px) * 4 + 3] < 16) continue;
+                const fx = flip ? (img.width - 1 - px) : px;
+                out.push([Math.round(xLeft + fx * scale), Math.round(yTop + py * scale)]);
+            }
+        }
+        return out;
+    }
+
+    // GIF 한 프레임의 불투명 픽셀을 색까지 포함해 월드 좌표에 배치 ([x,y,r,g,b]).
+    // 공중 체이닝 시 "현재 떠있는 포즈"를 픽셀무브 src로 쓰기 위함.
+    _gifFramePixels(gifKey, frameIdx, atX, atFootY, flip) {
+        const info = this._animFrames?.[gifKey];
+        const fi   = Math.min(frameIdx, (info?.imgs?.length ?? 1) - 1);
+        const img  = info?.imgs?.[fi];
+        const p    = this._player;
+        if (!img || !p) return [];
+
+        if (!this._imgReadCv) {
+            this._imgReadCv  = document.createElement('canvas');
+            this._imgReadCtx = this._imgReadCv.getContext('2d', { willReadFrequently: true });
+        }
+        const cv = this._imgReadCv, c = this._imgReadCtx;
+        cv.width = img.width; cv.height = img.height;
+        c.clearRect(0, 0, img.width, img.height);
+        c.drawImage(img, 0, 0);
+        let data;
+        try { data = c.getImageData(0, 0, img.width, img.height).data; } catch (e) { return []; }
+
+        const scale     = (p.ph / AERIAL_REF_SRC_H) * 0.9;
+        const footRow   = info.footRows ? info.footRows[fi] : img.height;
+        const dw        = img.width * scale;
+        const xLeft     = (atX + p.pw / 2) - dw / 2;
+        const yTop      = atFootY - footRow * scale;
+
+        const out    = [];
+        const STRIDE = 2;
+        for (let py = 0; py < img.height; py += STRIDE) {
+            for (let px = 0; px < img.width; px += STRIDE) {
+                const idx = (py * img.width + px) * 4;
+                if (data[idx + 3] < 16) continue;
+                const fx = flip ? (img.width - 1 - px) : px;
+                out.push([
+                    Math.round(xLeft + fx * scale), Math.round(yTop + py * scale),
+                    data[idx], data[idx + 1], data[idx + 2],
+                ]);
+            }
+        }
+        return out;
+    }
+
+    // ── 착지 포즈 → idle 픽셀 무브 전환 (동작 이어주기) ───────
+    _startLandToIdleBlend(flip) {
+        const p = this._player;
+        if (!p) return;
+        // idle 포즈 픽셀 (착지 위치)
+        this._setAnim(p, 'idle') || this._setAnim(p, 'run_stop');
+        if (p.asm) { p.asm.tick(performance.now()); p._frameIdx = p.asm.getCurrentFrame(); }
+        const dst = this._pixelsScreen(p, p._frameIdx ?? 0, flip);
+        if (!dst.length) { p.visible = true; return; }
+
+        // land 마지막 프레임 실루엣(웅크린 포즈) 위치 → idle 색으로 채워 src
+        const footY    = p.y + IDLE_FOOT_ROW;
+        const lastLand = (this._animFrames?.land_new?.imgs?.length ?? 1) - 1;
+        const sil = this._aerialDstSilhouette('land_new', p.x, footY, flip, lastLand);
+        const N   = dst.length;
+        let src;
+        if (sil.length) {
+            const step = sil.length / N;
+            src = dst.map((d, i) => {
+                const s = sil[Math.round(i * step) % sil.length];
+                return [s[0], s[1], d[2], d[3], d[4]];
+            });
+        } else {
+            src = dst.map(d => [d[0] + (Math.random() - 0.5) * 50, d[1] + Math.random() * 30, d[2], d[3], d[4]]);
         }
 
-        const startX = p.x;
-        this._seqPlayer.start('aerial_move', this._animFrames, {
-            onPull: () => {
-                // pull phase: 제자리에서 당기기 모션
-                this._flyX = startX;
-            },
-            onFly: () => {
-                // fly phase: flyData 활성화 → lerp 이동 시작
-                this._flyData = { startX, endX: dstX, dur: flyDur, elapsed: 0, arrived: false };
-            },
-            onArrive: () => {
-                // arrive_loop: 목적지 X 고정
-                p.x = dstX;
-                this._flyX = dstX;
-            },
-            onImpact: () => {
-                // arrive_end: 충격파 + 모래
-                this._triggerLandImpact();
-            },
-            onLand: () => {
-                // land phase 시작: 캐릭터 위치 확정
-                p.x = dstX;
-                p.y = (this._groundY ?? (this._H - 20)) - IDLE_FOOT_ROW;
-            },
-            onAppear: () => {
-                // 마지막 phase 완료 → 캐릭터 표시
-                p.x = dstX;
-                p.y = (this._groundY ?? (this._H - 20)) - IDLE_FOOT_ROW;
-                p.visible = true;
-                this._setAnim(p, 'idle') || this._setAnim(p, 'run_stop');
-            },
-            onDone: () => {
-                this._flyData = null;
-                this._flyX    = null;
-            },
-        });
+        p.visible = false;
+        this._startPixelMoveBlend(src, dst, 350, () => {
+            p.visible = true;
+            this._setAnim(p, 'idle') || this._setAnim(p, 'run_stop');
+        }, true);   // straight 흐름
+    }
+
+    // ── 공중 이동 물리 (rise: 부드럽게 떠오름 / spin_fall: 가속 낙하) ──
+    _updateAirBallistic(dt) {
+        const cur = this._aerialState;
+        if (cur !== 'rise' && cur !== 'spin_fall') return;
+        const p   = this._player;
+        const dtS = dt / 1000;
+        const dir = this._aerialDir ?? 1;
+        const maxX = WORLD_WIDTH - p.pw;
+
+        if (cur === 'rise') {
+            // 중력 없이 부드럽게 살짝 떠오름 + 전진
+            p.y -= RISE_VY * dtS;
+            p.x = Math.max(0, Math.min(maxX, p.x + dir * RISE_VX * dtS));
+            this._aerialVel = { x: dir * RISE_VX, y: -RISE_VY };
+            return;
+        }
+
+        // spin_fall: 가속 낙하 + 전진
+        this._fallVY += FALL_GRAV * dtS;
+        p.y += this._fallVY * dtS;
+        p.x = Math.max(0, Math.min(maxX, p.x + dir * FALL_VX * dtS));
+        this._aerialVel = { x: dir * FALL_VX, y: this._fallVY };
+
+        const gY = this._groundY ?? (this._H - 20);
+        if (this._fallVY > 0 && p.y + IDLE_FOOT_ROW >= gY) {
+            p.y = gY - IDLE_FOOT_ROW;              // 지면에 정확히 맞춤
+            this._aerialState = null;             // 착지 후 전진/낙하 정지 (미끄러짐 방지)
+            this._seqPlayer?.notifyGrounded();     // → land phase
+        }
+    }
+
+    // ── 이동 동선 디버그 꼬리 (임시) ──────────────────────────
+    _updateMoveTrail(dt) {
+        const p = this._player;
+        const cur = this._seqPlayer?.currentId;
+        // 공중 비행(rise/spin_fall) 및 착지 중 캐릭터 중심·발 기록
+        if (p && this._seqPlayer?.isActive && cur && cur !== 'deliver') {
+            this._moveTrail.push({
+                cx: p.x + p.pw / 2, cy: p.y + p.ph * 0.5,
+                fx: p.x + p.pw / 2, fy: p.y + IDLE_FOOT_ROW,
+                age: 0,
+            });
+        }
+        for (let i = this._moveTrail.length - 1; i >= 0; i--) {
+            this._moveTrail[i].age += dt;
+            if (this._moveTrail[i].age >= MOVE_TRAIL_MS) this._moveTrail.splice(i, 1);
+        }
+    }
+
+    _renderMoveTrail(ctx) {
+        if (!this._moveTrail.length) return;
+        const camX = this._cameraX;
+        ctx.save();
+        // 중심 경로(시안) + 발 경로(주황) 두 선
+        for (const [key, col] of [[['cx','cy'], '0,255,255'], [['fx','fy'], '255,150,0']]) {
+            const [kx, ky] = key;
+            ctx.beginPath();
+            let started = false;
+            for (const q of this._moveTrail) {
+                const x = q[kx] - camX, y = q[ky];
+                if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = `rgba(${col},0.5)`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // 점 (나이에 따라 페이드)
+            for (const q of this._moveTrail) {
+                const a = 1 - q.age / MOVE_TRAIL_MS;
+                ctx.globalAlpha = a * 0.8;
+                ctx.fillStyle = `rgb(${col})`;
+                ctx.beginPath();
+                ctx.arc(q[kx] - camX, q[ky], 2.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+        }
+        ctx.restore();
     }
 
     // ── 공중 상태머신 전환 ────────────────────────────────────
@@ -453,7 +966,7 @@ export default class NuriGame extends Scene {
     // ── 공중 이동 fly lerp 업데이트 ──────────────────────────────
     _updateFly(dt) {
         const fd = this._flyData;
-        if (!fd) return;
+        if (!fd || !this._flyActive) return;   // pull phase 동안은 정지
         const p = this._player;
 
         fd.elapsed = Math.min(fd.dur, fd.elapsed + dt);
@@ -463,8 +976,7 @@ export default class NuriGame extends Scene {
 
         if (!fd.arrived && fd.elapsed >= fd.dur) {
             fd.arrived = true;
-            p.x = fd.endX;
-            p.y = (this._groundY ?? (this._H - 20)) - IDLE_FOOT_ROW;
+            if (p) p.x = fd.endX;
             this._seqPlayer?.notifyArrived();
         }
     }
@@ -485,7 +997,10 @@ export default class NuriGame extends Scene {
         re.flipX = dir > 0;
         re.visible = true;
 
-        if (re.asm) { re.asm.setState('run'); re.asm.restart(); }
+        if (re.asm) {
+            if (re.asm.states?.run) re.asm.states.run.fps = this._runFps;
+            re.asm.setState('run'); re.asm.restart();
+        }
 
         p.visible = false;
     }
@@ -538,15 +1053,18 @@ export default class NuriGame extends Scene {
 
         const p = this._player;
         if (p?.asm) { p.asm.tick(now); p._frameIdx = p.asm.getCurrentFrame(); }
-        this._updateAmmo(dt);
-        this._updateMessage(dt);
+        this.ammo.update(dt);
+        this.messages.update(dt);
         this._updateAirState(dt);
         this._updateFly(dt);
+        this._updateAirBallistic(dt);
+        if (MOVE_TRAIL_ON) this._updateMoveTrail(dt);
         this._seqPlayer?.update(dt);
         this._updateSpinParticles(dt);
         this._updateImpactParticles(dt);
         this._updateShockRings(dt);
         this._updateDust(dt);
+        this._updateCombat(dt, now);
         this._updateCamera();
 
         // run_stop → idle 타이머 (클릭 이동 & 조이스틱 정지 공통)
@@ -568,8 +1086,10 @@ export default class NuriGame extends Scene {
             this._chargePhase = held >= HOLD_THRESHOLD ? 2 : 1;
         }
 
-        // 조이스틱 상태머신 (픽셀 블렌드·공중 상태 중에는 처리 안 함)
-        if (!this._pmBlend && !this._airState) this._updateRunState(now, dt);
+        // 조이스틱 상태머신 (픽셀 블렌드·공중 상태·공중 이동 시퀀스 중에는 처리 안 함)
+        if (!this._pmBlend && !this._airState && !this._seqPlayer?.isActive) {
+            this._updateRunState(now, dt);
+        }
     }
 
     _updateRunState(now, dt) {
@@ -596,7 +1116,7 @@ export default class NuriGame extends Scene {
                     }
                     if (re) {
                         const maxX = WORLD_WIDTH - re.pw;
-                        re.x = Math.max(0, Math.min(maxX, re.x + this._runDir * RUN_SPEED * dt / 1000));
+                        re.x = Math.max(0, Math.min(maxX, re.x + this._runDir * this._runSpeed * dt / 1000));
                         // idle entity X 동기화 (정지 전환 시 위치 맞춤용)
                         p.x = re.x + Math.round((re.pw - p.pw) / 2);
                     }
@@ -631,7 +1151,7 @@ export default class NuriGame extends Scene {
         const activeEnt = isRunning ? re : p;
 
         if (this._pointerDown && this._mousePos && !this._pmBlend) {
-            this._renderAimLine(ctx, activeEnt);
+            this.ammo.renderAimLine(ctx, activeEnt, this._chargePhase === 2 ? this._aimClampedScreen() : null);
         }
 
         // fly GIF (캐릭터 아래 레이어)
@@ -642,18 +1162,21 @@ export default class NuriGame extends Scene {
         } else if (activeEnt?.visible !== false) {
             if (isRunning) {
                 this._buildEntBuf(re);
-                this._renderAmmo(ctx, false, re);
+                this.ammo.render(ctx, false, re);
                 this._renderDust(ctx);
                 this._renderTrail(ctx, re);
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
+                ctx.filter = `brightness(${CHAR_BRIGHTNESS})`;
                 ctx.drawImage(this._entBuf, re.x - this._cameraX, re.y, re.pw, re.ph);
+                ctx.filter = 'none';
                 ctx.imageSmoothingEnabled = false;
-                this._renderAmmo(ctx, true, re);
+                this.ammo.render(ctx, true, re);
             } else {
-                this._renderAmmo(ctx, false, activeEnt);
+                this.ammo.render(ctx, false, activeEnt);
                 this._drawEntityCam(ctx, activeEnt);
-                this._renderAmmo(ctx, true, activeEnt);
+                if (this._sigOn) this._drawCharRim(ctx, activeEnt);   // 시그니처 림라이트
+                this.ammo.render(ctx, true, activeEnt);
             }
         }
         this._renderImpactParticles(ctx);
@@ -661,7 +1184,18 @@ export default class NuriGame extends Scene {
         this._renderLandFlash(ctx);
         // land GIF는 flash/shock 위에 그려야 보임
         this._renderSeqOverlay(ctx, true);
-        this._renderMessage(ctx);
+        // 격자 파동 전투 (적·투사체·이펙트·조준 가이드)
+        this._renderCombat(ctx);
+        // ── 모래엔진 시그니처 효과: 시간대 조명 (게임 위 / 디버그 오버레이 아래) ──
+        // nuri는 onPostRender에서 캔버스를 직접 그리므로 엔진 자동 FX 패스가
+        // 덮어써짐 → 여기서 직접 호출. (림라이트는 캐릭터 그릴 때 _drawCharRim 으로 처리)
+        if (this._sigOn) this.engine.lighting?.render(canvas, this._cameraX);
+        if (MOVE_TRAIL_ON) this._renderMoveTrail(ctx);
+        // F 키: 애니메이션 플로우 다이어그램 (디버그 오버레이)
+        if (this._showFlow && this._seqPlayer) {
+            this._seqPlayer.renderFlow(ctx, this._W - 178, 14, { seqId: 'aerial_move' });
+        }
+        this.messages.render(ctx, this._W, this._H);
     }
 
     // 카메라 x 적용 drawEntity
@@ -669,7 +1203,42 @@ export default class NuriGame extends Scene {
         if (!this._buildEntBuf(entity)) return;
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
+        ctx.filter = `brightness(${CHAR_BRIGHTNESS})`;
         ctx.drawImage(this._entBuf, entity.x - this._cameraX, entity.y, entity.pw, entity.ph);
+        ctx.filter = 'none';
+        ctx.imageSmoothingEnabled = false;
+    }
+
+    // ── 시그니처 림라이트 (캐릭터 버퍼 기반 백라이트) ──────────────
+    // 엔진 RimLightSystem은 레이어 엔티티를 샘플하지만 nuri는 캐릭터를
+    // 직접 그리므로 적용 불가 → 캐릭터 버퍼(_entBuf)를 림 색으로 틴트해
+    // 위쪽으로 살짝 오프셋·가산합성하여 실루엣 상단을 달빛처럼 분리.
+    _drawCharRim(ctx, entity) {
+        const buf = this._entBuf;
+        if (!buf) return;
+        if (!this._rimBuf) { this._rimBuf = document.createElement('canvas'); this._rimCtx = this._rimBuf.getContext('2d'); }
+        const rb = this._rimBuf, rc = this._rimCtx;
+        if (rb.width !== buf.width || rb.height !== buf.height) { rb.width = buf.width; rb.height = buf.height; }
+        const o = 2;                                       // 백라이트 오프셋(버퍼 px, 위쪽=달빛 방향)
+        rc.clearRect(0, 0, rb.width, rb.height);
+        rc.globalCompositeOperation = 'source-over';
+        rc.drawImage(buf, 0, -o);                          // 실루엣을 위로 살짝 이동
+        rc.globalCompositeOperation = 'source-in';
+        rc.fillStyle = '#9fc0ff';
+        rc.fillRect(0, 0, rb.width, rb.height);
+        rc.globalCompositeOperation = 'destination-out';
+        rc.drawImage(buf, 0, 0);                           // 원래 실루엣을 빼내 가장자리만 남김
+        rc.globalCompositeOperation = 'source-over';
+
+        const dw = entity.pw, dh = entity.ph;
+        const x = entity.x - this._cameraX, y = entity.y;
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.9;
+        ctx.drawImage(rb, x, y, dw, dh);
+        ctx.restore();
+        ctx.globalAlpha = 1;
         ctx.imageSmoothingEnabled = false;
     }
 
@@ -820,318 +1389,6 @@ export default class NuriGame extends Scene {
             ctx.globalAlpha = 1;
             ctx.restore();
         }
-    }
-
-    // ── 탄창 시스템 ───────────────────────────────────────────
-    // 탄창 슬롯 데이터 테이블
-    // state: 'orbit' | 'locked' | 'empty'
-    // orbit  → 궤도 회전 중 (사용 가능)
-    // locked → pointerdown으로 잠금, 라인 발사 기준점
-    // empty  → 소모됨, regenMs 카운트 중
-    // angle은 _initAmmo에서 count 기준 균등 배치로 덮어씀
-    static _AMMO_TABLE = [
-        { angVel: 0.45, rx: 65, ry: 22, size: 13, morphT: 0.0, morphSpeed: 1.5 },
-        { angVel: 0.38, rx: 58, ry: 19, size: 10, morphT: 1.4, morphSpeed: 2.0 },
-        { angVel: 0.52, rx: 70, ry: 25, size: 11, morphT: 2.8, morphSpeed: 1.7 },
-        { angVel: 0.41, rx: 62, ry: 21, size: 14, morphT: 4.2, morphSpeed: 1.3 },
-        { angVel: 0.47, rx: 68, ry: 23, size:  9, morphT: 5.6, morphSpeed: 2.2 },
-        { angVel: 0.43, rx: 60, ry: 20, size: 12, morphT: 3.0, morphSpeed: 1.8 },
-        { angVel: 0.50, rx: 72, ry: 26, size: 11, morphT: 1.8, morphSpeed: 1.6 },
-    ];
-
-    _initAmmo(count = 5) {
-        // 모프 포인트 — 한 번만 생성
-        if (!this._ammoPts) {
-            const N = 24, sq = [], ci = [];
-            for (let i = 0; i < N; i++) {
-                const d = (i / N) * 4;
-                let x, y;
-                if (d < 1)      { x = d;         y = 0; }
-                else if (d < 2) { x = 1;         y = d - 1; }
-                else if (d < 3) { x = 1-(d-2);   y = 1; }
-                else            { x = 0;         y = 1-(d-3); }
-                sq.push([x - 0.5, y - 0.5]);
-                const a = (i / N) * Math.PI * 2;
-                ci.push([Math.cos(a) * 0.56, Math.sin(a) * 0.56]);
-            }
-            this._ammoPts = { sq, ci };
-        }
-
-        // 슬롯 생성: count개, angle은 균등 배치로 덮어씀
-        const base = NuriGame._AMMO_TABLE;
-        this._ammoSlots = Array.from({ length: count }, (_, i) => ({
-            ...base[i % base.length],
-            angle:   (i / count) * Math.PI * 2,
-            state:   'orbit',
-            regenMs: 0,
-            lockedX: 0,
-            lockedY: 0,
-        }));
-
-        // 레벨 전환 시 잠긴 슬롯이 구 배열에 속하면 해제
-        if (this._lockedSlot && !this._ammoSlots.includes(this._lockedSlot)) {
-            this._lockedSlot = null;
-        }
-    }
-
-    // ── 메시지 시스템 ─────────────────────────────────────────
-    _initMessages(engine) {
-        this._msgMap    = new Map();
-        this._activeMsg = null;   // { text, style, duration, remaining }
-        const tbl = engine.data?.messages;
-        if (!tbl) return;
-        for (const row of tbl.all()) {
-            if (!row.trigger) continue;
-            this._msgMap.set(row.trigger, {
-                text:     row.text_ko,
-                duration: Number(row.duration_ms) || 2000,
-                style:    row.style || 'info',
-            });
-        }
-    }
-
-    _showMessage(trigger) {
-        const cfg = this._msgMap?.get(trigger);
-        if (!cfg) return;
-        this._activeMsg = { text: cfg.text, style: cfg.style, duration: cfg.duration, remaining: cfg.duration };
-    }
-
-    _updateMessage(dt) {
-        if (!this._activeMsg) return;
-        this._activeMsg.remaining -= dt;
-        if (this._activeMsg.remaining <= 0) this._activeMsg = null;
-    }
-
-    _renderMessage(ctx) {
-        const msg = this._activeMsg;
-        if (!msg) return;
-
-        const elapsed  = msg.duration - msg.remaining;
-        const fadeIn   = Math.min(1, elapsed / 250);
-        const fadeOut  = Math.min(1, msg.remaining / 250);
-        const alpha    = Math.min(fadeIn, fadeOut);
-        if (alpha <= 0.01) return;
-
-        const STYLE_COLOR = { warning: [255, 160, 60], info: [180, 220, 255], hint: [160, 255, 180] };
-        const [r, g, b] = STYLE_COLOR[msg.style] ?? STYLE_COLOR.info;
-
-        const W = this._W, H = this._H;
-        const fontSize = Math.round(H * 0.03);
-
-        ctx.save();
-        ctx.globalAlpha = alpha * 0.95;
-        ctx.font        = `bold ${fontSize}px 'Noto Sans KR', sans-serif`;
-        ctx.textAlign   = 'center';
-        ctx.textBaseline = 'middle';
-
-        // 그림자
-        ctx.shadowColor   = `rgba(0,0,0,0.8)`;
-        ctx.shadowBlur    = 8;
-        ctx.fillStyle     = `rgb(${r},${g},${b})`;
-        ctx.fillText(msg.text, W / 2, H * 0.12);
-
-        ctx.restore();
-    }
-
-    // ── 원소 레벨 시스템 ──────────────────────────────────────
-    _initAmmoLevels(engine) {
-        this._ammoLevelMap = new Map();
-        const tbl = engine.data?.ammoLevels;
-        if (tbl) {
-            for (const row of tbl.all()) {
-                const lv = Number(row.level);
-                if (!lv) continue;
-                this._ammoLevelMap.set(lv, {
-                    name:    row.name_ko,
-                    maxAmmo: Number(row.max_ammo) || 5,
-                    regenMs: Number(row.regen_ms) || 30000,
-                });
-            }
-        }
-        this._ammoLevel = 1;
-        this._setAmmoLevel(1);
-    }
-
-    _setAmmoLevel(level) {
-        const cfg = this._ammoLevelMap?.get(level) ?? { maxAmmo: 5, regenMs: 30000 };
-        this._ammoLevel   = level;
-        this._ammoRegenMs = cfg.regenMs;
-        this._initAmmo(cfg.maxAmmo);
-    }
-
-    _updateAmmo(dt) {
-        const dtSec = dt / 1000;
-        for (const slot of this._ammoSlots) {
-            if (slot.state === 'orbit') {
-                slot.angle  = (slot.angle + slot.angVel * dtSec) % (Math.PI * 2);
-                slot.morphT += slot.morphSpeed * dtSec;
-            } else if (slot.state === 'empty') {
-                slot.regenMs += dt;
-                if (slot.regenMs >= this._ammoRegenMs) {
-                    slot.state   = 'orbit';
-                    slot.regenMs = 0;
-                    slot.angle   = Math.random() * Math.PI * 2;
-                    this._showMessage('regen_done');
-                }
-            }
-            // locked 슬롯은 정지 상태 유지
-        }
-    }
-
-    // pointerdown 시 호출 — 첫 번째 orbit 슬롯 잠금
-    _lockAmmo(charCx, charCy) {
-        for (const slot of this._ammoSlots) {
-            if (slot.state !== 'orbit') continue;
-            const sa  = Math.sin(slot.angle);
-            slot.lockedX = charCx + Math.cos(slot.angle) * slot.rx;
-            slot.lockedY = charCy + sa * slot.ry;
-            slot.state   = 'locked';
-            this._lockedSlot = slot;
-            return slot;
-        }
-        return null;   // 탄창 없음
-    }
-
-    // pointerup(이동/공격) 시 호출 — 슬롯 소모
-    _consumeAmmo() {
-        if (!this._lockedSlot) return;
-        this._lockedSlot.state   = 'empty';
-        this._lockedSlot.regenMs = 0;
-        this._lockedSlot = null;
-    }
-
-    // pointerup(취소) 시 호출 — 슬롯 복귀
-    _releaseAmmo() {
-        if (!this._lockedSlot) return;
-        this._lockedSlot.state = 'orbit';
-        this._lockedSlot = null;
-    }
-
-    _renderAmmo(ctx, frontPass, activeEnt) {
-        const pts = this._ammoPts;
-        const ent = activeEnt ?? this._player;
-        if (!pts || !ent) return;
-
-        const charCx = ent.x - this._cameraX + ent.pw / 2;
-        const charCy = ent.y + (ent.ph || 150) * 0.38;
-
-        ctx.save();
-        for (const slot of this._ammoSlots) {
-            if (slot.state === 'empty') continue;
-
-            let ox, oy;
-            if (slot.state === 'locked') {
-                ox = slot.lockedX;
-                oy = slot.lockedY;
-            } else {
-                const sa = Math.sin(slot.angle);
-                if ((sa > 0) !== frontPass) continue;
-                ox = charCx + Math.cos(slot.angle) * slot.rx;
-                oy = charCy + sa * slot.ry;
-            }
-            if (slot.state === 'locked' && frontPass) continue;  // locked는 뒤 패스에만
-
-            const sa    = slot.state === 'locked' ? 0 : Math.sin(slot.angle);
-            const scale = slot.state === 'locked' ? 1.2 : (0.65 + 0.35 * (sa + 1) / 2);
-            const sz    = slot.size * scale;
-            const alpha = slot.state === 'locked' ? 1.0 : (frontPass ? 0.88 : 0.60);
-            const phase = (Math.sin(slot.morphT) + 1) / 2;
-            const morph = phase * phase * (3 - 2 * phase);
-
-            ctx.globalAlpha = alpha;
-            ctx.globalCompositeOperation = 'lighter';
-            const N = pts.sq.length;
-            for (let i = 0; i < N; i++) {
-                const s = pts.sq[i], c = pts.ci[i];
-                const px = ox + (s[0] + (c[0] - s[0]) * morph) * sz;
-                const py = oy + (s[1] + (c[1] - s[1]) * morph) * sz;
-                // locked: 시안 단색으로 강조
-                if (slot.state === 'locked') {
-                    ctx.fillStyle = 'rgb(80,255,255)';
-                } else {
-                    ctx.fillStyle = (i % 2 === 0) ? 'rgb(255,110,210)' : 'rgb(110,200,255)';
-                }
-                ctx.fillRect(px | 0, py | 0, 3, 3);
-            }
-        }
-        ctx.restore();
-    }
-
-    // ── 조준선 렌더 (홀드 중) ─────────────────────────────────
-    _renderAimLine(ctx, activeEnt) {
-        const ent = activeEnt ?? this._player;
-        if (!ent) return;
-        const mx = this._mousePos.x, my = this._mousePos.y;
-
-        // 라인 기준점: locked 탄창 위치 → 없으면 캐릭터 중심
-        const slot = this._lockedSlot;
-        const cx = slot ? slot.lockedX : ent.x - this._cameraX + ent.pw / 2;
-        const cy = slot ? slot.lockedY : ent.y + ent.ph * 0.45;
-        const held = performance.now() - this._holdStart;
-        const t = Math.min(1, held / HOLD_THRESHOLD);   // 0→1 (0.5초 동안)
-
-        // 색상: 흰색 → 시안 → 주황 (phase 1→2)
-        let r, g, b, alpha, lineW;
-        if (this._chargePhase < 2) {
-            // phase 1: 흰→시안
-            r = Math.round(255 * (1 - t));
-            g = 255;
-            b = 255;
-            alpha = 0.3 + t * 0.3;
-            lineW = 1 + t * 0.5;
-        } else {
-            // phase 2: 시안→주황 (충전 지속 시간 기반)
-            const ct = Math.min(1, (held - HOLD_THRESHOLD) / 1500);
-            r = Math.round(0   + ct * 255);
-            g = Math.round(255 - ct * 95);
-            b = Math.round(255 - ct * 255);
-            alpha = 0.6 + ct * 0.3;
-            lineW = 2 + ct * 2;
-        }
-
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.strokeStyle = `rgb(${r},${g},${b})`;
-        ctx.lineWidth   = lineW;
-        ctx.lineCap     = 'round';
-
-        // 파동 충전 중: 사인파 출렁임
-        if (this._chargePhase === 2) {
-            const ct   = Math.min(1, (held - HOLD_THRESHOLD) / 1500);
-            const amp  = 4 + ct * 10;
-            const freq = 0.04 + ct * 0.02;
-            const phase = held * 0.005;
-            const dx = mx - cx, dy = my - cy;
-            const len = Math.sqrt(dx * dx + dy * dy);
-            if (len < 1) { ctx.restore(); return; }
-            const ux = dx / len, uy = dy / len;
-            const px = -uy, py = ux;   // 수직 방향
-
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            const steps = Math.max(20, len / 4) | 0;
-            for (let i = 1; i <= steps; i++) {
-                const f  = i / steps;
-                const wx = cx + dx * f + px * Math.sin(f * len * freq + phase) * amp * f;
-                const wy = cy + dy * f + py * Math.sin(f * len * freq + phase) * amp * f;
-                ctx.lineTo(wx, wy);
-            }
-        } else {
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(mx, my);
-        }
-
-        ctx.stroke();
-
-        // 목표 지점 점
-        ctx.globalAlpha = alpha * 1.2;
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
-        ctx.beginPath();
-        ctx.arc(mx, my, lineW * 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
     }
 
     // ── 엔티티 렌더 ────────────────────────────────────────────
@@ -1289,7 +1546,7 @@ export default class NuriGame extends Scene {
     }
 
     // ── 블렌드 초기화 ─────────────────────────────────────────
-    _startPixelMoveBlend(src, dst, dur, onDone) {
+    _startPixelMoveBlend(src, dst, dur, onDone, straight = false, riseOffset = 0) {
         const N = src.length;
         if (!N) { onDone?.(); return; }
 
@@ -1326,16 +1583,18 @@ export default class NuriGame extends Scene {
 
         const streamDot = cosA * (releaseX - gatherX) + sinA * (releaseY - gatherY);
         const midX = (sx + dx) / 2, midY = (sy + dy) / 2;
-        const safeGX = streamDot > 0 ? gatherX  : midX;
-        const safeGY = streamDot > 0 ? gatherY  : midY;
-        const safeRX = streamDot > 0 ? releaseX : midX;
-        const safeRY = streamDot > 0 ? releaseY : midY;
+        // straight=true → 오버슈트(출발·도착점 너머) 제거, 중심선 직선 흐름
+        const safeGX = straight ? sx : (streamDot > 0 ? gatherX  : midX);
+        const safeGY = straight ? sy : (streamDot > 0 ? gatherY  : midY);
+        const safeRX = straight ? dx : (streamDot > 0 ? releaseX : midX);
+        const safeRY = straight ? dy : (streamDot > 0 ? releaseY : midY);
 
         this._pmBlend = {
             particles,
             gatherX: safeGX, gatherY: safeGY,
             releaseX: safeRX, releaseY: safeRY,
             cosA, sinA, dur, t: 0, onDone,
+            riseOffset,
         };
     }
 
@@ -1371,6 +1630,7 @@ export default class NuriGame extends Scene {
 
         // 파티클 좌표는 월드 좌표 → 화면 렌더 시 카메라 오프셋 적용
         const camX = this._cameraX | 0;
+        const riseShift = ((b.riseOffset || 0) * prog) | 0;   // 채우며 상승
 
         for (const p of b.particles) {
             const trav = (prog - p.ff * 0.5) / 0.5;
@@ -1409,10 +1669,12 @@ export default class NuriGame extends Scene {
             }
 
             const px = wx - camX;
-            if (px < 0 || px >= W || py < 0 || py >= H) continue;
-            const off = (py * W + px) * 4;
+            const py2 = py - riseShift;             // 채우며 부드럽게 상승
+            if (px < 0 || px >= W || py2 < 0 || py2 >= H) continue;
+            const off = (py2 * W + px) * 4;
             if (a > d[off + 3]) {
-                d[off]=p.sr; d[off+1]=p.sg; d[off+2]=p.sb; d[off+3]=a;
+                // 지상이동(클릭 이동 픽셀 스트림) 캐릭터 어둡기 — putImageData는 ctx.filter가 안 먹어 직접 곱함
+                d[off]=p.sr * CHAR_BRIGHTNESS; d[off+1]=p.sg * CHAR_BRIGHTNESS; d[off+2]=p.sb * CHAR_BRIGHTNESS; d[off+3]=a;
             }
         }
 
@@ -1428,18 +1690,8 @@ export default class NuriGame extends Scene {
                 d[off+3] = 255;
             }
         }
-        if (b.dur - b.t < FLASH_MS) {
-            const fa = ((1 - (b.dur - b.t) / FLASH_MS) * 255) | 0;
-            for (const p of b.particles) {
-                const x = (p.dx|0) - camX, y = p.dy|0;
-                if (x < 0 || x >= W || y < 0 || y >= H) continue;
-                const off = (y * W + x) * 4;
-                d[off]   = Math.min(255, d[off]   + fa);
-                d[off+1] = Math.min(255, d[off+1] + fa);
-                d[off+2] = Math.min(255, d[off+2] + fa);
-                d[off+3] = 255;
-            }
-        }
+        // 이동 완료 시 흰색 번쩍임(끝 플래시) 제거 — 재조립 모습이 잘 보이도록
+        // (필요 시 위 시작 플래시 블록을 참고해 복원)
 
         this._blendBufCtx.putImageData(imgD, 0, 0);
         ctx.drawImage(this._blendBuf, 0, 0);
@@ -1485,6 +1737,33 @@ export default class NuriGame extends Scene {
         ctx.restore();
     }
 
+    // 이미지의 불투명 픽셀 세로 범위 (최상단/최하단 행) 계산
+    _computeVBounds(img) {
+        try {
+            if (!this._vbCv) {
+                this._vbCv  = document.createElement('canvas');
+                this._vbCtx = this._vbCv.getContext('2d', { willReadFrequently: true });
+            }
+            const cv = this._vbCv, c = this._vbCtx;
+            cv.width = img.width; cv.height = img.height;
+            c.clearRect(0, 0, img.width, img.height);
+            c.drawImage(img, 0, 0);
+            const d = c.getImageData(0, 0, img.width, img.height).data;
+            let topRow = -1, footRow = -1;
+            for (let y = 0; y < img.height; y++) {
+                let any = false;
+                const rowOff = y * img.width * 4;
+                for (let x = 0; x < img.width; x++) {
+                    if (d[rowOff + x * 4 + 3] > 24) { any = true; break; }
+                }
+                if (any) { if (topRow < 0) topRow = y; footRow = y; }
+            }
+            return { topRow: topRow < 0 ? 0 : topRow, footRow: footRow < 0 ? img.height : footRow + 1 };
+        } catch (e) {
+            return { topRow: 0, footRow: img.height };
+        }
+    }
+
     // ── GIF + 시퀀스 에셋 로더 ───────────────────────────────
     async _loadAnimAssets() {
         const base = './pixels/characters/jump/';
@@ -1504,7 +1783,13 @@ export default class NuriGame extends Scene {
                 // 개별 프레임 로드 실패 시 해당 키만 스킵
                 try {
                     const imgs = await Promise.all(info.frames.map(f => loadImg(base + f.file)));
-                    frames[key] = { imgs, frames: info.frames };
+                    // 프레임별 실제 발(최하단)·머리(최상단) 행 계산 → 발 기준 정렬용
+                    const bounds = imgs.map(img => this._computeVBounds(img));
+                    frames[key] = {
+                        imgs, frames: info.frames,
+                        footRows: bounds.map(b => b.footRow),
+                        topRows:  bounds.map(b => b.topRow),
+                    };
                 } catch (e) {
                     console.warn(`[nuri] skip anim key "${key}":`, e.message);
                 }
@@ -1519,30 +1804,120 @@ export default class NuriGame extends Scene {
 
     // ── 스핀 파티클 생성 ──────────────────────────────────────
     _updateSpinParticles(dt) {
-        if (this._seqPlayer?.currentId !== 'spin') return;
+        // 회전(spin_fall) 중에만 — 톱니바퀴 파편처럼 접선 방향으로 모래 픽셀 방출.
+        // 활성 여부는 phase.fx 의 spinSparks(during) 데이터로 게이팅.
+        const spinFX = this._activeFX('spinSparks');
+        if (!spinFX || spinFX.enabled === false) return;
         const p = this._player;
         if (!p) return;
 
-        const cx = p.x - this._cameraX + p.pw / 2;
-        const cy = p.y + p.ph / 2;
+        const cx  = p.x - this._cameraX + p.pw / 2;
+        const cy  = p.y + p.ph * 0.45;            // 회전 중심(시각 중심) 근사
+        const dir = p.flipX ? -1 : 1;              // 회전 방향(렌더와 일치)
 
-        this._spinPartAcc += 80 * dt / 1000;
+        this._spinPartAcc += SPIN_SPARK_RATE * dt / 1000;
         while (this._spinPartAcc >= 1) {
             this._spinPartAcc -= 1;
-            const angle = Math.random() * Math.PI * 2;
-            const speed = 130 + Math.random() * 200;
+            const a  = Math.random() * Math.PI * 2;
+            const ca = Math.cos(a), sa = Math.sin(a);
+            // 접선(회전 방향) + 약간의 바깥쪽 성분 → 휘날리는 파편
+            const vt = SPIN_SPARK_VT * (0.7 + Math.random() * 0.6);
+            const vo = SPIN_SPARK_VO * (0.4 + Math.random() * 0.9);
+            const tx = -sa * dir, ty = ca * dir;   // 접선 단위벡터
+            // 불꽃 색: 대부분 진한 주황~빨강, 일부 흰열(hot core)
+            const hot = Math.random() < SPIN_SPARK_HOT;
+            const r = hot ? 255 : 235 + (Math.random() * 20 | 0);
+            const g = hot ? 235 + (Math.random() * 20 | 0) : 80 + (Math.random() * 90 | 0);
+            const b = hot ? 190 + (Math.random() * 50 | 0) : 18 + (Math.random() * 42 | 0);
             this._impactParticles.push({
-                x: cx + Math.cos(angle) * 18,
-                y: cy + Math.sin(angle) * 18,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed,
+                x: cx + ca * SPIN_SPARK_RADIUS,
+                y: cy + sa * SPIN_SPARK_RADIUS,
+                vx: tx * vt + ca * vo,
+                vy: ty * vt + sa * vo,
                 age: 0,
-                maxlife: 0.25 + Math.random() * 0.35,
-                r: 196 + (Math.random() * 40 | 0),
-                g: 155 + (Math.random() * 40 | 0),
-                b:  90 + (Math.random() * 30 | 0),
+                maxlife: 0.16 + Math.random() * 0.28,
+                r, g, b,
+                streak: true,
             });
         }
+    }
+
+    // ── 데이터 기반 VFX 디스패처 ──────────────────────────────
+    // phase.fx 배열의 'enter'(또는 미지정) 효과를 phase 진입 시 1회 실행.
+    // 'during' 효과는 매 프레임 _updateSpinParticles 등에서 phase.fx 를 직접 읽음.
+    // type 매핑:
+    //   landImpact → 착지 충격파(_triggerLandImpact)
+    //   flash/shake/colorShift/emit:* → 엔진 FX/Particle (엔진 연동 시 확장)
+    _runPhaseFX(ph) {
+        for (const fx of (ph.fx ?? [])) {
+            if (fx.when && fx.when !== 'enter') continue;   // during 등은 여기서 스킵
+            switch (fx.type) {
+                // ── nuri 자체 효과 ──
+                case 'landImpact':
+                    this._triggerLandImpact(fx);
+                    break;
+                // ── 모래엔진 FXSystem (화면 단위) ──
+                case 'flash':
+                    this.engine?.fx?.flash({
+                        color: fx.color ?? '#ffffff',
+                        duration: fx.duration ?? 200,
+                        maxAlpha: fx.maxAlpha ?? 0.6,
+                        blend: fx.blend ?? 'source-over',
+                    });
+                    break;
+                case 'shake':
+                    this.engine?.fx?.shake({
+                        intensity: fx.intensity ?? 4,
+                        duration: fx.duration ?? 300,
+                        decay: fx.decay ?? 1,
+                    });
+                    break;
+                case 'colorShift':
+                    this.engine?.fx?.colorShift({
+                        color: fx.color ?? '#ff8800',
+                        duration: fx.duration ?? 500,
+                        blend: fx.blend ?? 'overlay',
+                        maxAlpha: fx.maxAlpha ?? 0.3,
+                    });
+                    break;
+                // ── 모래엔진 ParticleSystem ──
+                // fx.particle = vortex|stardust|sand_rain|burst|convergence|
+                //               erosion|streak|wake|drift|pixel_burst
+                case 'emit': {
+                    const at = this._fxOrigin(fx.at);   // 기본: 캐릭터 발 (월드 좌표)
+                    this.engine?.particles?.emit(fx.particle ?? 'burst', {
+                        cx: fx.cx ?? at.x,
+                        cy: fx.cy ?? at.y,
+                        count: fx.count ?? 20,
+                        ...fx.config,
+                    });
+                    break;
+                }
+                // 렌더 모디파이어 — AnimPhasePlayer.render 가 직접 소비 (여기선 no-op)
+                case 'spin': case 'squash': case 'afterimage': case 'spinSparks':
+                    break;
+                default:
+                    if (fx.type) console.warn(`[nuri] unknown phase fx: ${fx.type}`);
+            }
+        }
+    }
+
+    // VFX 기준점(월드 좌표). at='foot'(기본)|'center'|'head'
+    _fxOrigin(at = 'foot') {
+        const p = this._player;
+        if (!p) return { x: 0, y: 0 };
+        const x = p.x + p.pw / 2;
+        const footY = this._groundY ?? (p.y + IDLE_FOOT_ROW);
+        if (at === 'center') return { x, y: p.y + p.ph * 0.5 };
+        if (at === 'head')   return { x, y: p.y };
+        return { x, y: footY };
+    }
+
+    // 현재 활성 phase 의 fx 중 type 일치하는 첫 항목 반환 (during 효과 게이팅용)
+    _activeFX(type) {
+        const fxs = this._seqPlayer?.currentPhase?.fx;
+        if (!fxs) return null;
+        return fxs.find(f => f.type === type) ?? null;
     }
 
     // ── 착지 충격파 트리거 ────────────────────────────────────
@@ -1552,29 +1927,49 @@ export default class NuriGame extends Scene {
         const cx = p.x - this._cameraX + p.pw / 2;
         const cy = this._groundY ?? (p.y + IDLE_FOOT_ROW);
 
-        // 충격파 링 2개
+        // 충격파 링 3개 (더 크게)
         this._shockRings = [
-            { cx, cy, maxR: 140, t: 0, dur: 420 },
-            { cx, cy, maxR:  90, t: 0, dur: 280 },
+            { cx, cy, maxR: 210, t: 0, dur: 520 },
+            { cx, cy, maxR: 150, t: 0, dur: 380 },
+            { cx, cy, maxR:  95, t: 0, dur: 240 },
         ];
 
-        // 먼지 폭발 파티클 120개 (좌우 180° 부채꼴)
-        for (let i = 0; i < 120; i++) {
+        // ① 먼지 폭발 파티클 280개 (좌우 180° 부채꼴, 더 빠르고 멀리)
+        for (let i = 0; i < 280; i++) {
             const angle = Math.PI + (Math.random() - 0.5) * Math.PI;
-            const speed = 90 + Math.random() * 310;
+            const speed = 120 + Math.random() * 460;
             this._impactParticles.push({
                 x: cx, y: cy,
                 vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed * 0.45,
+                vy: Math.sin(angle) * speed * 0.5 - Math.random() * 40,
                 age: 0,
-                maxlife: 0.4 + Math.random() * 0.55,
+                maxlife: 0.45 + Math.random() * 0.6,
+                sz: 2 + (Math.random() * 2 | 0),
                 r: 175 + (Math.random() * 55 | 0),
                 g: 138 + (Math.random() * 45 | 0),
                 b:  75 + (Math.random() * 35 | 0),
             });
         }
 
-        this._landFlash = { t: 0, dur: 200 };
+        // ② 바닥을 따라 낮게 퍼지는 먼지 구름 (느리고 넓고 큰 덩어리)
+        for (let i = 0; i < 90; i++) {
+            const side  = Math.random() < 0.5 ? -1 : 1;
+            const speed = 40 + Math.random() * 180;
+            this._impactParticles.push({
+                x: cx + side * (Math.random() * 30),
+                y: cy - Math.random() * 8,
+                vx: side * speed,
+                vy: -Math.random() * 30,
+                age: 0,
+                maxlife: 0.6 + Math.random() * 0.8,
+                sz: 3 + (Math.random() * 3 | 0),
+                r: 158 + (Math.random() * 50 | 0),
+                g: 128 + (Math.random() * 42 | 0),
+                b:  82 + (Math.random() * 34 | 0),
+            });
+        }
+
+        this._landFlash = { t: 0, dur: 240 };
     }
 
     _updateImpactParticles(dt) {
@@ -1606,11 +2001,12 @@ export default class NuriGame extends Scene {
         const p = this._player;
         if (!p) return;
         const curId     = this._seqPlayer.currentId;
-        const isFront   = curId === 'arrive_loop' || curId === 'arrive_end' || curId === 'land';
+        const isFront   = curId === 'rise' || curId === 'spin_fall' || curId === 'land' || curId === 'arrive_loop' || curId === 'arrive_end';
         if (frontPass !== isFront) return;
 
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
+        ctx.filter = `brightness(${CHAR_BRIGHTNESS})`;   // 공중이동(jump/fly 시퀀스) 캐릭터 어둡기
         this._seqPlayer.render(ctx, {
             playerX:     p.x,
             playerY:     p.y,
@@ -1622,7 +2018,12 @@ export default class NuriGame extends Scene {
             flip:        p.flipX,
             idleFootRow: IDLE_FOOT_ROW,
             flyX:        this._flyX ?? undefined,
+            refSrcH:     AERIAL_REF_SRC_H,
+            spinFixedBlur: this._spinFixedBlur,
+            velX:        this._aerialVel?.x ?? 0,
+            velY:        this._aerialVel?.y ?? 0,
         });
+        ctx.filter = 'none';
         ctx.imageSmoothingEnabled = false;
     }
 
@@ -1634,9 +2035,29 @@ export default class NuriGame extends Scene {
             const t = q.age / q.maxlife;
             const a = (t > 0.55 ? (1 - (t - 0.55) / 0.45) : 1) * 0.85;
             if (a <= 0.02) continue;
+
+            if (q.streak) {
+                // 불꽃 파편: 속도 방향으로 늘어진 선 + 가산합성
+                const sp = Math.hypot(q.vx, q.vy) || 1;
+                const len = Math.min(26, sp * 0.045) * (0.5 + (1 - t) * 0.5);
+                const ux = q.vx / sp, uy = q.vy / sp;
+                ctx.globalAlpha = a;
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.strokeStyle = `rgb(${q.r},${q.g},${q.b})`;
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(q.x, q.y);
+                ctx.lineTo(q.x - ux * len, q.y - uy * len);
+                ctx.stroke();
+                continue;
+            }
+
+            ctx.globalCompositeOperation = 'source-over';
             ctx.globalAlpha = a;
             ctx.fillStyle = `rgb(${q.r},${q.g},${q.b})`;
-            ctx.fillRect(((q.x / G) | 0) * G, ((q.y / G) | 0) * G, G, G);
+            const sz = q.sz ?? G;
+            ctx.fillRect(((q.x / G) | 0) * G, ((q.y / G) | 0) * G, sz, sz);
         }
         ctx.restore();
     }

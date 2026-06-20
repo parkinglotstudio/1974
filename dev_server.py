@@ -274,6 +274,50 @@ init().catch(e => console.error('[{pid}]', e));
             print(f'[API] save-scene: {rel_path}', flush=True)
             return
 
+        elif self.path == '/api/save-sequence':
+            # ── 애니메이션 시퀀스 JSON 저장 (애니메이터 에디터용) ──
+            length   = int(self.headers.get('Content-Length', 0))
+            body     = json.loads(self.rfile.read(length))
+            rel_path = body.get('path', '')
+            data     = body.get('data', None)
+
+            # games/**/data/*.json 만 허용
+            allowed = (rel_path.startswith('games/') and
+                       '/data/' in rel_path and rel_path.endswith('.json'))
+            if not allowed or '..' in rel_path:
+                self.send_response(403)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(b'{"ok":false,"error":"path not allowed"}')
+                return
+
+            # data는 객체(JSON)여야 함 — 서버에서 직렬화하여 형식 보장
+            if not isinstance(data, (dict, list)):
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(b'{"ok":false,"error":"data must be JSON object/array"}')
+                return
+
+            full_path = os.path.join(ROOT, rel_path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            # 기존 파일은 .bak 로 백업 (소스 오브 트루스 보호)
+            if os.path.isfile(full_path):
+                try:
+                    import shutil
+                    shutil.copyfile(full_path, full_path + '.bak')
+                except Exception as e:
+                    print(f'[API] save-sequence backup warn: {e}', flush=True)
+            with open(full_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(b'{"ok":true}')
+            print(f'[API] save-sequence: {rel_path}', flush=True)
+            return
+
         elif self.path == '/api/save-pixel':
             length   = int(self.headers.get('Content-Length', 0))
             body     = json.loads(self.rfile.read(length))
@@ -628,6 +672,109 @@ init().catch(e => console.error('[{pid}]', e));
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps({'ok': False, 'error': str(e)}).encode('utf-8'))
+            return
+
+        elif self.path == '/api/extract-anim-gif':
+            # ── GIF → 크로마키 PNG 프레임 추출 + meta.json 키 등록 (애니메이터 연동) ──
+            # gif_extract2.py 로직의 API 버전. body:
+            #   gifBase64 | gifPath, key(meta 키), outDir(games/**/pixels/**), chroma(기본 true)
+            try:
+                from PIL import Image, ImageSequence
+                import numpy as np
+                import io, base64
+            except ImportError as e:
+                self.send_response(500); self.send_header('Content-Type','application/json'); self.end_headers()
+                self.wfile.write(json.dumps({'ok':False,'error':'Pillow+numpy 필요: '+str(e)}).encode()); return
+
+            length = int(self.headers.get('Content-Length', 0))
+            body   = json.loads(self.rfile.read(length))
+            key    = (body.get('key') or '').strip()
+            out_rel = (body.get('outDir') or '').strip().strip('/')
+            use_chroma = body.get('chroma', True)
+
+            # 경로/키 검증
+            if not key or not key.replace('_','').isalnum():
+                self.send_response(400); self.send_header('Content-Type','application/json'); self.end_headers()
+                self.wfile.write(b'{"ok":false,"error":"invalid key"}'); return
+            if not (out_rel.startswith('games/') and '/pixels/' in out_rel) or '..' in out_rel:
+                self.send_response(403); self.send_header('Content-Type','application/json'); self.end_headers()
+                self.wfile.write(b'{"ok":false,"error":"outDir not allowed"}'); return
+
+            # GIF 바이트 확보
+            gif_bytes = None
+            if 'gifBase64' in body:
+                gif_bytes = base64.b64decode(body['gifBase64'])
+            elif 'gifPath' in body:
+                rel = unquote(urlparse(body['gifPath']).path if '://' in body['gifPath'] else body['gifPath']).lstrip('/')
+                if '..' in rel: self.send_response(403); self.end_headers(); return
+                full = os.path.join(ROOT, rel)
+                if not os.path.isfile(full): self.send_response(404); self.end_headers(); return
+                with open(full, 'rb') as f: gif_bytes = f.read()
+            if not gif_bytes:
+                self.send_response(400); self.end_headers(); return
+
+            KEY_HARD, KEY_SOFT = 40, 10
+            def chroma_key(rgba):
+                arr = np.asarray(rgba).astype(np.int16)
+                r,g,b,a = arr[...,0],arr[...,1],arr[...,2],arr[...,3]
+                maxrb = np.maximum(r,b); greenness = g - maxrb
+                alpha = a.astype(np.float32)
+                soft = np.clip((KEY_HARD - greenness)/(KEY_HARD-KEY_SOFT), 0.0, 1.0)
+                alpha = alpha*soft; alpha[greenness>=KEY_HARD] = 0
+                g2 = np.where(g>maxrb, maxrb, g)
+                out = np.stack([r,g2,b,np.round(alpha)],axis=-1).astype(np.uint8)
+                return Image.fromarray(out,'RGBA')
+
+            try:
+                im = Image.open(io.BytesIO(gif_bytes))
+                keyed, durs = [], []
+                for frame in ImageSequence.Iterator(im):
+                    rgba = frame.convert('RGBA').copy()
+                    keyed.append(chroma_key(rgba) if use_chroma else rgba)
+                    durs.append(frame.info.get('duration', 70))
+
+                # union bbox 크롭 (gif_extract2.py 와 동일)
+                mnx,mny,mxx,mxy = 9999,9999,0,0
+                for imgf in keyed:
+                    bb = imgf.split()[3].getbbox()
+                    if bb:
+                        mnx,mny = min(mnx,bb[0]),min(mny,bb[1]); mxx,mxy = max(mxx,bb[2]),max(mxy,bb[3])
+                pad = 4
+                bbox = (max(0,mnx-pad),max(0,mny-pad),mxx+pad,mxy+pad) if mnx<=mxx else (0,0,keyed[0].width,keyed[0].height)
+
+                out_dir = os.path.join(ROOT, out_rel)
+                os.makedirs(out_dir, exist_ok=True)
+                meta_path = os.path.join(out_dir, 'meta.json')
+                meta = {}
+                if os.path.isfile(meta_path):
+                    with open(meta_path, encoding='utf-8') as f: meta = json.load(f)
+                # 기존 동일 키 프레임 삭제
+                for old in meta.get(key, {}).get('frames', []):
+                    op = os.path.join(out_dir, old.get('file',''))
+                    if old.get('file') and os.path.isfile(op): os.remove(op)
+
+                new_frames = []
+                for i, imgf in enumerate(keyed):
+                    c = imgf.crop(bbox)
+                    fname = f'{key}_{i}.png'
+                    c.save(os.path.join(out_dir, fname))
+                    new_frames.append({'file':fname,'duration_ms':durs[i],'width':c.width,'height':c.height})
+                meta[key] = {'frames': new_frames}
+                with open(meta_path,'w',encoding='utf-8') as f:
+                    json.dump(meta, f, ensure_ascii=False, indent=2)
+
+                resp = {'ok':True,'key':key,'frameCount':len(new_frames),
+                        'width':new_frames[0]['width'] if new_frames else 0,
+                        'height':new_frames[0]['height'] if new_frames else 0}
+                data = json.dumps(resp).encode('utf-8')
+                self.send_response(200); self.send_header('Content-Type','application/json')
+                self.send_header('Content-Length',str(len(data))); self.end_headers()
+                self.wfile.write(data)
+                print(f'[API] extract-anim-gif: key={key} ({len(new_frames)}f) -> {out_rel}', flush=True)
+            except Exception as e:
+                import traceback; traceback.print_exc()
+                self.send_response(500); self.send_header('Content-Type','application/json'); self.end_headers()
+                self.wfile.write(json.dumps({'ok':False,'error':str(e)}).encode('utf-8'))
             return
 
         else:

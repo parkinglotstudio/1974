@@ -1,0 +1,70 @@
+{
+  "aerial_move": [
+    {
+      "id": "deliver",
+      "kind": "pixelmove",
+      "nextTrigger": "blendDone",
+      "fx": []
+    },
+    {
+      "id": "rise",
+      "gif": "jump_rise",
+      "frameDur": 30,
+      "size": 0.9,
+      "anchor": "foot",
+      "loop": false,
+      "afterimage": true,
+      "afterGhosts": 4,
+      "afterGap": 0.02,
+      "nextTrigger": "frameEnd",
+      "fx": []
+    },
+    {
+      "id": "spin_fall",
+      "gif": "jump_loop",
+      "frameDur": 50,
+      "size": 0.9,
+      "anchor": "foot",
+      "staticFrame": 0,
+      "kind": "gravity",
+      "spin": true,
+      "spinRevPerSec": 8,
+      "spinGhosts": 10,
+      "spinSpread": 3.2,
+      "spinBlurSec": 0.03,
+      "nextTrigger": "grounded",
+      "fx": [
+        {
+          "type": "spinSparks",
+          "when": "during",
+          "enabled": false
+        }
+      ]
+    },
+    {
+      "id": "land",
+      "gif": "land_new",
+      "frameDur": 35,
+      "size": 1.05,
+      "anchor": "foot",
+      "loop": false,
+      "startFrame": 2,
+      "squash": 0.03,
+      "holdLastMs": 500,
+      "nextTrigger": "frameEnd",
+      "fx": [
+        {
+          "type": "landImpact",
+          "when": "enter"
+        },
+        {
+          "type": "shake",
+          "when": "enter",
+          "intensity": 5,
+          "duration": 280,
+          "decay": 2
+        }
+      ]
+    }
+  ]
+}

@@ -1,50 +1,52 @@
 {
   "aerial_move": [
     {
-      "id": "pull",
-      "gif": "jump_start",
-      "frameDur": 70,
-      "size": 1.0,
-      "anchor": "foot",
-      "loop": false,
-      "nextTrigger": "frameEnd"
+      "id": "deliver",
+      "kind": "pixelmove",
+      "nextTrigger": "blendDone",
+      "fx": []
     },
     {
-      "id": "fly",
+      "id": "rise",
+      "gif": "jump_rise",
+      "frameDur": 30,
+      "size": 0.9,
+      "anchor": "foot",
+      "loop": false,
+      "nextTrigger": "frameEnd",
+      "fx": [
+        { "type": "afterimage", "ghosts": 4, "gap": 0.02 }
+      ]
+    },
+    {
+      "id": "spin_fall",
       "gif": "jump_loop",
-      "frameDur": 70,
-      "size": 1.0,
+      "frameDur": 50,
+      "size": 0.9,
       "anchor": "foot",
-      "loop": true,
-      "nextTrigger": "arrived"
-    },
-    {
-      "id": "arrive_loop",
-      "gif": "arrive_loop",
-      "frameDur": 70,
-      "size": 1.0,
-      "anchor": "foot",
-      "loop": false,
-      "nextTrigger": "frameEnd"
-    },
-    {
-      "id": "arrive_end",
-      "gif": "jump_land",
-      "frameDur": 70,
-      "size": 1.0,
-      "anchor": "foot",
-      "loop": false,
-      "impact": true,
-      "nextTrigger": "frameEnd"
+      "staticFrame": 0,
+      "kind": "gravity",
+      "nextTrigger": "grounded",
+      "fx": [
+        { "type": "spin", "revPerSec": 8, "ghosts": 10, "spread": 3.2, "blurSec": 0.03 },
+        { "type": "spinSparks", "when": "during", "enabled": false }
+      ]
     },
     {
       "id": "land",
-      "gif": "new_land",
-      "frameDur": 70,
-      "size": 1.0,
+      "gif": "land_new",
+      "frameDur": 35,
+      "size": 1.05,
       "anchor": "foot",
       "loop": false,
-      "nextTrigger": "frameEnd"
+      "startFrame": 2,
+      "holdLastMs": 500,
+      "nextTrigger": "frameEnd",
+      "fx": [
+        { "type": "squash", "amount": 0.03 },
+        { "type": "landImpact", "when": "enter" },
+        { "type": "shake", "when": "enter", "intensity": 5, "duration": 280, "decay": 2 }
+      ]
     }
   ]
 }

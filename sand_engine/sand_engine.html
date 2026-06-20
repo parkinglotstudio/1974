@@ -1599,6 +1599,7 @@
     </div>
     <div class="header-scene" id="sceneLabel">—</div>
     <div class="header-actions">
+        <button class="hbtn" id="btnAnimator" onclick="toggleAnimator()" title="애니메이션 플로우 + VFX 에디터 (anim_sequences.json 편집·저장)">🎬 애니메이터</button>
         <button class="hbtn" id="btnSaveScene">↓ 씬 저장</button>
     </div>
 </div>
@@ -8730,6 +8731,307 @@ window.openLivePopup = function(scale) {
     <div class="tip-name" id="pixelHoverName"></div>
     <div class="tip-dim"  id="pixelHoverDim"></div>
 </div>
+
+<!-- ════ 애니메이터 (애니메이션 플로우 + VFX 에디터) — 격리 모듈 ════ -->
+<div id="animatorPanel" style="display:none;position:fixed;top:46px;right:8px;width:412px;
+    max-height:calc(100vh - 60px);background:#16160F;border:1px solid #3A3A2A;border-radius:6px;
+    z-index:9990;box-shadow:0 8px 28px rgba(0,0,0,0.6);font-family:'JetBrains Mono',monospace;
+    flex-direction:column;color:#C8C8C0;">
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid #2C2C20;">
+        <span style="font-weight:700;color:#C8922A;font-size:11px;flex:1;">🎬 애니메이터</span>
+        <select id="animSeqSel" style="font-size:9px;background:#1E1E14;border:1px solid #3A3A2A;color:#C8C8A0;border-radius:3px;padding:1px 4px;"></select>
+        <button onclick="animatorPreview()" title="실행 중인 누리 게임에서 데모 공중 이동 1회 재생"
+            style="font-size:8px;padding:2px 7px;background:#1E2A33;border:1px solid #3A7FA8;color:#8FD0F0;border-radius:3px;cursor:pointer;">▶ 미리보기</button>
+        <button onclick="animatorSave()" title="anim_sequences.json 저장 (저장 후 실행 중 게임에 자동 반영)"
+            style="font-size:8px;padding:2px 7px;background:#23301F;border:1px solid #3A8A3A;color:#7FE07F;border-radius:3px;cursor:pointer;">💾 저장</button>
+        <button onclick="toggleAnimator()" style="font-size:11px;padding:0 5px;background:none;border:none;color:#888;cursor:pointer;">✕</button>
+    </div>
+    <div id="animStatus" style="padding:5px 10px;font-size:8px;border-bottom:1px solid #2C2C20;color:#999;"></div>
+    <div style="display:flex;gap:0;overflow:hidden;">
+        <div id="animPhaseList" style="width:118px;flex-shrink:0;overflow-y:auto;max-height:calc(100vh - 130px);
+            padding:8px 6px;border-right:1px solid #2C2C20;"></div>
+        <div id="animInspector" style="flex:1;overflow-y:auto;max-height:calc(100vh - 130px);padding:8px 10px;"></div>
+    </div>
+</div>
+
+<script>
+// 애니메이터 — anim_sequences.json 의 phase 플로우 + 각 phase 의 fx 배열을 편집/저장.
+// (에디터 기존 로직과 분리된 격리 스크립트. nuri 게임 데이터를 직접 편집)
+(function(){
+    const SEQ_PATH = 'games/nuri/data/anim_sequences.json';
+    const OUT_DIR  = 'games/nuri/pixels/characters/jump';
+    const META_URL = '/'+OUT_DIR+'/meta.json';
+    let _data = null;        // 전체 시퀀스 JSON
+    let _seqId = null;       // 현재 편집 중 시퀀스 키
+    let _selPhase = 0;       // 선택된 phase 인덱스
+    let _gifKeys = [];       // 사용 가능한 GIF 키 (meta.json)
+    let _dirty = false;
+
+    // ── VFX 카탈로그: 타입별 편집 가능한 파라미터 스펙 ──
+    // src: 'nuri'(자체 효과) | 'engine'(모래엔진 FX/Particle)
+    const PARTICLES = ['burst','pixel_burst','vortex','stardust','sand_rain','streak','wake','drift','convergence','erosion'];
+    const FX_CATALOG = {
+        landImpact: { label:'착지 충격파', src:'nuri', params:[] },
+        spinSparks: { label:'회전 불꽃',   src:'nuri', params:[
+            { key:'enabled', type:'bool', def:true } ] },
+        spin: { label:'회전(롤링)', src:'render', params:[
+            { key:'revPerSec', type:'range', min:0, max:16, step:0.5, def:8 },
+            { key:'ghosts', type:'range', min:1, max:20, step:1, def:10 },
+            { key:'spread', type:'range', min:0, max:6, step:0.1, def:3.2 },
+            { key:'blurSec', type:'range', min:0, max:0.1, step:0.005, def:0.03 } ] },
+        afterimage: { label:'잔상', src:'render', params:[
+            { key:'ghosts', type:'range', min:1, max:10, step:1, def:4 },
+            { key:'gap', type:'range', min:0, max:0.05, step:0.002, def:0.02 } ] },
+        squash: { label:'스쿼시', src:'render', params:[
+            { key:'amount', type:'range', min:0, max:0.15, step:0.01, def:0.03 } ] },
+        flash: { label:'섬광', src:'engine', params:[
+            { key:'color', type:'color', def:'#ffffff' },
+            { key:'maxAlpha', type:'range', min:0, max:1, step:0.05, def:0.6 },
+            { key:'duration', type:'range', min:0, max:1000, step:10, def:200 } ] },
+        shake: { label:'흔들림', src:'engine', params:[
+            { key:'intensity', type:'range', min:0, max:12, step:1, def:5 },
+            { key:'duration', type:'range', min:0, max:800, step:10, def:280 },
+            { key:'decay', type:'range', min:1, max:2, step:1, def:2 } ] },
+        colorShift: { label:'색조', src:'engine', params:[
+            { key:'color', type:'color', def:'#ff8800' },
+            { key:'maxAlpha', type:'range', min:0, max:1, step:0.05, def:0.3 },
+            { key:'duration', type:'range', min:0, max:1500, step:10, def:500 } ] },
+        emit: { label:'파티클 방출', src:'engine', params:[
+            { key:'particle', type:'select', options:PARTICLES, def:'burst' },
+            { key:'count', type:'range', min:0, max:300, step:5, def:20 },
+            { key:'at', type:'select', options:['foot','center','head'], def:'foot' } ] },
+    };
+
+    function setStatus(msg, color){ const s=document.getElementById('animStatus'); if(s){ s.innerHTML=msg; s.style.color=color||'#999'; } }
+    function markDirty(){ _dirty=true; setStatus('● 수정됨 — 저장하지 않으면 사라집니다.', '#C8A050'); }
+
+    async function load(){
+        setStatus('불러오는 중…');
+        try {
+            const [data, meta] = await Promise.all([
+                fetch('/'+SEQ_PATH, {cache:'no-store'}).then(r=>r.json()),
+                fetch(META_URL, {cache:'no-store'}).then(r=>r.json()).catch(()=>({})),
+            ]);
+            _data = data; _gifKeys = Object.keys(meta);
+            const sel = document.getElementById('animSeqSel');
+            sel.innerHTML = Object.keys(_data).map(k=>'<option value="'+k+'">'+k+'</option>').join('');
+            sel.onchange = ()=>{ _seqId = sel.value; _selPhase = 0; renderPhases(); renderInspector(); };
+            _seqId = Object.keys(_data)[0]; sel.value = _seqId; _selPhase = 0;
+            renderPhases(); renderInspector();
+            _dirty = false; setStatus('🟢 anim_sequences.json 로드됨 — 노드를 선택해 편집하세요.', '#7FB47F');
+        } catch(e){
+            setStatus('로드 실패: '+e, '#E08080');
+        }
+    }
+
+    function phases(){ return _data?.[_seqId] ?? []; }
+
+    function renderPhases(){
+        const el = document.getElementById('animPhaseList');
+        const ps = phases();
+        el.innerHTML = '';
+        ps.forEach((ph,i)=>{
+            const active = i===_selPhase;
+            const node = document.createElement('div');
+            node.style.cssText = 'background:'+(active?'#1E2A33':'#1A1A12')+';border:1px solid '+(active?'#3A7FA8':'#2C2C20')+';'
+                + 'border-radius:4px;padding:6px 7px;margin-bottom:4px;cursor:pointer;';
+            const fxn = (ph.fx?.length)||0;
+            node.innerHTML = '<div style="font-size:10px;font-weight:700;color:'+(active?'#8FD0F0':'#C8C8A0')+';">'+ph.id+'</div>'
+                + '<div style="font-size:8px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(ph.gif||ph.kind||'—')+'</div>'
+                + (fxn? '<div style="font-size:7px;color:#C8922A;margin-top:1px;">✦ '+fxn+' fx</div>':'');
+            node.onclick = ()=>{ _selPhase=i; renderPhases(); renderInspector(); };
+            el.appendChild(node);
+            if (i < ps.length-1){
+                const arr = document.createElement('div');
+                arr.style.cssText='text-align:center;color:#555;font-size:8px;margin:-1px 0 3px;';
+                arr.textContent='▼ '+(ph.nextTrigger||'');
+                el.appendChild(arr);
+            }
+        });
+    }
+
+    function field(label, inner){
+        return '<div style="display:flex;align-items:center;gap:6px;margin:5px 0;">'
+            + '<span style="font-size:8px;color:#999;width:62px;flex-shrink:0;">'+label+'</span>'+inner+'</div>';
+    }
+
+    function renderInspector(){
+        const el = document.getElementById('animInspector');
+        const ph = phases()[_selPhase];
+        if (!ph){ el.innerHTML=''; return; }
+        let h = '';
+        // ── GIF 소스 ──
+        h += '<div style="font-size:9px;font-weight:700;color:#C8922A;border-bottom:1px solid #2C2C20;padding-bottom:2px;margin-bottom:5px;">GIF 소스</div>';
+        const opts = ['<option value="">(없음)</option>'].concat(
+            _gifKeys.map(k=>'<option value="'+k+'"'+(k===ph.gif?' selected':'')+'>'+k+'</option>')).join('');
+        h += field('gif 키', '<select id="aGif" style="flex:1;font-size:9px;background:#1E1E14;border:1px solid #3A3A2A;color:#C8C8A0;border-radius:3px;padding:1px 4px;">'+opts+'</select>'
+            + '<button id="aConvBtn" title="GIF 파일을 크로마키 변환해 이 키로 등록" style="font-size:8px;padding:2px 6px;background:#2A2418;border:1px solid #5A5A3A;color:#E8C870;border-radius:3px;cursor:pointer;flex-shrink:0;">⬆ 변환</button>');
+        // 주요 phase 속성 (있을 때만)
+        for (const [k,mn,mx,st] of [['size',0.5,1.5,0.05],['frameDur',10,120,5],['startFrame',0,10,1],['holdLastMs',0,1500,50]]){
+            if (ph[k]===undefined) continue;
+            h += field(k, '<input type="range" data-prop="'+k+'" min="'+mn+'" max="'+mx+'" step="'+st+'" value="'+ph[k]+'" style="flex:1;height:13px;accent-color:#C8922A;">'
+                + '<span class="aPropVal" style="font-size:9px;color:#E8C870;width:34px;text-align:right;">'+ph[k]+'</span>');
+        }
+        // ── VFX 효과 ──
+        h += '<div style="font-size:9px;font-weight:700;color:#C8922A;border-bottom:1px solid #2C2C20;padding-bottom:2px;margin:10px 0 5px;">VFX 효과</div>';
+        h += '<div id="aFxList"></div>';
+        h += '<div style="font-size:8px;color:#777;margin:8px 0 3px;">+ 효과 추가</div>';
+        h += '<div id="aFxLib" style="display:flex;flex-wrap:wrap;gap:4px;"></div>';
+        el.innerHTML = h;
+
+        // gif select
+        el.querySelector('#aGif').onchange = (e)=>{ ph.gif = e.target.value || undefined; markDirty(); renderPhases(); };
+        // gif 변환: 파일 선택 → 크로마키 추출 → 키 등록 → phase.gif 할당
+        el.querySelector('#aConvBtn').onclick = ()=> convertGif(ph);
+        // phase prop sliders
+        el.querySelectorAll('input[data-prop]').forEach(sl=>{
+            sl.addEventListener('input', ()=>{
+                const v=+sl.value; ph[sl.dataset.prop]=v;
+                sl.parentElement.querySelector('.aPropVal').textContent=v; markDirty();
+            });
+        });
+        renderFxList(ph);
+        renderFxLib(ph);
+    }
+
+    function renderFxList(ph){
+        const box = document.getElementById('aFxList');
+        const list = ph.fx || (ph.fx=[]);
+        if (!list.length){ box.innerHTML='<div style="font-size:8px;color:#666;padding:3px 0;">(없음)</div>'; return; }
+        box.innerHTML='';
+        list.forEach((fx,fi)=>{
+            const spec = FX_CATALOG[fx.type] || { label:fx.type, src:'?', params:[] };
+            const card = document.createElement('div');
+            card.style.cssText='background:#1A1A12;border:1px solid #2C2C20;border-radius:4px;padding:6px 7px;margin-bottom:5px;';
+            const TAGS = {
+                engine: '<span style="font-size:7px;background:#1E2A33;color:#7FB8E0;border-radius:3px;padding:1px 5px;">엔진</span>',
+                render: '<span style="font-size:7px;background:#2A1E33;color:#C89FE0;border-radius:3px;padding:1px 5px;">렌더</span>',
+                nuri:   '<span style="font-size:7px;background:#2A2418;color:#C8A050;border-radius:3px;padding:1px 5px;">nuri</span>',
+            };
+            const tag = TAGS[spec.src] || TAGS.nuri;
+            let inner = '<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">'
+                + '<span style="font-size:9px;font-weight:700;color:#D0D0B0;flex:1;">'+spec.label+' <span style="color:#666;font-weight:400;">'+fx.type+'</span></span>'
+                + tag
+                + '<button data-del="'+fi+'" style="font-size:8px;background:none;border:none;color:#C86060;cursor:pointer;">✕</button></div>';
+            for (const pm of spec.params){
+                const val = (pm.key in fx) ? fx[pm.key] : pm.def;
+                if (pm.type==='range'){
+                    inner += '<div style="display:flex;align-items:center;gap:5px;margin:3px 0;"><span style="font-size:8px;color:#999;width:58px;">'+pm.key+'</span>'
+                        + '<input type="range" data-fi="'+fi+'" data-k="'+pm.key+'" data-num="1" min="'+pm.min+'" max="'+pm.max+'" step="'+pm.step+'" value="'+val+'" style="flex:1;height:12px;accent-color:#C8922A;">'
+                        + '<span class="aFxVal" style="font-size:8px;color:#E8C870;width:32px;text-align:right;">'+val+'</span></div>';
+                } else if (pm.type==='bool'){
+                    inner += '<div style="display:flex;align-items:center;gap:5px;margin:3px 0;"><span style="font-size:8px;color:#999;width:58px;">'+pm.key+'</span>'
+                        + '<input type="checkbox" data-fi="'+fi+'" data-k="'+pm.key+'" data-bool="1" '+(val?'checked':'')+'></div>';
+                } else if (pm.type==='color'){
+                    inner += '<div style="display:flex;align-items:center;gap:5px;margin:3px 0;"><span style="font-size:8px;color:#999;width:58px;">'+pm.key+'</span>'
+                        + '<input type="color" data-fi="'+fi+'" data-k="'+pm.key+'" value="'+val+'" style="width:30px;height:18px;background:none;border:1px solid #3A3A2A;"></div>';
+                } else if (pm.type==='select'){
+                    const o = pm.options.map(x=>'<option'+(x===val?' selected':'')+'>'+x+'</option>').join('');
+                    inner += '<div style="display:flex;align-items:center;gap:5px;margin:3px 0;"><span style="font-size:8px;color:#999;width:58px;">'+pm.key+'</span>'
+                        + '<select data-fi="'+fi+'" data-k="'+pm.key+'" style="flex:1;font-size:8px;background:#1E1E14;border:1px solid #3A3A2A;color:#C8C8A0;border-radius:3px;">'+o+'</select></div>';
+                }
+            }
+            card.innerHTML = inner;
+            box.appendChild(card);
+        });
+        // bind controls
+        box.querySelectorAll('[data-del]').forEach(b=> b.onclick=()=>{ ph.fx.splice(+b.dataset.del,1); markDirty(); renderFxList(ph); renderPhases(); });
+        box.querySelectorAll('input[data-num]').forEach(sl=> sl.addEventListener('input', ()=>{
+            const v=+sl.value; ph.fx[+sl.dataset.fi][sl.dataset.k]=v;
+            sl.parentElement.querySelector('.aFxVal').textContent=v; markDirty();
+        }));
+        box.querySelectorAll('input[data-bool]').forEach(cb=> cb.onchange=()=>{ ph.fx[+cb.dataset.fi][cb.dataset.k]=cb.checked; markDirty(); });
+        box.querySelectorAll('input[type=color][data-k]').forEach(c=> c.oninput=()=>{ ph.fx[+c.dataset.fi][c.dataset.k]=c.value; markDirty(); });
+        box.querySelectorAll('select[data-k]').forEach(s=> s.onchange=()=>{ ph.fx[+s.dataset.fi][s.dataset.k]=s.value; markDirty(); });
+    }
+
+    function renderFxLib(ph){
+        const lib = document.getElementById('aFxLib');
+        lib.innerHTML='';
+        for (const [type,spec] of Object.entries(FX_CATALOG)){
+            const chip = document.createElement('span');
+            chip.textContent = '+ '+spec.label;
+            chip.title = type+' ('+spec.src+')';
+            const C = { engine:['#3A5A6A','#8FB8D0'], render:['#4A3A5A','#C89FE0'], nuri:['#4A4A30','#C8C8A0'] };
+            const [bd,fg] = C[spec.src] || C.nuri;
+            chip.style.cssText='font-size:8px;padding:2px 7px;border:1px solid '+bd+';color:'+fg+';border-radius:3px;cursor:pointer;';
+            chip.onclick = ()=>{
+                const fx = { type };
+                if (spec.src!=='render') fx.when = (type==='spinSparks') ? 'during' : 'enter';
+                for (const pm of spec.params) fx[pm.key]=pm.def;
+                (ph.fx || (ph.fx=[])).push(fx);
+                markDirty(); renderFxList(ph); renderPhases();
+            };
+            lib.appendChild(chip);
+        }
+    }
+
+    function convertGif(ph){
+        const key = prompt('등록할 GIF 키 이름 (영문/숫자/_):', ph.gif || '');
+        if (!key) return;
+        if (!/^[a-zA-Z0-9_]+$/.test(key)) { setStatus('키 이름은 영문/숫자/_ 만 가능', '#E08080'); return; }
+        const inp = document.createElement('input');
+        inp.type = 'file'; inp.accept = 'image/gif';
+        inp.onchange = async ()=>{
+            const file = inp.files?.[0]; if (!file) return;
+            setStatus('변환 중… '+file.name);
+            try {
+                const b64 = await new Promise((res,rej)=>{ const r=new FileReader();
+                    r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(file); });
+                const res = await fetch('/api/extract-anim-gif', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({ key, outDir: OUT_DIR, gifBase64: b64, chroma: true })
+                });
+                const j = await res.json();
+                if (!j.ok){ setStatus('변환 실패: '+(j.error||'?'), '#E08080'); return; }
+                // meta 키 갱신 + 이 phase 에 할당
+                const meta = await fetch(META_URL, {cache:'no-store'}).then(r=>r.json()).catch(()=>({}));
+                _gifKeys = Object.keys(meta);
+                ph.gif = key; markDirty();
+                renderInspector(); renderPhases();
+                setStatus('✅ 변환·등록됨 — '+key+' ('+j.frameCount+'f, '+j.width+'×'+j.height+')', '#7FE07F');
+            } catch(e){ setStatus('변환 실패: '+e, '#E08080'); }
+        };
+        inp.click();
+    }
+
+    window.toggleAnimator = function(){
+        const el = document.getElementById('animatorPanel');
+        const open = el.style.display==='none' || !el.style.display;
+        el.style.display = open ? 'flex' : 'none';
+        if (open && !_data) load();
+    };
+    // 실행 중인 게임 iframe(들)에 메시지 전송 → 라이브 반영
+    function postToGame(msg){
+        let sent = 0;
+        document.querySelectorAll('iframe').forEach(f=>{
+            try { if (f.contentWindow){ f.contentWindow.postMessage(msg, '*'); sent++; } } catch(e){}
+        });
+        return sent;
+    }
+    window.animatorSave = async function(){
+        if (!_data){ return; }
+        setStatus('저장 중…');
+        try {
+            const res = await fetch('/api/save-sequence', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ path: SEQ_PATH, data: _data })
+            });
+            const j = await res.json();
+            if (j.ok){
+                _dirty=false;
+                const n = postToGame({ type:'nuri:reloadSeq', demo:true });   // 저장 즉시 게임 반영 + 데모
+                setStatus('✅ 저장됨 — '+SEQ_PATH+(n? ' · 게임 '+n+'곳에 반영':' (.bak 백업)'), '#7FE07F');
+            }
+            else { setStatus('저장 실패: '+(j.error||'?'), '#E08080'); }
+        } catch(e){ setStatus('저장 실패: '+e, '#E08080'); }
+    };
+    window.animatorPreview = function(){
+        const n = postToGame({ type:'nuri:demoMove' });
+        setStatus(n ? '▶ 미리보기 전송 — 실행 중 게임에서 데모 이동 재생' : '🟡 실행 중인 누리 게임이 없습니다 (씬뷰 ▶ 플레이 먼저)', n?'#8FD0F0':'#C8A050');
+    };
+})();
+</script>
 
 </body>
 </html>

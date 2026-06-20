@@ -25,12 +25,22 @@
     #btnFreeze { padding:5px 10px; }
 
     /* 조이스틱 */
-    #joy { position:absolute; bottom:18px; left:50%; transform:translateX(-50%);
+    #joy { position:absolute; bottom:18px; left:18px;
            display:flex; gap:14px; }
     #joy .jb { width:64px; height:64px; font-size:24px; padding:0;
                border-radius:14px; font-weight:bold; letter-spacing:0; }
     #joy .jb.held { background:#3b5fa0; border-color:#7faaee;
                     box-shadow:0 0 14px rgba(80,150,255,.65); color:#fff; }
+
+    /* 스킬(원소) 선택 바 — 하단 */
+    #skills { position:absolute; bottom:92px; left:50%; transform:translateX(-50%);
+              display:flex; gap:8px; }
+    #skills .sk { width:48px; height:48px; padding:0; border-radius:12px;
+                  font-size:13px; font-weight:bold; display:flex; flex-direction:column;
+                  align-items:center; justify-content:center; line-height:1.1;
+                  border-width:2px; background:rgba(20,22,28,.55); }
+    #skills .sk small { font-size:8px; opacity:.75; font-weight:normal; }
+    #skills .sk.on { box-shadow:0 0 12px currentColor; }
   </style>
 </head>
 <body>
@@ -41,6 +51,7 @@
     <button id="btnFs" title="전체화면">⛶</button>
     <button id="btnFreeze">⏸</button>
   </div>
+  <div id="skills"></div>
   <div id="joy">
     <button id="btnL" class="jb">&#9664;</button>
     <button id="btnR" class="jb">&#9654;</button>
@@ -69,6 +80,39 @@
     if (!fs) (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
     else     (document.exitFullscreen || document.webkitExitFullscreen).call(document);
   });
+
+  // ── 스킬(원소) 선택 바 — element_config.csv 기반 ──
+  (async () => {
+    const box = document.getElementById('skills');
+    let txt;
+    try { txt = await fetch('./data/element_config.csv', { cache:'no-store' }).then(r => r.text()); }
+    catch { return; }
+    const lines = txt.split(/\r?\n/).filter(l => l.trim() && !l.trim().startsWith('#'));
+    const head = lines.shift().split(',').map(s => s.trim());
+    const col = n => head.indexOf(n);
+    const rows = lines.map(l => l.split(','));
+    let active = null;
+    function select(id, btn) {
+      active = id;
+      [...box.children].forEach(b => b.classList.toggle('on', b === btn));
+      const ng = window._nuri;
+      if (ng?.setActiveElement) ng.setActiveElement(id);
+    }
+    rows.forEach((cells, i) => {
+      const id = cells[col('id')].trim(), sym = cells[col('symbol')].trim();
+      const name = cells[col('name_ko')].trim(), color = cells[col('color')].trim();
+      const b = document.createElement('button');
+      b.className = 'sk'; b.style.color = color; b.style.borderColor = color;
+      b.innerHTML = `${sym}<small>${name}</small>`;
+      b.addEventListener('click', () => select(id, b));
+      box.appendChild(b);
+      if (i === 0) requestAnimationFrame(() => select(id, b)); // 기본 첫 원소
+    });
+    // 게임 인스턴스가 늦게 뜨면 활성 원소 재적용
+    const sync = setInterval(() => {
+      if (window._nuri?.setActiveElement && active) { window._nuri.setActiveElement(active); clearInterval(sync); }
+    }, 300);
+  })();
 </script>
 
 <script type="module" src="./main.js"></script>

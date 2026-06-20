@@ -18,5 +18,13 @@ __pycache__/
 # build / deps
 node_modules/
 dist/
+dist_nuri/
 
 .vercel
+
+# Claude Code 워크트리/도구 메타데이터
+.claude/
+.claire/
+
+# 별도 참고용 샘플 프로젝트 (자체 .git 보유, 본 repo와 무관)
+tang_sample/

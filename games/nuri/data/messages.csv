@@ -1,0 +1,6 @@
+# 누리 게임 메시지 테이블 — trigger 기반 인게임 알림
+# style: warning | info | hint
+id,trigger,text_ko,duration_ms,style
+msg_no_ammo,no_ammo,원소가 없습니다,2000,warning
+msg_regen,regen_done,원소가 돌아왔습니다,1500,info
+msg_no_move,no_move,이동할 수 없습니다,1500,hint
