@@ -1,0 +1,16 @@
+# 벽쌓기(WallBuild) 구역 — 떠도는 원소 필드 + 10초 주기 블록 배치
+# 블록 주기 = block_interval_ms (10초에 하나 맞춤). 떠도는 원소는 사방에서 3개씩 무리로 리젠.
+# value 는 숫자(ParamTable.num). gravity 만 문자열.
+key,value,note
+block_interval_ms,350,블록 하나를 놓는 주기(ms) — 작을수록 빨리 화면이 차오름(=어려움)
+gather_ms,130,풀에서 끌어모은 원소가 형성 슬롯으로 모이는 시간(ms)
+bind_ms,0,원소들이 한 블록(테트로미노)으로 묶이는 플래시(ms)
+fall_ms,120,묶인 블록이 빈틈 자리로 떨어져 안착(ms)
+field_count,16,화면에 떠다니는 원소 목표 수(공기처럼 흩어짐)
+field_burst,3,한 번에 날아오는 원소 무리 수(3개씩)
+field_spawn_ms,650,원소 무리 리젠 간격(ms)
+cell_px,44,격자 셀 크기(px) — 클수록 칸수 적어 빨리 차고 컴퓨팅 가벼움
+cols,5,격자 열 수 — 몬스터 생성 블록 전체 크기(기본 5x5)
+rows,5,격자 행 수 — 몬스터 생성 블록 전체 크기(기본 5x5)
+gravity,down,down=바닥부터 탑 / up=천장매달림
+line_flash_ms,360,줄 완성(테트리스 매치) 강조 플래시 시간(ms) — 끝나는 순간 몬스터 출현

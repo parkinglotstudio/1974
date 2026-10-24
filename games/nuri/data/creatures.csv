@@ -14,3 +14,4 @@
 id,kind,name_ko,ai,hp,speed_min,speed_max,size,color,contact_dmg,spawn_weight,elite,dialogue_id,notes
 cell_basic,enemy,망각세포,seek_core,38,0.8,1.4,12,#C8102E,0,92,0,,코어로 몰려드는 기본 적
 cell_elite,enemy,망각세포(엘리트),seek_core,220,0.4,0.7,22,#C8102E,0,8,1,,체력 높고 느린 엘리트 변종
+cell_boss,enemy,망각(보스),seek_core,2000,0.18,0.32,64,#C2B280,0,0,2,,벽(블록 무리)이 완성되어 일어선 보스

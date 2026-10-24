@@ -1,5 +1,5 @@
 import SandEngine from '../../engine/SandEngine.js';
-import NuriGame   from './scripts/NuriGame.js?v=3.2';
+import NuriGame   from './scripts/NuriGame.js?v=5.0';
 import { loadCsvTable, loadParamTable } from '../../engine/data/Csv.js';
 
 // ── flat 1D → [[x,y,idx], ...] ──────────────────────────────
@@ -93,7 +93,7 @@ async function init() {
 
     // CSV 데이터 로드
     try {
-        const [chapters, characters, fx, messages, ammoLevels, elements, charge, creatures] = await Promise.all([
+        const [chapters, characters, fx, messages, ammoLevels, elements, charge, creatures, wallConfig, wallSpots, wallPieces] = await Promise.all([
             loadCsvTable('./data/chapters.csv'),
             loadCsvTable('./data/characters.csv'),
             loadParamTable('./data/fx_params.csv'),
@@ -102,8 +102,11 @@ async function init() {
             loadCsvTable('./data/element_config.csv'),
             loadParamTable('./data/charge_config.csv'),
             loadCsvTable('./data/creatures.csv'),
+            loadParamTable('./data/wall_config.csv'),
+            loadCsvTable('./data/wall_spots.csv'),
+            fetch('./data/tetrominoes.json', { cache: 'no-store' }).then(r => r.json()),
         ]);
-        engine.data = { chapters, characters, fx, messages, ammoLevels, elements, charge, creatures };
+        engine.data = { chapters, characters, fx, messages, ammoLevels, elements, charge, creatures, wallConfig, wallSpots, wallPieces };
         console.log('[nuri] data loaded:', chapters.all().length, 'chapters,', characters.all().length, 'chars');
     } catch (e) {
         console.warn('[nuri] data load failed:', e);

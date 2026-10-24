@@ -47,10 +47,13 @@ export default class GridWaveSystem {
         this.BEHAVIORS = {
             straight: () => {},                       // 직선 — 각도 유지
             // 유도 — 발사 시 각 투사체에 서로 다른 적을 배정해 분산 추적 (평타 제외)
-            // 한번 배정된 타겟은 죽거나 사라질 때까지 유지(p.target) → 같은 적에게 몰리지 않음
+            // 타겟은 죽거나 사라지거나, 진행방향 기준 너무 벗어나면(놓침) 해제 → 매 틱 재서치
             homing: (p, enemies, el) => {
                 if (p.tier === TIER.BASIC || !enemies.length) return;
-                if (p.target && (p.target.hp <= 0 || !enemies.includes(p.target))) p.target = null;
+                if (p.target) {
+                    const lost = p.target.hp <= 0 || !enemies.includes(p.target) || this._angleLost(p);
+                    if (lost) p.target = null;
+                }
                 if (!p.target) {
                     const claimed = new Set(
                         this.projectiles.filter(o => o !== p && o.target).map(o => o.target)
@@ -66,7 +69,7 @@ export default class GridWaveSystem {
                 }
                 if (!p.target) return;
                 const target = Math.atan2(p.target.y - p.y, p.target.x - p.x);
-                const turn = p.tier === TIER.STRONG ? (el.params.turnStrong ?? 0.15) : (el.params.turn ?? 0.05);
+                const turn = p.tier === TIER.STRONG ? (el.params.turnStrong ?? 0.3) : (el.params.turn ?? 0.12);
                 p.angle += (target - p.angle) * turn;
             },
         };
@@ -267,6 +270,16 @@ export default class GridWaveSystem {
     _pierces(p) {
         if (p.el.pierce === 'always') return true;             // 철
         return p.tier === TIER.STRONG || p.tier === TIER.FUSION; // 강파동·필살융합
+    }
+
+    // 유도탄이 타겟을 "놓쳤는지" 판정 — 진행 방향과 타겟 방향이 108° 이상 벌어지면
+    // (지나쳤거나 회피당함) 추적을 포기하고 재서치하도록 함
+    _angleLost(p) {
+        if (!p.target) return false;
+        const toTarget = Math.atan2(p.target.y - p.y, p.target.x - p.x);
+        let diff = toTarget - p.angle;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        return Math.abs(diff) > Math.PI * 0.6;
     }
 
     // ── 업데이트 (프레임 1틱) — enemies 주입 ─────────────────────────

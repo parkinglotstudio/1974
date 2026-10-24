@@ -7,7 +7,33 @@ import { AnimPhasePlayer } from '../../../engine/anim/AnimPhasePlayer.js';
 import GridWaveSystem      from './core/GridWaveSystem.js';
 import MessageSystem       from './core/MessageSystem.js';
 import AmmoSystem          from './core/AmmoSystem.js';
+import WallBuildMechanic   from './zones/WallBuildMechanic.js';
+import WallGrid            from './zones/WallGrid.js';
 import { HOLD_THRESHOLD }  from './core/constants.js';
+
+// 테트로미노 회전셋 생성 (A 모드 기억의 벽용)
+const _easeInOut = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+function _normCells(cells) {
+    const mc = Math.min(...cells.map(p => p[0])), mr = Math.min(...cells.map(p => p[1]));
+    return cells.map(([c, r]) => [c - mc, r - mr]);
+}
+function _rotCW(cells) { return _normCells(cells.map(([c, r]) => [r, -c])); }
+function _rotationsOf(base) {
+    const seen = new Set(), out = [];
+    let cur = _normCells(base.map(p => p.slice()));
+    for (let i = 0; i < 4; i++) {
+        const k = cur.map(p => p.join(',')).sort().join(';');
+        if (!seen.has(k)) { seen.add(k); out.push(cur); }
+        cur = _rotCW(cur);
+    }
+    return out;
+}
+
+// 신규 컨트롤(스페이스 즉발 발사 + 더블탭 점프)
+const FIRE_CHARGE_S   = 0.6;    // 즉발 파동 고정 파워(초 환산)
+const SPACE_DBL_MS    = 280;    // 더블탭 판정 윈도우(ms)
+const JUMP_G          = 2600;   // 점프 중력 px/s²
+const JUMP_V0         = 1612;   // 점프 초기 상승속도 px/s (정점 ≈ 500px, 보통~높게 사이)
 
 // ── 공중 이동 물리 ──
 const GRAVITY           = 600;   // px/s² (구 상태머신용, 미사용)
@@ -101,6 +127,19 @@ export default class NuriGame extends Scene {
         this._pmBlend      = null;
         this._landing      = false;
         this._landingTimer = 0;
+
+        // ── 구역 메커니즘(ZoneMechanic) — 씬별 컨셉 교체 슬롯 ──
+        this._mechanic = null;      // 활성 메커니즘 (예: WallBuildMechanic)
+        this._wallZone = false;     // 벽쌓기 구역(고정형) 진입 여부 — B키 토글
+        this._crystals = [];        // 기억 결정 — 망각세포 처치 시 생성(A/B 모드 공통)
+        // ── A 모드 "기억의 벽": 결정 10초당 1블록 → 우측 끝부터 쌓임 → 다 차면 몬스터 ──
+        this._memWall        = null;   // WallGrid (우측, 아래→위)
+        this._memWallRot     = null;   // 회전셋
+        this._memWallColors  = null;
+        this._memWallBlock   = null;   // 조립 중 블록(결정이 날아와 모임)
+        this._memWallTimer   = 0;      // 10초 주기 타이머
+        this._memWallFull    = false;
+        this._memWallBoss    = false;  // 보스 1회 스폰 가드
 
         this._runEntity = null;
         this._runState  = 'idle';   // 'idle' | 'running' | 'stopping'
@@ -254,6 +293,63 @@ export default class NuriGame extends Scene {
         console.log('[nuri] combat ready — elements:', elemTbl.all().map(e => e.id).join(','));
     }
 
+    // ── 벽쌓기 구역(고정형) 토글 — Phase 0 데모 (B키) ─────────────
+    _toggleWallZone() {
+        if (this._wallZone) {                       // ── 이탈 ──
+            this._mechanic?.onExit();
+            this._mechanic = null;
+            this._wallZone = false;
+            this._wallGameOver = false;
+            this._combatOn = true;
+            console.log('[nuri] wall-build zone OFF');
+            return;
+        }
+        // ── 진입 ── 타이밍/격자 설정은 wall_config.csv 에서
+        const wc  = this.engine.data?.wallConfig;
+        const cfg = wc ? {
+            blockIntervalMs: wc.num('block_interval_ms', 10000),
+            gatherMs:        wc.num('gather_ms',          1800),
+            bindMs:          wc.num('bind_ms',             300),
+            fallMs:          wc.num('fall_ms',             700),
+            fieldCount:      wc.num('field_count',          16),
+            fieldBurst:      wc.num('field_burst',           3),
+            fieldSpawnMs:    wc.num('field_spawn_ms',      650),
+            cell:            wc.num('cell_px',              34),
+            cols:            wc.num('cols',                 15),
+            rows:            wc.num('rows',                 15),
+            gravity:         wc.str('gravity', 'down'),
+            lineFlashMs:     wc.num('line_flash_ms',        360),
+        } : {};
+        cfg.shapes = this.engine.data?.wallPieces;   // tetrominoes.json (7종)
+
+        // 적군(벽 쌓는 주체) 1개 — 화면 오른쪽 끝, 바닥부터 위로(down) 쌓아 올라간다.
+        //   cols = CSV(단일 벽 폭), rows = 화면 높이만큼 → 끝까지 차오르면 게임오버.
+        //   originX = 화면 우측 끝에 맞춤, topY = 격자 바닥이 화면 바닥에 닿게.
+        const cell = cfg.cell || 44;
+        const cols = cfg.cols  || 5;
+        const rows = Math.ceil(this._H / cell);
+        cfg.cols = cols; cfg.rows = rows;
+        cfg.spots = [{
+            blockIntervalMs: cfg.blockIntervalMs,
+            gravity: 'down',
+            originX: this._cameraX + this._W - cols * cell,
+            topY:    this._H - rows * cell,
+        }];
+        this._wallGameOver = false;
+
+        // 고정형: 달리기/조이스틱 정지 → idle, 일반 적 스폰 일시중지
+        this._joy.left = this._joy.right = false;
+        if (this._runState !== 'idle') this._enterIdle();
+        if (this._runEntity) this._runEntity.visible = false;
+        if (this._player)    this._player.visible    = true;
+        this._combatOn = false;
+        this._enemies.length = 0;
+        this._mechanic = new WallBuildMechanic(this, cfg);
+        this._mechanic.onEnter();
+        this._wallZone = true;
+        console.log('[nuri] wall-build zone ON — block interval(ms):', cfg.blockIntervalMs ?? 10000);
+    }
+
     setActiveElement(id) { if (this._gridWave?.elements[id]) this._activeElement = id; }
     get activeElement() { return this._activeElement; }
 
@@ -314,6 +410,57 @@ export default class NuriGame extends Scene {
         });
     }
 
+    // 캐릭터가 바라보는 방향(facing): 조이스틱 우선, 없으면 마지막 달리기 방향
+    _facingDir() {
+        if (this._joy.left && !this._joy.right) return -1;
+        if (this._joy.right && !this._joy.left) return 1;
+        return this._runDir || 1;
+    }
+
+    // 스페이스 즉발 파동 — 충전 없이 고정 파워, facing 방향으로 발사(미사일은 호밍)
+    _fireWaveInstant() {
+        const gw = this._gridWave;
+        if (!gw) return;
+        const o = this._playerWorld();
+        gw.setOrigin(o.x, o.y);
+        const dir = this._facingDir();
+        const target = { x: o.x + dir * 500, y: o.y };
+        const orbit = this.ammo.slots.filter(s => s.state === 'orbit');
+        gw.fire(FIRE_CHARGE_S, target, {
+            element: this._activeElement,
+            slotCount: orbit.length,
+            consume: (cost) => {
+                let g = 0;
+                for (let i = orbit.length - 1; i >= 0 && g < cost; i--) { orbit[i].state = 'empty'; orbit[i].regenMs = 0; g++; }
+                return g;
+            },
+            onEvent: (type, data) => {
+                if (type === 'shake') this.engine.fx?.shake({ intensity: data.amount, duration: 280, decay: 2 });
+                if (type === 'popup') this._showMessageText?.(data.text);
+            },
+        });
+    }
+
+    // 더블탭 점프 — 약 500px 포물선 상승 후 낙하·착지 (체공/연출은 추후)
+    _startJump() {
+        const p = this._player;
+        if (!p || this._jumpActive) return;
+        if (this._groundY == null) this._groundY = p.y + IDLE_FOOT_ROW;
+        this._jumpActive = true;
+        this._jumpVY = -JUMP_V0;
+    }
+
+    _updateJump(dt) {
+        if (!this._jumpActive || !this._player) return;
+        const p = this._player, dtSec = dt / 1000;
+        this._jumpVY += JUMP_G * dtSec;
+        p.y += this._jumpVY * dtSec;
+        const groundTopY = (this._groundY ?? (this._H - 20)) - IDLE_FOOT_ROW;
+        if (this._jumpVY > 0 && p.y >= groundTopY) {   // 착지
+            p.y = groundTopY; this._jumpActive = false; this._jumpVY = 0;
+        }
+    }
+
     // 크리쳐 테이블(kind=enemy)에서 spawn_weight 가중치로 한 행 추첨
     _pickEnemyDef() {
         const defs = this._enemyDefs;
@@ -342,6 +489,177 @@ export default class NuriGame extends Scene {
         });
     }
 
+    // 벽(블록 무리) 완성 → 보스로 일어선다 (게임오버 아님)
+    onWallComplete(worldX, worldY) {
+        this.spawnBoss(worldX, worldY);
+        console.log('[nuri] WALL COMPLETE → BOSS rises @', Math.round(worldX), Math.round(worldY));
+    }
+
+    // 벽에서 솟아오르는 보스(cell_boss) — 큰 덩치 + 긴 등장 연출
+    spawnBoss(worldX, worldY) {
+        const def = this._enemyDefs.find(d => d.id === 'cell_boss');
+        if (!def) return;
+        const speedMin = Number(def.speed_min) || 0.2, speedMax = Number(def.speed_max) || 0.35;
+        const hp = Number(def.hp) || 2000;
+        this._enemies.push({
+            defId: def.id, x: worldX, y: worldY,
+            speed: speedMin + Math.random() * (speedMax - speedMin),
+            hp, maxHp: hp,
+            size: Number(def.size) || 64, color: def.color || '#C2B280',
+            contactDmg: Number(def.contact_dmg) || 0,
+            isElite: false, isBoss: true, flashTicks: 14, birthMs: 950, birthMax: 950,
+        });
+    }
+
+    // ── 기억 결정 (記憶結晶) — 망각세포 처치 시 튀어나와 공중에 떠다니는 네모 ─────────
+    _spawnCrystals(x, y, n) {
+        for (let i = 0; i < n; i++) {
+            const a = Math.random() * Math.PI * 2, sp = 130 + Math.random() * 170;
+            this._crystals.push({
+                x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 70,
+                life: 0, spin: Math.random() * Math.PI, ph: Math.random() * Math.PI * 2,
+            });
+        }
+        // 무한 누적 방지 — 오래된 것부터 정리
+        const MAX = 260;
+        if (this._crystals.length > MAX) this._crystals.splice(0, this._crystals.length - MAX);
+    }
+
+    _updateCrystals(dt) {
+        const dtSec = dt / 1000;
+        for (const c of this._crystals) {
+            c.life += dt;
+            if (c.life < 600) {                       // 초기 분출(관성으로 튕김)
+                c.vx *= 0.9; c.vy = c.vy * 0.9 + 26 * dtSec;
+            } else {                                    // 이후 공중 부유 — 느린 브라운 드리프트
+                c.vx += (Math.random() - 0.5) * 46 * dtSec;
+                c.vy += (Math.random() - 0.5) * 46 * dtSec;
+                const sp = Math.hypot(c.vx, c.vy), max = 26;
+                if (sp > max) { c.vx = c.vx / sp * max; c.vy = c.vy / sp * max; }
+            }
+            c.x += c.vx * dtSec; c.y += c.vy * dtSec;
+            c.spin += dtSec * 1.6;
+            c.ph   += dtSec * 3;
+        }
+    }
+
+    // 월드좌표 — _renderCombat 의 translate(-cameraX) 안에서 호출. 사라지지 않고 떠다님(은은한 명멸).
+    _renderCrystals(ctx) {
+        if (!this._crystals.length) return;
+        const s = 14;
+        ctx.save();
+        ctx.shadowColor = '#BFE9FF'; ctx.shadowBlur = 10;
+        ctx.fillStyle = '#BFE9FF';
+        for (const c of this._crystals) {
+            ctx.globalAlpha = 0.8 + 0.2 * Math.sin(c.ph);   // 은은한 명멸(살아있는 느낌)
+            ctx.translate(c.x, c.y); ctx.rotate(c.spin);
+            ctx.fillRect(-s / 2, -s / 2, s, s);
+            ctx.rotate(-c.spin); ctx.translate(-c.x, -c.y);
+        }
+        ctx.restore();
+        ctx.globalAlpha = 1;
+    }
+
+    // ── A 모드 기억의 벽 — 결정 10초당 1블록 → 우측 끝부터 쌓임 → 다 차면 몬스터 ──
+    _initMemoryWall() {
+        const pieces = this.engine.data?.wallPieces;
+        if (!pieces) return false;
+        this._memWallRot = {}; this._memWallColors = {};
+        for (const k of Object.keys(pieces)) {
+            if (k[0] === '_') continue;
+            this._memWallRot[k]    = _rotationsOf(pieces[k].cells);
+            this._memWallColors[k] = pieces[k].color || '#C2B280';
+        }
+        const cell = 44, cols = 5, rows = Math.ceil(this._H / cell);
+        const originX = (this._cameraX + this._W - cols * cell) | 0;   // 화면 우측 끝
+        const topY    = this._H - rows * cell;                          // 바닥 정렬
+        this._memWall = new WallGrid({ originX, topY, cols, rows, cell, gravity: 'down' });
+        return true;
+    }
+
+    _updateMemoryWall(dt) {
+        if (!this._memWall && !this._initMemoryWall()) return;
+        const wall = this._memWall;
+
+        // 조립 중 블록: 결정이 날아와 모임 → 완료 시 격자에 고정
+        if (this._memWallBlock) {
+            const b = this._memWallBlock;
+            b.t += dt;
+            const e = _easeInOut(Math.min(b.t / 900, 1));
+            for (const p of b.particles) { p.x = p.sx + (p.tx - p.sx) * e; p.y = p.sy + (p.ty - p.sy) * e; }
+            if (b.t >= 900) {
+                wall.placeAt(b.cells, b.col, b.row, b.color);
+                this._memWallBlock = null;
+                if (!wall.chooseBest(this._memWallRot)) this._memWallFull = true;   // 다 참
+            }
+            return;
+        }
+
+        // 다 차면 → 몬스터(보스) 1회 출현
+        if (this._memWallFull) {
+            if (!this._memWallBoss) {
+                this._memWallBoss = true;
+                this.spawnBoss(wall.originX + wall.pxWidth / 2, wall.topY + wall.pxHeight / 2);
+            }
+            return;
+        }
+
+        // 10초마다 결정 4개 → 블록 1개 (끝=바닥부터 쌓임)
+        this._memWallTimer += dt;
+        if (this._memWallTimer >= 10000 && this._crystals.length >= 4) {
+            this._memWallTimer = 0;
+            const pick = wall.chooseBest(this._memWallRot);
+            if (pick) {
+                const taken = this._crystals.splice(0, 4);
+                const cell = wall.cell;
+                const particles = pick.cells.map(([c, r], i) => {
+                    const f = taken[i] || { x: wall.originX, y: wall.topY };
+                    return { sx: f.x, sy: f.y, x: f.x, y: f.y,
+                        tx: wall.originX + (pick.col + c) * cell + cell / 2,
+                        ty: wall.topY    + (pick.row + r) * cell + cell / 2 };
+                });
+                this._memWallBlock = { cells: pick.cells, col: pick.col, row: pick.row, color: this._memWallColors[pick.key], particles, t: 0 };
+            }
+        }
+    }
+
+    // 월드좌표 — _renderCombat translate 안에서 호출
+    _renderMemoryWall(ctx) {
+        const wall = this._memWall;
+        if (!wall) return;
+        wall.render(ctx);
+        const b = this._memWallBlock;
+        if (b) {
+            const cell = wall.cell;
+            ctx.globalAlpha = 0.15; ctx.strokeStyle = b.color; ctx.lineWidth = 1.5;
+            for (const [c, r] of b.cells) ctx.strokeRect(wall.originX + (b.col + c) * cell + 1, wall.topY + (b.row + r) * cell + 1, cell - 2, cell - 2);
+            ctx.globalAlpha = 1;
+            const s = cell * 0.45;
+            ctx.save(); ctx.shadowColor = '#BFE9FF'; ctx.shadowBlur = 8; ctx.fillStyle = '#BFE9FF';
+            for (const p of b.particles) ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+            ctx.restore();
+        }
+    }
+
+    // 벽쌓기: 완성된 줄에서 튀어나오는 적. tier: 'normal'(cell_basic) | 'elite'(cell_elite)
+    spawnWallEnemy(worldX, worldY, tier) {
+        const id  = tier === 'elite' ? 'cell_elite' : 'cell_basic';
+        const def = this._enemyDefs.find(d => d.id === id) || this._pickEnemyDef();
+        if (!def) return;
+        const speedMin = Number(def.speed_min) || 0.8, speedMax = Number(def.speed_max) || 1.4;
+        const hp = Number(def.hp) || 1;
+        this._enemies.push({
+            defId: def.id, x: worldX, y: worldY,
+            speed: speedMin + Math.random() * (speedMax - speedMin),
+            hp, maxHp: hp,
+            size: Number(def.size) || 12, color: def.color || '#C8102E',
+            contactDmg: Number(def.contact_dmg) || 0,
+            isElite: def.elite === '1', flashTicks: 10,
+            birthMs: def.elite === '1' ? 520 : 380,   // 출현 연출: 확대·발광 시간
+            birthMax: def.elite === '1' ? 520 : 380,
+        });
+    }
+
     _updateCombat(dt, now) {
         const gw = this._gridWave;
         if (!gw) return;
@@ -364,14 +682,21 @@ export default class NuriGame extends Scene {
         for (let i = this._enemies.length - 1; i >= 0; i--) {
             const e = this._enemies[i];
             const a = Math.atan2(o.y - e.y, o.x - e.x);
-            const step = e.speed * dtSec * 60;        // 프레임 기준 속도 → dt 보정
+            // 출현 연출 중(birthMs>0)에는 거의 정지 — 확대·발광이 보이도록
+            const birthing = e.birthMs > 0;
+            if (birthing) e.birthMs -= dt;
+            const step = e.speed * dtSec * 60 * (birthing ? 0.12 : 1);  // 프레임 기준 속도 → dt 보정
             e.x += Math.cos(a) * step; e.y += Math.sin(a) * step;
             if (e.flashTicks > 0) e.flashTicks--;
             if (Math.hypot(o.x - e.x, o.y - e.y) < e.size + 18) {
                 this._carbon.push({ x: e.x, y: e.y, size: e.isElite ? 35 : 18, alpha: 1 });
                 this._enemies.splice(i, 1); continue;
             }
-            if (e.hp <= 0) this._enemies.splice(i, 1);
+            if (e.hp <= 0) {
+                // 망각세포 처치 → 기억 결정 생성: 일반 3 / 정예 5 (A/B 모드 공통)
+                if (!e.isBoss) this._spawnCrystals(e.x, e.y, e.isElite ? 5 : 3);
+                this._enemies.splice(i, 1);
+            }
         }
         this._carbon.forEach(c => { if (c.alpha > 0.45) c.alpha -= 0.005 * dt / 16.67; });
     }
@@ -387,16 +712,44 @@ export default class NuriGame extends Scene {
             ctx.fillStyle = `rgba(3,4,6,${c.alpha})`;
             ctx.fillRect(c.x - c.size / 2, c.y - c.size / 2, c.size, c.size);
         }
-        // 적 (코어로 몰려드는 망각세포)
+        // 적 (코어로 몰려드는 망각세포 / 보스)
         for (const e of this._enemies) {
-            ctx.beginPath(); ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
-            ctx.fillStyle = e.flashTicks > 0 ? '#fff' : e.color; ctx.fill();
-            ctx.fillStyle = '#222'; ctx.fillRect(e.x - 12, e.y - (e.isElite ? 20 : 15), 24, 3);
-            ctx.fillStyle = e.isElite ? '#FFB300' : '#00E676';
-            ctx.fillRect(e.x - 12, e.y - (e.isElite ? 20 : 15), (e.hp / e.maxHp) * 24, 3);
+            const accent = e.isBoss ? '#C2B280' : e.isElite ? '#FFB300' : '#00E676';
+            // 출현 연출: birthMs 동안 0→1 확대 + 발광 후광, 살짝 오버슈트
+            const bt = e.birthMs > 0 ? Math.min(e.birthMs / (e.birthMax || 380), 1) : 0;
+            const grow = bt > 0 ? (1 - bt) : 1;
+            const r = e.size * (0.2 + 0.8 * grow) * (1 + 0.25 * bt);
+            if (bt > 0) {
+                ctx.save();
+                ctx.globalAlpha = 0.6 * bt;
+                ctx.shadowColor = accent;
+                ctx.shadowBlur = (e.isBoss ? 60 : 30) * bt;
+                ctx.beginPath(); ctx.arc(e.x, e.y, r * 1.6, 0, Math.PI * 2);
+                ctx.fillStyle = accent; ctx.fill();
+                ctx.restore();
+            }
+            ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+            ctx.fillStyle = (e.flashTicks > 0 || bt > 0.5) ? '#fff' : e.color; ctx.fill();
+            const bw = e.isBoss ? 80 : 24, by = e.y - (e.isBoss ? e.size + 14 : e.isElite ? 20 : 15);
+            ctx.fillStyle = '#222'; ctx.fillRect(e.x - bw / 2, by, bw, e.isBoss ? 5 : 3);
+            ctx.fillStyle = accent;
+            ctx.fillRect(e.x - bw / 2, by, (e.hp / e.maxHp) * bw, e.isBoss ? 5 : 3);
         }
         // 파동 투사체·이펙트만 표시 (격자 가이드 점선은 제거 — 이동 라인 스타일로 단일화)
         gw.render(ctx);
+        this._renderCrystals(ctx);   // 기억 결정 (월드좌표)
+        if (!this._wallZone) this._renderMemoryWall(ctx);   // 기억의 벽 (월드좌표)
+        // 벽쌓기 구역에선 캐릭터 뒤에서 따로 그림(_renderMechanic) → 여기선 스킵
+        if (!this._wallZone) this._mechanic?.render(ctx);
+        ctx.restore();
+    }
+
+    // 구역 메커니즘(벽 블록)을 캐릭터보다 먼저(뒤에) 그려서 캐릭터가 블록 앞에 오게 함
+    _renderMechanic(ctx) {
+        if (!this._mechanic) return;
+        ctx.save();
+        ctx.translate(-this._cameraX, 0);
+        this._mechanic.render(ctx);
         ctx.restore();
     }
 
@@ -451,6 +804,17 @@ export default class NuriGame extends Scene {
             if (e.key === 't' || e.key === 'T') this._cycleTimeOfDay();
             if (e.key === 'g' || e.key === 'G') this._sigOn = !this._sigOn;
             if (e.key === 'c' || e.key === 'C') this._combatOn = !this._combatOn;
+            // B: 벽쌓기 구역(고정형) 진입/이탈 토글 — Phase 0 데모
+            if (e.key === 'b' || e.key === 'B') this._toggleWallZone();
+            // 스페이스: 1번=즉발 파동 발사 / 더블탭=점프
+            if (e.code === 'Space' || e.key === ' ') {
+                e.preventDefault();
+                if (e.repeat) return;
+                this._fireWaveInstant();
+                const now = performance.now();
+                if (now - (this._lastSpace || 0) < SPACE_DBL_MS) this._startJump();
+                this._lastSpace = now;
+            }
         };
         this._onKeyUp = e => {
             if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') this._joy.left  = false;
@@ -499,6 +863,17 @@ export default class NuriGame extends Scene {
 
         const held = performance.now() - this._holdStart;
         this._chargePhase = 0;
+
+        // 벽쌓기 구역(고정형): 이동은 막고 파동 공격만 허용 — 망각세포 사냥(처치 시 기억 결정)
+        if (this._wallZone) {
+            if (this.ammo.lockedSlot && held >= HOLD_THRESHOLD) {
+                this.ammo.release();
+                this._startWaveAttack(held);
+            } else {
+                this.ammo.release();
+            }
+            return;
+        }
 
         // 공중 부양(rise/spin_fall) 중이면 체이닝 재이동 허용
         const airborne = this._seqPlayer?.isActive &&
@@ -1065,7 +1440,12 @@ export default class NuriGame extends Scene {
         this._updateShockRings(dt);
         this._updateDust(dt);
         this._updateCombat(dt, now);
-        this._updateCamera();
+        this._updateCrystals(dt);                                  // 기억 결정 (A/B 공통)
+        this._updateJump(dt);                                      // 더블탭 점프 포물선
+        if (!this._wallZone) this._updateMemoryWall(dt);           // A 모드 기억의 벽(결정→블록→몬스터)
+        if (!this._wallGameOver) this._mechanic?.update(dt, now);   // 활성 구역 메커니즘(게임오버 시 정지)
+        else this._wallGameOverT = (this._wallGameOverT || 0) + dt;
+        if (!this._wallZone) this._updateCamera(); // 벽쌓기 구역에선 카메라 park(고정형)
 
         // run_stop → idle 타이머 (클릭 이동 & 조이스틱 정지 공통)
         if (this._landing && this._landingTimer !== undefined) {
@@ -1086,8 +1466,8 @@ export default class NuriGame extends Scene {
             this._chargePhase = held >= HOLD_THRESHOLD ? 2 : 1;
         }
 
-        // 조이스틱 상태머신 (픽셀 블렌드·공중 상태·공중 이동 시퀀스 중에는 처리 안 함)
-        if (!this._pmBlend && !this._airState && !this._seqPlayer?.isActive) {
+        // 조이스틱 상태머신 (픽셀 블렌드·공중 상태·공중 이동 시퀀스·벽쌓기 구역 중에는 처리 안 함)
+        if (!this._pmBlend && !this._airState && !this._seqPlayer?.isActive && !this._wallZone) {
             this._updateRunState(now, dt);
         }
     }
@@ -1154,6 +1534,9 @@ export default class NuriGame extends Scene {
             this.ammo.renderAimLine(ctx, activeEnt, this._chargePhase === 2 ? this._aimClampedScreen() : null);
         }
 
+        // 벽쌓기 블록은 캐릭터보다 뒤(먼저) — 캐릭터가 블록 앞에 보이게
+        if (this._wallZone) this._renderMechanic(ctx);
+
         // fly GIF (캐릭터 아래 레이어)
         this._renderSeqOverlay(ctx, false);
 
@@ -1196,6 +1579,45 @@ export default class NuriGame extends Scene {
             this._seqPlayer.renderFlow(ctx, this._W - 178, 14, { seqId: 'aerial_move' });
         }
         this.messages.render(ctx, this._W, this._H);
+        this._renderModeLabel(ctx);
+        if (this._wallGameOver) this._renderWallGameOver(ctx);
+    }
+
+    // 현재 모드 표시 (좌상단) — A 모드(전투) / B 모드(벽)
+    _renderModeLabel(ctx) {
+        const wall = this._wallZone;
+        const label = wall ? 'B 모드 · 벽' : 'A 모드 · 전투';
+        const accent = wall ? '#C2B280' : '#00E676';
+        ctx.save();
+        ctx.font = 'bold 22px sans-serif';
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        const w = ctx.measureText(label).width;
+        ctx.fillStyle = 'rgba(8,10,14,0.55)';
+        ctx.fillRect(16, 16, w + 28, 38);
+        ctx.fillStyle = accent;
+        ctx.fillRect(16, 16, 5, 38);
+        ctx.fillStyle = '#FFFCE9';
+        ctx.fillText(label, 32, 23);
+        ctx.restore();
+    }
+
+    // 벽이 화면을 꽉 채움 → 게임오버 연출(붉은 암전 + "기억이 지워졌다")
+    _renderWallGameOver(ctx) {
+        const t = Math.min((this._wallGameOverT || 0) / 800, 1);
+        ctx.save();
+        ctx.fillStyle = `rgba(60,2,8,${0.72 * t})`;
+        ctx.fillRect(0, 0, this._W, this._H);
+        ctx.globalAlpha = t;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#FF3B57';
+        ctx.font = 'bold 64px sans-serif';
+        ctx.shadowColor = '#FF3B57'; ctx.shadowBlur = 24;
+        ctx.fillText('기억이 지워졌다', this._W / 2, this._H / 2 - 20);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+        ctx.font = '24px sans-serif';
+        ctx.fillText('GAME OVER — B 키로 다시', this._W / 2, this._H / 2 + 46);
+        ctx.restore();
     }
 
     // 카메라 x 적용 drawEntity

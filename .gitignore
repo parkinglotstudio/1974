@@ -28,3 +28,12 @@ dist_nuri/
 
 # 별도 참고용 샘플 프로젝트 (자체 .git 보유, 본 repo와 무관)
 tang_sample/
+
+# 2026-10-24 projects cleanup (build outputs / backups / logs)
+.tmp*/
+backups/
+_backups/
+logs/
+*.zip
+NUL.css
+_tmp_*
